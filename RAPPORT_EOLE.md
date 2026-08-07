@@ -202,6 +202,8 @@ Hors périmètre initial :
 - Confirmation obligatoire des e-mails désactivée.
 - Politiques RLS vérifiées avec deux comptes distincts : aucune lecture ni écriture croisée n’est possible.
 - Audit Supabase Security Advisor : 0 erreur et 0 avertissement après restriction des fonctions internes.
+- Journaux Vercel contrôlés après le parcours public : réponses `200`/`304`, sans erreur applicative observée.
+- Protections HTTP ajoutées : politique de contenu, blocage des iframes, limitation des permissions et détection stricte des types de fichiers.
 - Projet GitHub relié à Vercel avec déploiement automatique de `main`.
 - Application publique : [eole-sandy.vercel.app](https://eole-sandy.vercel.app).
 - URL principale et retour `/auth/callback` de production autorisés dans Supabase.
