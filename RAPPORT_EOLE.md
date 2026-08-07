@@ -201,6 +201,7 @@ Hors périmètre initial :
 - Projet Supabase créé et migration SQL appliquée.
 - Confirmation obligatoire des e-mails désactivée.
 - Politiques RLS vérifiées avec deux comptes distincts : aucune lecture ni écriture croisée n’est possible.
+- Audit Supabase Security Advisor : 0 erreur et 0 avertissement après restriction des fonctions internes.
 - Projet GitHub relié à Vercel avec déploiement automatique de `main`.
 - Application publique : [eole-sandy.vercel.app](https://eole-sandy.vercel.app).
 - URL principale et retour `/auth/callback` de production autorisés dans Supabase.
