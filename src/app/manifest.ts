@@ -10,6 +10,9 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#f2f9fc",
     theme_color: "#f2f9fc",
     orientation: "portrait-primary",
-    icons: [{ src: "/eole-mark.svg", sizes: "any", type: "image/svg+xml" }],
+    icons: [
+      { src: "/eole-mark-192.png", sizes: "192x192", type: "image/png" },
+      { src: "/eole-mark-512.png", sizes: "512x512", type: "image/png" },
+    ],
   };
 }

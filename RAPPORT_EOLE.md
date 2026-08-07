@@ -194,17 +194,24 @@ Hors périmètre initial :
 - Mode sombre.
 - Pause pendant une séance.
 
-## 12. Étapes de mise en service
+## 12. État de mise en service
 
-1. Créer le projet Supabase et appliquer la migration SQL.
-2. Ajouter les deux variables Supabase dans `.env.local`.
-3. Désactiver la confirmation obligatoire des e-mails.
-4. Configurer un service SMTP pour la récupération de mot de passe.
-5. Tester deux comptes réels et vérifier qu’ils ne voient jamais les données l’un de l’autre.
-6. Déployer le site en HTTPS.
-7. Tester une séance complète sur un iPhone réel, écouteurs et haut-parleur.
-8. Vérifier le comportement quand l’écran se verrouille ou que le réseau tombe.
-9. Partager le lien au petit groupe prévu.
+État vérifié le 7 août 2026 :
+
+- Projet Supabase créé et migration SQL appliquée.
+- Confirmation obligatoire des e-mails désactivée.
+- Politiques RLS vérifiées avec deux comptes distincts : aucune lecture ni écriture croisée n’est possible.
+- Projet GitHub relié à Vercel avec déploiement automatique de `main`.
+- Application publique : [eole-sandy.vercel.app](https://eole-sandy.vercel.app).
+- URL principale et retour `/auth/callback` de production autorisés dans Supabase.
+- Inscription immédiate, connexion, séance complète, sauvegarde, reconnexion, statistiques et réglages vérifiés sur le site public.
+- Comptes et séances de validation supprimés après les tests.
+
+Avant le partage à des amis :
+
+1. Configurer un serveur SMTP personnalisé. Le serveur d’essai Supabase refuse les destinataires qui ne font pas partie de l’équipe du projet.
+2. Tester le son, le verrouillage de l’écran et la veille avec un iPhone physique, une fois avec écouteurs et une fois avec le haut-parleur.
+3. Faire un dernier essai de récupération de mot de passe avec une véritable boîte e-mail.
 
 ## 13. Définition de terminé
 
