@@ -196,7 +196,7 @@ Hors périmètre initial :
 
 ## 12. État de mise en service
 
-État vérifié le 7 août 2026 :
+État vérifié le 8 août 2026 :
 
 - Projet Supabase créé et migration SQL appliquée.
 - Confirmation obligatoire des e-mails désactivée.
@@ -205,6 +205,7 @@ Hors périmètre initial :
 - Journaux Vercel contrôlés après le parcours public : réponses `200`/`304`, sans erreur applicative observée.
 - Protections HTTP ajoutées : politique de contenu, blocage des iframes, limitation des permissions et détection stricte des types de fichiers.
 - Projet GitHub relié à Vercel avec déploiement automatique de `main`.
+- Fonctions Vercel exécutées à Dublin (`dub1`), dans la même zone européenne que Supabase.
 - Application publique : [eole-sandy.vercel.app](https://eole-sandy.vercel.app).
 - URL principale et retour `/auth/callback` de production autorisés dans Supabase.
 - Inscription immédiate, connexion, séance complète, sauvegarde, reconnexion, statistiques et réglages vérifiés sur le site public.
