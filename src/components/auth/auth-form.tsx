@@ -34,8 +34,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       if (mode === "signin") {
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
         if (authError) throw authError;
-        router.push("/app");
-        router.refresh();
+        openAuthenticatedApp();
+        return;
       }
       if (mode === "signup") {
         const firstName = String(form.get("firstName") ?? "").trim();
@@ -46,8 +46,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           options: { data: { first_name: firstName, username } },
         });
         if (authError) throw authError;
-        router.push("/app");
-        router.refresh();
+        openAuthenticatedApp();
+        return;
       }
       if (mode === "reset") {
         const redirectTo = `${window.location.origin}/auth/callback?next=/nouveau-mot-de-passe`;
@@ -123,4 +123,10 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       {!supabase && !isReset && !isUpdate && <p className="demo-note">Le mode aperçu ouvre directement l’application, sans créer de compte.</p>}
     </form>
   );
+}
+
+function openAuthenticatedApp() {
+  // A full load ensures the new Supabase SSR cookies are available to the protected route.
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign("/app");
 }
