@@ -4,6 +4,7 @@ import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { getFriendlyAuthError } from "@/lib/auth-errors";
 import { createClient } from "@/lib/supabase/client";
 
 type AuthMode = "signin" | "signup" | "reset" | "update";
@@ -22,7 +23,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
     setError(null);
     setMessage(null);
     const form = new FormData(event.currentTarget);
-    const email = String(form.get("email") ?? "");
+    const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
 
     if (!supabase) {
@@ -40,12 +41,13 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       if (mode === "signup") {
         const firstName = String(form.get("firstName") ?? "").trim();
         const username = String(form.get("username") ?? "").trim().toLowerCase();
-        const { error: authError } = await supabase.auth.signUp({
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { first_name: firstName, username } },
         });
         if (authError) throw authError;
+        if (!authData.session || authData.user?.identities?.length === 0) throw new Error("User already exists");
         openAuthenticatedApp();
         return;
       }
@@ -62,7 +64,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
         setTimeout(() => router.push("/app"), 900);
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Une erreur est survenue.");
+      setError(getFriendlyAuthError(caught));
     } finally {
       setPending(false);
     }
@@ -73,7 +75,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const isUpdate = mode === "update";
 
   return (
-    <form className="auth-form" onSubmit={handleSubmit}>
+    <form className="auth-form" aria-busy={pending} onSubmit={handleSubmit}>
       {isSignup && (
         <div className="form-grid-two">
           <label className="field">
@@ -82,7 +84,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           </label>
           <label className="field">
             <span>Pseudo</span>
-            <input name="username" autoComplete="username" minLength={3} maxLength={30} pattern="[A-Za-z0-9._-]+" title="Lettres, chiffres, points, tirets et tirets bas uniquement" required />
+            <input name="username" autoComplete="username" minLength={3} maxLength={30} pattern="[A-Za-z0-9._-]+" title="Lettres, chiffres, points, tirets et tirets bas uniquement" aria-describedby="username-hint" required />
+            <small className="field-hint" id="username-hint">3 à 30 caractères, sans espace.</small>
           </label>
         </div>
       )}
@@ -99,7 +102,8 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
             <input
               name="password"
               type={showPassword ? "text" : "password"}
-              autoComplete={isSignup ? "new-password" : "current-password"}
+              autoComplete={isSignup || isUpdate ? "new-password" : "current-password"}
+              aria-describedby={isSignup || isUpdate ? "password-hint" : undefined}
               minLength={8}
               required
             />
@@ -107,6 +111,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
             </button>
           </span>
+          {(isSignup || isUpdate) && <small className="field-hint" id="password-hint">8 caractères minimum.</small>}
         </label>
       )}
       {mode === "signin" && <Link className="forgot-link" href="/mot-de-passe-oublie">Mot de passe oublié ?</Link>}
@@ -127,6 +132,5 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
 function openAuthenticatedApp() {
   // A full load ensures the new Supabase SSR cookies are available to the protected route.
-  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-  window.location.assign("/app");
+  window.location.replace("/app");
 }

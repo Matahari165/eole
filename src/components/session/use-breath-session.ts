@@ -5,7 +5,7 @@ import { AudioEngine } from "@/lib/audio-engine";
 import { saveSession } from "@/lib/repository";
 import { PACE_TIMINGS, type BreathSession, type RoundResult, type SessionConfig, type SoundSettings } from "@/lib/types";
 
-export type SessionPhase = "ready" | "inhale" | "exhale" | "retention" | "recovery-inhale" | "recovery-hold" | "recovery-exhale" | "saving" | "complete" | "error";
+export type SessionPhase = "ready" | "starting" | "inhale" | "exhale" | "retention" | "recovery-inhale" | "recovery-hold" | "recovery-exhale" | "saving" | "complete" | "error";
 
 export function useBreathSession(config: SessionConfig, settings: SoundSettings) {
   const [phase, setPhase] = useState<SessionPhase>("ready");
@@ -20,6 +20,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const retentionStartedRef = useRef(0);
   const pendingRetentionRef = useRef(0);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const persistingRef = useRef(false);
   const initialSettingsRef = useRef(settings);
 
   useEffect(() => {
@@ -38,14 +39,42 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   }, [settings.hapticsEnabled]);
 
   const start = useCallback(async () => {
-    await audioRef.current?.unlock();
-    audioRef.current?.startAmbient();
+    if (startedAtRef.current) return;
+    setPhase("starting");
+    try {
+      await audioRef.current?.unlock();
+      audioRef.current?.startAmbient();
+    } catch {
+      // La séance reste utilisable sans son si Web Audio est indisponible.
+    }
     startedAtRef.current = new Date().toISOString();
     if ("wakeLock" in navigator) {
       try { wakeLockRef.current = await navigator.wakeLock.request("screen"); } catch { /* Not supported or denied. */ }
     }
     setPhase("inhale");
   }, []);
+
+  const sessionInProgress = !["ready", "complete", "error"].includes(phase);
+  useEffect(() => {
+    if (!sessionInProgress) return;
+    const preventAccidentalExit = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = true;
+    };
+    window.addEventListener("beforeunload", preventAccidentalExit);
+    return () => window.removeEventListener("beforeunload", preventAccidentalExit);
+  }, [sessionInProgress]);
+
+  const sessionNeedsWakeLock = !["ready", "starting", "saving", "complete", "error"].includes(phase);
+  useEffect(() => {
+    if (!sessionNeedsWakeLock) return;
+    const restoreWakeLock = async () => {
+      if (document.visibilityState !== "visible" || !("wakeLock" in navigator) || !wakeLockRef.current?.released) return;
+      try { wakeLockRef.current = await navigator.wakeLock.request("screen"); } catch { /* Non pris en charge ou refusé. */ }
+    };
+    document.addEventListener("visibilitychange", restoreWakeLock);
+    return () => document.removeEventListener("visibilitychange", restoreWakeLock);
+  }, [sessionNeedsWakeLock]);
 
   useEffect(() => {
     if (phase !== "inhale" && phase !== "exhale") return;
@@ -106,13 +135,8 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   }, [cue, phase, recoverySeconds]);
 
   const persist = useCallback(async (status: BreathSession["status"], completedResults: RoundResult[]) => {
-    if (!completedResults.length || !startedAtRef.current) {
-      audioRef.current?.stopAmbient();
-      void wakeLockRef.current?.release();
-      setPhase("complete");
-      return;
-    }
-    setPhase("saving");
+    if (persistingRef.current || !startedAtRef.current) return;
+    persistingRef.current = true;
     const session: BreathSession = {
       id: crypto.randomUUID(),
       status,
@@ -123,18 +147,40 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
       completedAt: new Date().toISOString(),
       rounds: completedResults,
     };
+    setSavedSession(session);
+    if (!completedResults.length) {
+      audioRef.current?.stopAmbient();
+      void wakeLockRef.current?.release();
+      persistingRef.current = false;
+      setPhase("complete");
+      return;
+    }
+    setPhase("saving");
     try {
       await saveSession(session);
-      setSavedSession(session);
       setPhase("complete");
     } catch {
-      setSavedSession(session);
       setPhase("error");
     } finally {
+      persistingRef.current = false;
       audioRef.current?.stopAmbient();
       void wakeLockRef.current?.release();
     }
   }, [config]);
+
+  const retrySave = useCallback(async () => {
+    if (!savedSession || !savedSession.rounds.length || persistingRef.current) return;
+    persistingRef.current = true;
+    setPhase("saving");
+    try {
+      await saveSession(savedSession);
+      setPhase("complete");
+    } catch {
+      setPhase("error");
+    } finally {
+      persistingRef.current = false;
+    }
+  }, [savedSession]);
 
   useEffect(() => {
     if (phase !== "recovery-exhale") return;
@@ -157,5 +203,5 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     void persist("stopped", results);
   }, [persist, results]);
 
-  return { phase, round, breath, retentionSeconds, recoverySeconds, results, savedSession, start, stop, endRetention };
+  return { phase, round, breath, retentionSeconds, recoverySeconds, results, savedSession, start, stop, endRetention, retrySave };
 }

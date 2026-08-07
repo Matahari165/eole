@@ -23,12 +23,12 @@ export function DashboardOverview() {
   }, []);
 
   if (error) {
-    return <div className="state-card" role="alert"><h1>Impossible de charger ton espace.</h1><p>Vérifie ta connexion puis recharge la page.</p></div>;
+    return <div className="state-card" role="alert"><h1>Impossible de charger ton espace.</h1><p>Vérifie ta connexion puis réessaie.</p><button className="button button-primary" type="button" onClick={() => window.location.reload()}>Réessayer</button></div>;
   }
   if (!profile || !sessions) return <DashboardSkeleton />;
 
   const stats = calculateStats(sessions);
-  const last = sessions[0];
+  const last = sessions.find((session) => session.rounds.length > 0);
   const nextMilestone = Math.ceil((stats.maxRetention + 1) / 15) * 15;
 
   return (

@@ -29,6 +29,17 @@ const sessions: BreathSession[] = [
   },
 ];
 
+const emptySession: BreathSession = {
+  id: "empty",
+  status: "stopped",
+  plannedRounds: 3,
+  breathsPerRound: 35,
+  pace: "normal",
+  startedAt: "2026-08-07T10:00:00.000Z",
+  completedAt: "2026-08-07T10:01:00.000Z",
+  rounds: [],
+};
+
 describe("calculateStats", () => {
   it("calcule les indicateurs à partir des rounds terminés", () => {
     const stats = calculateStats(sessions, new Date(2026, 7, 7));
@@ -44,9 +55,10 @@ describe("calculateStats", () => {
 
 describe("buildDailySeries", () => {
   it("génère aussi les jours sans séance", () => {
-    const series = buildDailySeries(sessions, 3, new Date(2026, 7, 7));
+    const series = buildDailySeries([...sessions, emptySession], 3, new Date(2026, 7, 7));
     expect(series).toHaveLength(3);
     expect(series.map((day) => day.sessions)).toEqual([0, 1, 1]);
+    expect(series[0].averageRetention).toBeNull();
     expect(series[1].averageRetention).toBe(90);
   });
 });

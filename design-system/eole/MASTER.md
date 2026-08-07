@@ -19,30 +19,27 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#0284C7` | `--color-primary` |
+| Primary | `#087D9D` | `--color-primary` |
 | On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#06B6D4` | `--color-secondary` |
-| Accent/CTA | `#0891B2` | `--color-accent` |
-| Background | `#F0F9FF` | `--color-background` |
-| Foreground | `#0F172A` | `--color-foreground` |
-| Muted | `#EFF7FB` | `--color-muted` |
-| Border | `#E0F0F8` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| Ring | `#0284C7` | `--color-ring` |
+| Secondary | `#35B7CA` | `--color-secondary` |
+| Accent/CTA | `#7FD4DC` | `--color-accent` |
+| Background | `#F2F9FC` | `--color-background` |
+| Surface | `#FFFFFF` | `--color-surface` |
+| Surface soft | `#EAF6F9` | `--color-surface-soft` |
+| Foreground | `#102F3B` | `--color-foreground` |
+| Muted text | `#59737D` | `--color-muted` |
+| Border | `#D9E9EE` | `--color-border` |
+| Destructive | `#B64343` | `--color-danger` |
+| Ring | `#087D9D` | `--color-ring` |
 
 **Color Notes:** Refreshing blue + water cyan
 
 ### Typography
 
-- **Heading Font:** Lora
-- **Body Font:** Raleway
+- **Heading Font:** Iowan Old Style, puis Palatino/Georgia
+- **Body Font:** Avenir Next, puis Avenir/Segoe UI
 - **Mood:** calm, wellness, health, relaxing, natural, organic
-- **Google Fonts:** [Lora + Raleway](https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap)
-
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
-```
+- **Chargement:** polices système uniquement, pour un affichage immédiat et sans dépendance réseau.
 
 ### Spacing Variables
 
@@ -76,7 +73,7 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #0891B2;
+  background: #087D9D;
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -92,9 +89,9 @@
 
 /* Secondary Button */
 .btn-secondary {
-  background: transparent;
-  color: #0284C7;
-  border: 2px solid #0284C7;
+  background: #EAF6F9;
+  color: #075E77;
+  border: 1px solid #D9E9EE;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -107,7 +104,8 @@
 
 ```css
 .card {
-  background: #F0F9FF;
+  background: #FFFFFF;
+  border: 1px solid #D9E9EE;
   border-radius: 12px;
   padding: 24px;
   box-shadow: var(--shadow-md);
@@ -126,16 +124,16 @@
 ```css
 .input {
   padding: 12px 16px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #D9E9EE;
   border-radius: 8px;
   font-size: 16px;
   transition: border-color 200ms ease;
 }
 
 .input:focus {
-  border-color: #0284C7;
+  border-color: #087D9D;
   outline: none;
-  box-shadow: 0 0 0 3px #0284C720;
+  box-shadow: 0 0 0 3px #087D9D33;
 }
 ```
 

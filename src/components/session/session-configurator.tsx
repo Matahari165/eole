@@ -46,8 +46,8 @@ export function SessionConfigurator() {
           <p className="eyebrow">Ta séance</p>
           <h2>{rounds} round{rounds > 1 ? "s" : ""}</h2>
           <div className="preview-details"><span>{breaths} respirations</span><span>Rétention libre</span><span>Récupération 15 s</span></div>
-          <button className="button button-primary button-wide" type="button" onClick={start}>Commencer maintenant <ArrowRight size={18} aria-hidden="true" /></button>
-          <p className="preview-note">La séance démarre dès que tu appuies. Aucun compte à rebours.</p>
+          <button className="button button-primary button-wide" type="button" onClick={start}>Continuer <ArrowRight size={18} aria-hidden="true" /></button>
+          <p className="preview-note">Sur l’écran suivant, touche « Commencer » quand tu es installé. Aucun compte à rebours.</p>
         </aside>
       </div>
     </div>

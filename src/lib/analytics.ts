@@ -50,7 +50,7 @@ export function buildDailySeries(sessions: BreathSession[], days: number, today 
     const date = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     date.setDate(date.getDate() - (days - index - 1));
     const key = localDateKey(date);
-    const matching = sessions.filter((session) => localDateKey(session.completedAt) === key);
+    const matching = sessions.filter((session) => session.rounds.length > 0 && localDateKey(session.completedAt) === key);
     const retentions = matching.flatMap((session) => session.rounds.map((round) => round.retentionSeconds));
 
     return {
@@ -59,7 +59,7 @@ export function buildDailySeries(sessions: BreathSession[], days: number, today 
       sessions: matching.length,
       averageRetention: retentions.length
         ? Math.round(retentions.reduce((sum, value) => sum + value, 0) / retentions.length)
-        : 0,
+        : null,
     };
   });
 }

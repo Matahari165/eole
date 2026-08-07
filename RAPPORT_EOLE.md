@@ -211,6 +211,18 @@ Hors périmètre initial :
 - Inscription immédiate, connexion, séance complète, sauvegarde, reconnexion, statistiques et réglages vérifiés sur le site public.
 - Comptes et séances de validation supprimés après les tests.
 
+Passe UX mobile du 8 août 2026 :
+
+- Parcours rejoués en portrait et paysage sur des formats iPhone, puis sur Mac.
+- Navigation basse, marges de sécurité de l’iPhone et zones tactiles d’au moins 44 px.
+- Geste de retour et fermeture protégés pendant une séance, avec confirmation avant l’arrêt.
+- États distincts pour la préparation du son, l’enregistrement, l’échec, l’arrêt et la fin normale.
+- Résultats conservés à l’écran si la sauvegarde échoue, avec un bouton pour réessayer.
+- Statistiques sans faux zéros les jours sans séance et écran vide centré sur la prochaine action utile.
+- Messages de connexion traduits en français sans exposer les erreurs techniques du serveur.
+- Sons respiratoires préparés à l’avance pour éviter les saccades pendant l’animation.
+- Contrastes, libellés des graphiques, navigation active et réduction des animations améliorés pour l’accessibilité.
+
 Avant le partage à des amis :
 
 1. Configurer un serveur SMTP personnalisé. Le serveur d’essai Supabase refuse les destinataires qui ne font pas partie de l’équipe du projet.

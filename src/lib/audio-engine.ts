@@ -14,6 +14,8 @@ const TRACK_FREQUENCIES: Record<SoundSettings["musicTrack"], number[]> = {
 export class AudioEngine {
   private context: AudioContext | null = null;
   private ambient: AmbientNodes | null = null;
+  private noiseBuffers = new Map<number, AudioBuffer[]>();
+  private noiseCursor = 0;
   private settings: SoundSettings;
 
   constructor(settings: SoundSettings) {
@@ -23,6 +25,7 @@ export class AudioEngine {
   async unlock() {
     this.context ??= new AudioContext();
     if (this.context.state === "suspended") await this.context.resume();
+    if (this.settings.breathVolume > 0) [1250, 2000, 2200, 3000].forEach((duration) => this.getNoiseBuffers(duration));
   }
 
   updateSettings(settings: SoundSettings) {
@@ -68,15 +71,9 @@ export class AudioEngine {
 
   playBreath(direction: "inhale" | "exhale", durationMs: number) {
     if (!this.context || this.settings.breathVolume === 0) return;
-    const sampleCount = Math.floor(this.context.sampleRate * (durationMs / 1000));
-    const buffer = this.context.createBuffer(1, sampleCount, this.context.sampleRate);
-    const channel = buffer.getChannelData(0);
-    let last = 0;
-    for (let index = 0; index < sampleCount; index += 1) {
-      const white = Math.random() * 2 - 1;
-      last = last * 0.82 + white * 0.18;
-      channel[index] = last;
-    }
+    const buffers = this.getNoiseBuffers(durationMs);
+    const buffer = buffers[this.noiseCursor % buffers.length];
+    this.noiseCursor += 1;
 
     const source = this.context.createBufferSource();
     const filter = this.context.createBiquadFilter();
@@ -118,5 +115,27 @@ export class AudioEngine {
     this.stopAmbient();
     void this.context?.close();
     this.context = null;
+    this.noiseBuffers.clear();
+  }
+
+  private getNoiseBuffers(durationMs: number) {
+    const existing = this.noiseBuffers.get(durationMs);
+    if (existing) return existing;
+    const context = this.context;
+    if (!context) throw new Error("Audio context unavailable");
+    const sampleCount = Math.floor(context.sampleRate * (durationMs / 1000));
+    const buffers = Array.from({ length: 3 }, () => {
+      const buffer = context.createBuffer(1, sampleCount, context.sampleRate);
+      const channel = buffer.getChannelData(0);
+      let last = 0;
+      for (let index = 0; index < sampleCount; index += 1) {
+        const white = Math.random() * 2 - 1;
+        last = last * 0.82 + white * 0.18;
+        channel[index] = last;
+      }
+      return buffer;
+    });
+    this.noiseBuffers.set(durationMs, buffers);
+    return buffers;
   }
 }

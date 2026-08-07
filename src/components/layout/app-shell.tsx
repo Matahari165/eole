@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, CircleUserRound, House, Settings, Wind } from "lucide-react";
+import { BarChart3, House, Settings, Wind } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Brand } from "@/components/layout/brand";
@@ -28,17 +28,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {links.map(({ href, label, icon: Icon, exact }) => {
             const active = exact ? pathname === href : pathname.startsWith(href);
             return (
-              <Link className="side-link" data-active={active} href={href} key={href}>
+              <Link className="side-link" data-active={active} aria-current={active ? "page" : undefined} href={href} key={href}>
                 <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
                 <span>{label}</span>
               </Link>
             );
           })}
         </nav>
-        <div className="sidebar-profile">
-          <CircleUserRound size={22} aria-hidden="true" />
-          <span>Mon espace</span>
-        </div>
       </aside>
       <main className="app-main" id="main-content">
         {!isSupabaseConfigured() && (
@@ -52,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {links.map(({ href, label, icon: Icon, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
-            <Link className="bottom-link" data-active={active} href={href} key={href}>
+            <Link className="bottom-link" data-active={active} aria-current={active ? "page" : undefined} href={href} key={href}>
               <Icon size={22} strokeWidth={active ? 2.3 : 1.8} aria-hidden="true" />
               <span>{label}</span>
             </Link>
