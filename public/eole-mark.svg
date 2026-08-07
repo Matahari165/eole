@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Eole</title>
+  <rect width="128" height="128" rx="30" fill="#e7f7fb"/>
+  <path d="M25 70c13-24 27-37 42-37 20 0 32 17 36 35-12-10-23-14-34-12-14 2-26 9-44 14Z" fill="#35b7ca" opacity=".82"/>
+  <path d="M24 75c17-9 31-13 44-12 14 1 25 7 36 17-14 13-28 19-42 17-16-2-29-10-38-22Z" fill="#087d9d"/>
+  <path d="M44 72c12-7 25-8 37-2" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".88"/>
+</svg>
