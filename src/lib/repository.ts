@@ -10,6 +10,7 @@ import {
 } from "@/lib/types";
 
 const DEMO_SESSION_KEY = "eole-demo-sessions";
+const DEMO_DELETED_SESSION_KEY = "eole-demo-deleted-sessions";
 const DEMO_SETTINGS_KEY = "eole-demo-settings";
 
 interface RawRound {
@@ -32,7 +33,15 @@ interface RawSession {
 function readDemoSessions() {
   if (typeof window === "undefined") return demoSessions;
   const saved = window.localStorage.getItem(DEMO_SESSION_KEY);
-  return saved ? ([...JSON.parse(saved), ...demoSessions] as BreathSession[]) : demoSessions;
+  const deleted = readDeletedDemoSessionIds();
+  const sessions = saved ? ([...JSON.parse(saved), ...demoSessions] as BreathSession[]) : demoSessions;
+  return sessions.filter((session) => !deleted.has(session.id));
+}
+
+function readDeletedDemoSessionIds() {
+  if (typeof window === "undefined") return new Set<string>();
+  const saved = window.localStorage.getItem(DEMO_DELETED_SESSION_KEY);
+  return new Set<string>(saved ? JSON.parse(saved) : []);
 }
 
 export async function getProfile(): Promise<UserProfile> {
@@ -89,6 +98,21 @@ export async function saveSession(session: BreathSession) {
     p_completed_at: session.completedAt,
     p_rounds: session.rounds,
   });
+  if (error) throw error;
+}
+
+export async function deleteSession(sessionId: string) {
+  const supabase = createClient();
+  if (!supabase) {
+    if (typeof window === "undefined") return;
+    const existing = JSON.parse(window.localStorage.getItem(DEMO_SESSION_KEY) ?? "[]") as BreathSession[];
+    window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(existing.filter((session) => session.id !== sessionId)));
+    const deleted = readDeletedDemoSessionIds();
+    deleted.add(sessionId);
+    window.localStorage.setItem(DEMO_DELETED_SESSION_KEY, JSON.stringify([...deleted]));
+    return;
+  }
+  const { error } = await supabase.from("sessions").delete().eq("id", sessionId);
   if (error) throw error;
 }
 

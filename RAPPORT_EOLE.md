@@ -86,6 +86,7 @@ Aucun ressenti, commentaire personnel ou donnée sociale n’est demandé.
 - Rétention moyenne par jour sur 7 ou 30 jours.
 - Nombre de sessions par jour.
 - Historique récent et résultat de chaque round.
+- Suppression individuelle d’une séance depuis l’historique, avec confirmation et retrait des statistiques.
 
 Les séries quotidiennes et records servent de repères motivants. Le ton reste calme et ne pénalise jamais une interruption de série.
 
@@ -106,7 +107,7 @@ Les séries quotidiennes et records servent de repères motivants. Le ton reste 
 - **Supabase Auth** pour les comptes e-mail et mot de passe.
 - **PostgreSQL Supabase** pour les profils, réglages, séances et rounds.
 - Sessions de connexion conservées dans des cookies via `@supabase/ssr`.
-- Politiques RLS : toutes les lectures et écritures sont limitées au propriétaire connecté.
+- Politiques RLS : toutes les lectures et écritures sont limitées au propriétaire connecté. La suppression de séance ajoute la même protection dans la migration dédiée.
 
 ### Modèle de données
 
@@ -210,6 +211,7 @@ Hors périmètre initial :
 - URL principale et retour `/auth/callback` de production autorisés dans Supabase.
 - Inscription immédiate, connexion, séance complète, sauvegarde, reconnexion, statistiques et réglages vérifiés sur le site public.
 - Comptes et séances de validation supprimés après les tests.
+- Suppression individuelle d’une séance implémentée dans l’interface et le dépôt local ; la migration `20260808100000_allow_session_deletion.sql` doit être appliquée à Supabase avant la mise en production de cette fonction.
 
 Passe UX mobile du 8 août 2026 :
 

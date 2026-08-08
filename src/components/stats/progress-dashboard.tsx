@@ -1,20 +1,70 @@
 "use client";
 
-import { ArrowRight, CalendarRange, Clock3, Layers3, Wind } from "lucide-react";
+import { ArrowRight, CalendarRange, Clock3, Layers3, LoaderCircle, Trash2, Wind, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SummaryCards } from "@/components/stats/summary-cards";
 import { buildDailySeries, calculateStats, formatDuration } from "@/lib/analytics";
-import { getSessions } from "@/lib/repository";
+import { deleteSession, getSessions } from "@/lib/repository";
 import type { BreathSession } from "@/lib/types";
 
 export function ProgressDashboard() {
   const [sessions, setSessions] = useState<BreathSession[] | null>(null);
   const [period, setPeriod] = useState<7 | 30>(7);
   const [error, setError] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<BreathSession | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteNotice, setDeleteNotice] = useState("");
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => { getSessions().then(setSessions).catch(() => setError(true)); }, []);
+  useEffect(() => {
+    const dialog = deleteDialogRef.current;
+    if (!dialog) return;
+    if (deleteTarget) {
+      if (!dialog.open) dialog.showModal();
+      cancelDeleteRef.current?.focus();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [deleteTarget]);
+
+  function requestDelete(session: BreathSession, event: MouseEvent<HTMLButtonElement>) {
+    deleteTriggerRef.current = event.currentTarget;
+    setDeleteError(null);
+    setDeleteNotice("");
+    setDeleteTarget(session);
+  }
+
+  function cancelDelete() {
+    if (deletingId) return;
+    const trigger = deleteTriggerRef.current;
+    setDeleteTarget(null);
+    setDeleteError(null);
+    window.setTimeout(() => trigger?.focus(), 0);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || deletingId) return;
+    const sessionId = deleteTarget.id;
+    setDeletingId(sessionId);
+    setDeleteError(null);
+    try {
+      await deleteSession(sessionId);
+      setSessions((current) => current?.filter((session) => session.id !== sessionId) ?? current);
+      setDeleteNotice("Séance supprimée de ton historique.");
+      setDeleteTarget(null);
+    } catch {
+      setDeleteError("La séance n’a pas pu être supprimée. Vérifie ta connexion puis réessaie.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (error) return <div className="state-card" role="alert"><h1>Les statistiques sont indisponibles.</h1><p>Vérifie ta connexion puis réessaie.</p><button className="button button-primary" type="button" onClick={() => window.location.reload()}>Réessayer</button></div>;
   if (!sessions) return <div className="page-stack" aria-busy="true" aria-label="Chargement des statistiques"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-hero" /></div>;
 
@@ -27,6 +77,7 @@ export function ProgressDashboard() {
   if (!stats.sessionCount) {
     return (
       <div className="page-stack stats-page">
+        {deleteNotice && <p className="sr-only" role="status">{deleteNotice}</p>}
         <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1><p>Tes tendances apparaîtront après ton premier round terminé.</p></div></header>
         <section className="content-card stats-empty-card">
           <span className="empty-state-icon"><Wind size={28} strokeWidth={1.7} aria-hidden="true" /></span>
@@ -40,6 +91,7 @@ export function ProgressDashboard() {
 
   return (
     <div className="page-stack stats-page">
+      {deleteNotice && <p className="sr-only" role="status">{deleteNotice}</p>}
       <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1><p>Observe les tendances sans transformer la pratique en compétition.</p></div><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></header>
       <SummaryCards stats={stats} />
 
@@ -57,10 +109,26 @@ export function ProgressDashboard() {
 
       <section className="content-card history-card">
         <div className="section-heading"><div><p className="eyebrow">Historique</p><h2>Dernières séances</h2></div></div>
-        {recent.length ? <div className="history-list">{recent.map((session) => <article key={session.id}><div><strong>{new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" }).format(new Date(session.completedAt))}</strong><span>{session.rounds.length} / {session.plannedRounds} round{session.plannedRounds > 1 ? "s" : ""} · {session.status === "stopped" ? "arrêtée" : "terminée"}</span></div><div className="retention-chips">{session.rounds.map((round) => <span key={round.roundIndex}>R{round.roundIndex} <strong>{formatDuration(round.retentionSeconds)}</strong></span>)}</div></article>)}</div> : <p className="empty-copy">Termine un round pour commencer ton historique.</p>}
+        {recent.length ? <div className="history-list" role="list">{recent.map((session) => {
+          const dateLabel = formatSessionDate(session.completedAt);
+          const isDeleting = deletingId === session.id;
+          return <article key={session.id} role="listitem"><div className="history-main"><strong>{dateLabel}</strong><span>{session.rounds.length} / {session.plannedRounds} round{session.plannedRounds > 1 ? "s" : ""} · {session.status === "stopped" ? "arrêtée" : "terminée"}</span></div><div className="retention-chips">{session.rounds.map((round) => <span key={round.roundIndex}>R{round.roundIndex} <strong>{formatDuration(round.retentionSeconds)}</strong></span>)}</div><button className="history-delete" type="button" disabled={Boolean(deletingId)} onClick={(event) => requestDelete(session, event)} aria-label={`Supprimer la séance du ${dateLabel}`} title="Supprimer cette séance">{isDeleting ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Trash2 size={18} aria-hidden="true" />}</button></article>;
+        })}</div> : <p className="empty-copy">Termine un round pour commencer ton historique.</p>}
       </section>
+      <dialog className="confirm-dialog history-delete-dialog" ref={deleteDialogRef} onCancel={(event) => { if (deletingId) event.preventDefault(); else cancelDelete(); }}>
+        <button className="dialog-close" type="button" onClick={cancelDelete} aria-label="Fermer" disabled={Boolean(deletingId)}><X size={20} aria-hidden="true" /></button>
+        <p className="eyebrow">Historique</p>
+        <h2>Supprimer cette séance&nbsp;?</h2>
+        <p>{deleteTarget ? `La séance du ${formatSessionDate(deleteTarget.completedAt)} et ses ${deleteTarget.rounds.length} round${deleteTarget.rounds.length > 1 ? "s" : ""} seront retirés de ton historique et de tes statistiques. Cette action est définitive.` : ""}</p>
+        {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
+        <div><button className="button button-secondary" type="button" onClick={cancelDelete} ref={cancelDeleteRef} disabled={Boolean(deletingId)}>Garder</button><button className="button button-danger" type="button" onClick={confirmDelete} disabled={Boolean(deletingId)}>{deletingId ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Trash2 size={17} aria-hidden="true" />}{deletingId ? "Suppression…" : "Supprimer"}</button></div>
+      </dialog>
     </div>
   );
+}
+
+function formatSessionDate(value: string) {
+  return new Intl.DateTimeFormat("fr-FR", { weekday: "short", day: "numeric", month: "short" }).format(new Date(value));
 }
 
 function RetentionTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value?: number | null }>; label?: string }) {

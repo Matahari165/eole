@@ -222,6 +222,11 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 .retention-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
 .retention-chips span { padding: .35rem .5rem; border-radius: 7px; color: var(--color-muted); background: var(--color-surface-soft); font-size: .75rem; }
 .retention-chips strong { color: var(--color-foreground); }
+.history-delete { width: 44px; height: 44px; flex: 0 0 auto; border: 1px solid transparent; border-radius: 50%; display: grid; place-items: center; color: var(--color-danger); cursor: pointer; background: transparent; }
+.history-delete:disabled { cursor: wait; opacity: .62; }
+.history-delete-dialog > p:not(.eyebrow):not(.form-error) { max-width: 360px; }
+.history-delete-dialog .form-error { margin: .6rem 0 1rem; }
+.history-delete-dialog > div { justify-content: flex-end; flex-wrap: wrap; }
 
 .settings-layout { display: grid; grid-template-columns: 1.4fr .75fr; align-items: start; gap: 1rem; }
 .settings-side { display: grid; gap: 1rem; }
@@ -309,6 +314,7 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 @media (hover: hover) {
   .button:hover { transform: translateY(-1px); }
   .button-primary:hover { background: var(--color-primary-strong); }
+  .history-delete:hover { border-color: #f0caca; background: #fff3f3; }
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -370,7 +376,10 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
   .period-control { justify-self: start; }
   .chart-card, .history-card { padding: 1rem .8rem; }
   .chart-wrap { height: 260px; }
-  .history-list article { align-items: flex-start; flex-direction: column; }
+  .history-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+  .history-list article > div:first-child { min-width: 0; }
+  .history-list article .retention-chips { grid-column: 1; justify-content: flex-start; }
+  .history-list article .history-delete { grid-column: 2; grid-row: 1; }
   .retention-chips { justify-content: flex-start; }
   .track-grid { grid-template-columns: 1fr; }
   .track-option { min-height: 92px; padding-left: 45%; }
