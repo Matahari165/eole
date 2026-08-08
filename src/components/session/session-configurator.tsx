@@ -62,7 +62,7 @@ export function SessionConfigurator() {
           <p className="eyebrow">Ta séance</p>
           <h2>{rounds} round{rounds > 1 ? "s" : ""}</h2>
           <div className="preview-details"><span>{breaths} respirations</span><span>Rétention libre</span><span>Récupération 15 s</span></div>
-          <p className="preview-note">Le bouton « Lancer » reste accessible en haut de la page. Aucun compte à rebours.</p>
+          <p className="preview-note">Le bouton « Lancer » reste accessible en haut de la page. Après le clic, un compte à rebours sonore de 3 secondes lance directement le premier souffle.</p>
         </aside>
       </div>
     </div>

@@ -5,10 +5,11 @@ import { AudioEngine } from "@/lib/audio-engine";
 import { saveSession } from "@/lib/repository";
 import { PACE_TIMINGS, type BreathSession, type RoundResult, type SessionConfig, type SoundSettings } from "@/lib/types";
 
-export type SessionPhase = "ready" | "starting" | "inhale" | "exhale" | "retention" | "recovery-inhale" | "recovery-hold" | "recovery-exhale" | "saving" | "complete" | "error";
+export type SessionPhase = "ready" | "starting" | "countdown" | "inhale" | "exhale" | "retention" | "recovery-inhale" | "recovery-hold" | "recovery-exhale" | "saving" | "complete" | "error";
 
 export function useBreathSession(config: SessionConfig, settings: SoundSettings) {
   const [phase, setPhase] = useState<SessionPhase>("ready");
+  const [countdownSeconds, setCountdownSeconds] = useState(3);
   const [round, setRound] = useState(1);
   const [breath, setBreath] = useState(1);
   const [retentionSeconds, setRetentionSeconds] = useState(0);
@@ -16,7 +17,9 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const [results, setResults] = useState<RoundResult[]>([]);
   const [savedSession, setSavedSession] = useState<BreathSession | null>(null);
   const audioRef = useRef<AudioEngine | null>(null);
+  const audioStartCancelledRef = useRef(false);
   const startedAtRef = useRef<string | null>(null);
+  const startingRef = useRef(false);
   const retentionStartedRef = useRef(0);
   const pendingRetentionRef = useRef(0);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -39,19 +42,26 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   }, [settings.hapticsEnabled]);
 
   const start = useCallback(async () => {
-    if (startedAtRef.current) return;
+    if (startedAtRef.current || startingRef.current) return;
+    startingRef.current = true;
+    audioStartCancelledRef.current = false;
     setPhase("starting");
-    try {
-      await audioRef.current?.unlock();
-      audioRef.current?.startAmbient();
-    } catch {
-      // La séance reste utilisable sans son si Web Audio est indisponible.
+    const audio = audioRef.current;
+    if (audio) {
+      void audio.unlock()
+        .then(() => {
+          if (!audioStartCancelledRef.current) audio.startAmbient();
+        })
+        .catch(() => {
+          // La séance reste utilisable sans son si Web Audio est indisponible.
+        });
     }
     startedAtRef.current = new Date().toISOString();
     if ("wakeLock" in navigator) {
       try { wakeLockRef.current = await navigator.wakeLock.request("screen"); } catch { /* Not supported or denied. */ }
     }
-    setPhase("inhale");
+    setCountdownSeconds(3);
+    setPhase("countdown");
   }, []);
 
   const sessionInProgress = !["ready", "complete", "error"].includes(phase);
@@ -77,6 +87,31 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   }, [sessionNeedsWakeLock]);
 
   useEffect(() => {
+    if (phase !== "countdown") return;
+    cue(countdownSeconds === 1 ? 620 : 480);
+    const timeout = window.setTimeout(() => {
+      if (countdownSeconds <= 1) {
+        setBreath(1);
+        setPhase("inhale");
+      } else {
+        setCountdownSeconds((value) => value - 1);
+      }
+    }, 1000);
+    return () => window.clearTimeout(timeout);
+  }, [countdownSeconds, cue, phase]);
+
+  const beginRetention = useCallback(() => {
+    retentionStartedRef.current = performance.now();
+    setRetentionSeconds(0);
+    cue(430);
+    setPhase("retention");
+  }, [cue]);
+
+  const skipToRetention = useCallback(() => {
+    if (phase === "inhale" || phase === "exhale") beginRetention();
+  }, [beginRetention, phase]);
+
+  useEffect(() => {
     if (phase !== "inhale" && phase !== "exhale") return;
     const duration = PACE_TIMINGS[config.pace][phase];
     audioRef.current?.playBreath(phase, duration);
@@ -84,17 +119,14 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
       if (phase === "inhale") {
         setPhase("exhale");
       } else if (breath >= config.breathsPerRound) {
-        retentionStartedRef.current = performance.now();
-        setRetentionSeconds(0);
-        cue(430);
-        setPhase("retention");
+        beginRetention();
       } else {
         setBreath((value) => value + 1);
         setPhase("inhale");
       }
     }, duration);
     return () => window.clearTimeout(timeout);
-  }, [breath, config.breathsPerRound, config.pace, cue, phase]);
+  }, [beginRetention, breath, config.breathsPerRound, config.pace, phase]);
 
   useEffect(() => {
     if (phase !== "retention") return;
@@ -137,6 +169,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const persist = useCallback(async (status: BreathSession["status"], completedResults: RoundResult[]) => {
     if (persistingRef.current || !startedAtRef.current) return;
     persistingRef.current = true;
+    audioStartCancelledRef.current = true;
     const session: BreathSession = {
       id: crypto.randomUUID(),
       status,
@@ -186,7 +219,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     if (phase !== "recovery-exhale") return;
     audioRef.current?.playBreath("exhale", 2000);
     const timeout = window.setTimeout(() => {
-      const completed = [...results, { roundIndex: round, breathsCompleted: config.breathsPerRound, retentionSeconds: pendingRetentionRef.current }];
+      const completed = [...results, { roundIndex: round, breathsCompleted: Math.min(breath, config.breathsPerRound), retentionSeconds: pendingRetentionRef.current }];
       setResults(completed);
       if (round >= config.rounds) {
         void persist("completed", completed);
@@ -197,11 +230,11 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
       }
     }, 2000);
     return () => window.clearTimeout(timeout);
-  }, [config.breathsPerRound, config.rounds, persist, phase, results, round]);
+  }, [breath, config.breathsPerRound, config.rounds, persist, phase, results, round]);
 
   const stop = useCallback(() => {
     void persist("stopped", results);
   }, [persist, results]);
 
-  return { phase, round, breath, retentionSeconds, recoverySeconds, results, savedSession, start, stop, endRetention, retrySave };
+  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, start, stop, endRetention, skipToRetention, retrySave };
 }

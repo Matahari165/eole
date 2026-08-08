@@ -5,16 +5,25 @@ type AmbientNodes = {
   oscillators: OscillatorNode[];
 };
 
+type BreathDirection = "inhale" | "exhale";
+
 const TRACK_FREQUENCIES: Record<SoundSettings["musicTrack"], number[]> = {
   glacier: [110, 164.81, 220],
   lagon: [130.81, 196, 261.63],
   aurore: [98, 146.83, 246.94],
 };
 
+const BREATH_AUDIO_PATHS: Record<BreathDirection, string> = {
+  inhale: "/audio/eole-inhale.mp3",
+  exhale: "/audio/eole-exhale.mp3",
+};
+
 export class AudioEngine {
   private context: AudioContext | null = null;
   private ambient: AmbientNodes | null = null;
   private noiseBuffers = new Map<number, AudioBuffer[]>();
+  private breathBuffers = new Map<BreathDirection, AudioBuffer>();
+  private breathLoadPromise: Promise<void> | null = null;
   private noiseCursor = 0;
   private settings: SoundSettings;
 
@@ -23,9 +32,10 @@ export class AudioEngine {
   }
 
   async unlock() {
+    this.setPlaybackAudioSession();
     this.context ??= new AudioContext();
     if (this.context.state === "suspended") await this.context.resume();
-    if (this.settings.breathVolume > 0) [1250, 2000, 2200, 3000].forEach((duration) => this.getNoiseBuffers(duration));
+    if (this.settings.breathVolume > 0) await this.loadBreathBuffers();
   }
 
   updateSettings(settings: SoundSettings) {
@@ -69,8 +79,14 @@ export class AudioEngine {
     this.ambient = null;
   }
 
-  playBreath(direction: "inhale" | "exhale", durationMs: number) {
+  playBreath(direction: BreathDirection, durationMs: number) {
     if (!this.context || this.settings.breathVolume === 0) return;
+    const recordedBreath = this.breathBuffers.get(direction);
+    if (recordedBreath) {
+      this.playRecordedBreath(recordedBreath, durationMs);
+      return;
+    }
+
     const buffers = this.getNoiseBuffers(durationMs);
     const buffer = buffers[this.noiseCursor % buffers.length];
     this.noiseCursor += 1;
@@ -116,6 +132,67 @@ export class AudioEngine {
     void this.context?.close();
     this.context = null;
     this.noiseBuffers.clear();
+    this.breathBuffers.clear();
+    this.breathLoadPromise = null;
+    this.restoreAudioSession();
+  }
+
+  private async loadBreathBuffers() {
+    if (this.breathLoadPromise || !this.context) return this.breathLoadPromise;
+    const context = this.context;
+    this.breathLoadPromise = (async () => {
+      await Promise.all(Object.entries(BREATH_AUDIO_PATHS).map(async ([direction, path]) => {
+        try {
+          const response = await fetch(path);
+          if (!response.ok) throw new Error(`Breath audio request failed: ${response.status}`);
+          const audioData = await response.arrayBuffer();
+          const buffer = await context.decodeAudioData(audioData);
+          this.breathBuffers.set(direction as BreathDirection, buffer);
+        } catch {
+          // Le bruit filtré reste disponible si un fichier ne se charge pas.
+        }
+      }));
+    })();
+    return this.breathLoadPromise;
+  }
+
+  private playRecordedBreath(buffer: AudioBuffer, durationMs: number) {
+    if (!this.context) return;
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    const now = this.context.currentTime;
+    const duration = durationMs / 1000;
+    const end = now + duration;
+    source.buffer = buffer;
+    source.playbackRate.setValueAtTime(buffer.duration / duration, now);
+    const volume = (this.settings.breathVolume / 100) * 0.7;
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + Math.min(0.18, duration / 4));
+    gain.gain.setValueAtTime(volume, Math.max(now + 0.19, end - Math.min(0.18, duration / 4)));
+    gain.gain.exponentialRampToValueAtTime(0.001, end);
+    source.connect(gain).connect(this.context.destination);
+    source.start(now);
+    source.stop(end + 0.02);
+  }
+
+  private setPlaybackAudioSession() {
+    const audioSession = (navigator as Navigator & { audioSession?: { type?: string } }).audioSession;
+    if (!audioSession) return;
+    try {
+      audioSession.type = "playback";
+    } catch {
+      // Les versions d’iOS sans AudioSession Web API utilisent le comportement par défaut.
+    }
+  }
+
+  private restoreAudioSession() {
+    const audioSession = (navigator as Navigator & { audioSession?: { type?: string } }).audioSession;
+    if (!audioSession) return;
+    try {
+      audioSession.type = "ambient";
+    } catch {
+      // La restauration est optionnelle et peut être refusée par le navigateur.
+    }
   }
 
   private getNoiseBuffers(durationMs: number) {

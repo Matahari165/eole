@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowRight, Check, CircleStop, LoaderCircle, RotateCcw, Volume2, X } from "lucide-react";
+import { Check, CircleStop, LoaderCircle, RotateCcw, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { formatDuration } from "@/lib/analytics";
 import { getSoundSettings } from "@/lib/repository";
 import { DEFAULT_SOUND_SETTINGS, PACE_TIMINGS, type SessionConfig, type SoundSettings } from "@/lib/types";
@@ -10,41 +10,40 @@ import { useBreathSession } from "@/components/session/use-breath-session";
 
 export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   const [settings, setSettings] = useState<SoundSettings>(DEFAULT_SOUND_SETTINGS);
-  const [settingsReady, setSettingsReady] = useState(false);
   const [settingsFallback, setSettingsFallback] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const lastSessionTapRef = useRef(0);
   const session = useBreathSession(config, settings);
+  const sessionPhase = session.phase;
+  const startSession = session.start;
 
   useEffect(() => {
     let active = true;
-    const fallbackTimer = window.setTimeout(() => {
-      if (!active) return;
-      setSettingsFallback(true);
-      setSettingsReady(true);
-    }, 2500);
     getSoundSettings()
       .then((nextSettings) => {
         if (!active) return;
         setSettings(nextSettings);
         setSettingsFallback(false);
       })
-      .catch(() => active && setSettingsFallback(true))
-      .finally(() => {
-        if (!active) return;
-        window.clearTimeout(fallbackTimer);
-        setSettingsReady(true);
-      });
+      .catch(() => active && setSettingsFallback(true));
     return () => {
       active = false;
-      window.clearTimeout(fallbackTimer);
     };
   }, []);
+
+  useEffect(() => {
+    if (sessionPhase === "ready") void startSession();
+  }, [sessionPhase, startSession]);
 
   useEffect(() => {
     if (confirmStop) dialogRef.current?.showModal();
     else dialogRef.current?.close();
   }, [confirmStop]);
+
+  useEffect(() => {
+    lastSessionTapRef.current = 0;
+  }, [sessionPhase]);
 
   const sessionInProgress = !["ready", "complete", "error"].includes(session.phase);
   useEffect(() => {
@@ -68,17 +67,17 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
     };
   }, [sessionInProgress]);
 
-  if (session.phase === "ready" || session.phase === "starting") {
-    const preparing = !settingsReady || session.phase === "starting";
+  if (session.phase === "ready" || session.phase === "starting" || session.phase === "countdown") {
+    const countdown = session.phase === "countdown";
     return (
-      <main className="session-screen session-ready">
+      <main className={`session-screen session-ready${countdown ? " session-countdown" : ""}`} aria-busy={!countdown}>
         <div className="ready-wave" aria-hidden="true"><span /><span /><span /></div>
         <div className="session-ready-content">
-          <p className="eyebrow">Round 1 sur {config.rounds}</p>
-          <h1>Ferme les yeux.<br />Laisse le rythme te guider.</h1>
-          <p><Volume2 size={17} aria-hidden="true" /> {settingsFallback ? "Le son utilisera les réglages par défaut." : "Le son démarre au toucher."}</p>
-          <button className="button button-light button-large" type="button" disabled={preparing} onClick={session.start}>{preparing ? <LoaderCircle className="spin" size={19} aria-hidden="true" /> : null}{preparing ? "Préparation…" : "Commencer"}{!preparing && <ArrowRight size={19} aria-hidden="true" />}</button>
-          <Link href="/app/session/nouvelle" replace>Modifier la séance</Link>
+          <p className="eyebrow">{countdown ? `Round 1 sur ${config.rounds}` : "Préparation"}</p>
+          <div className="countdown-orb" aria-live="polite" aria-atomic="true">{countdown ? <strong>{session.countdownSeconds}</strong> : <LoaderCircle className="spin" size={34} aria-hidden="true" />}</div>
+          <h1>{countdown ? "Installe-toi." : "Préparation…"}</h1>
+          <p>{countdown ? "Le premier souffle arrive." : "Le son se prépare en douceur."}</p>
+          {countdown && settingsFallback ? <p className="session-audio-note">Les réglages audio par défaut sont utilisés.</p> : null}
         </div>
       </main>
     );
@@ -109,16 +108,31 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
 
   const isBreathing = session.phase === "inhale" || session.phase === "exhale";
   const isRetention = session.phase === "retention";
+  const canSkipToRetention = session.phase === "inhale" || session.phase === "exhale";
+  const handleSessionPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
+    if (!canSkipToRetention) return;
+    if (event.target instanceof Element && event.target.closest("button, a, dialog")) {
+      lastSessionTapRef.current = 0;
+      return;
+    }
+    const now = performance.now();
+    if (now - lastSessionTapRef.current < 420) {
+      lastSessionTapRef.current = 0;
+      session.skipToRetention();
+      return;
+    }
+    lastSessionTapRef.current = now;
+  };
   const phaseLabel = session.phase === "inhale" ? "Inspire" : session.phase === "exhale" ? "Expire" : session.phase === "recovery-inhale" ? "Inspire profondément" : session.phase === "recovery-hold" ? "Garde l’air" : "Relâche";
   const animationDuration = session.phase === "inhale" || session.phase === "exhale"
     ? PACE_TIMINGS[config.pace][session.phase]
     : 2000;
 
   return (
-    <main className={`session-screen session-running phase-${session.phase}`}>
+    <main className={`session-screen session-running phase-${session.phase}`} onPointerUp={handleSessionPointerUp}>
       <header className="session-topbar"><span>Round {session.round} / {config.rounds}</span><button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} /></button></header>
       <div className="session-center">
-        {isBreathing && <><p className="phase-label">{phaseLabel}</p><div className="breath-orb" style={{ animationDuration: `${animationDuration / 1000}s` }} role="img" aria-label={`${phaseLabel}, respiration ${session.breath} sur ${config.breathsPerRound}`}><span className="orb-light" /><strong>{session.breath}</strong><small>sur {config.breathsPerRound}</small></div><p className="session-guidance">Suis le mouvement et le son</p></>}
+        {isBreathing && <><p className="phase-label">{phaseLabel}</p><div className="breath-orb" style={{ animationDuration: `${animationDuration / 1000}s` }} role="img" aria-label={`${phaseLabel}, respiration ${session.breath} sur ${config.breathsPerRound}`}><span className="orb-light" /><strong>{session.breath}</strong><small>sur {config.breathsPerRound}</small></div><p className="session-guidance">Suis le mouvement et le son</p><p className="session-skip-hint">Double-tape pour passer à la rétention</p></>}
         {isRetention && <><p className="phase-label">Rétention</p><button className="retention-target" type="button" onClick={session.endRetention} aria-label={`Rétention ${session.retentionSeconds} secondes. Toucher pour terminer.`}><strong>{formatClock(session.retentionSeconds)}</strong><span>Toucher pour terminer</span></button><p className="session-guidance">Reste détendu, sans forcer</p></>}
         {!isBreathing && !isRetention && <><p className="phase-label">Récupération</p><div className="recovery-orb"><strong>{session.phase === "recovery-hold" ? session.recoverySeconds : phaseLabel}</strong><small>{session.phase === "recovery-hold" ? "secondes" : ""}</small></div><p className="session-guidance">{session.phase === "recovery-hold" ? "Maintiens pendant 15 secondes" : "Suis le son"}</p></>}
       </div>

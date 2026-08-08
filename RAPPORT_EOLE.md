@@ -28,13 +28,18 @@ L’utilisateur règle :
 
 Valeurs par défaut : **3 rounds, 35 respirations, vitesse normale**.
 
-Il n’y a ni programme personnel enregistré, ni compte à rebours avant le départ.
+Il n’y a ni programme personnel enregistré. Après validation des réglages, la
+séance démarre directement avec un compte à rebours sonore de trois secondes ;
+aucune page intermédiaire ne demande de confirmer le départ.
 
 ### Déroulement d’un round
 
 1. Inspiration guidée par l’expansion de l’animation et un son respiratoire.
 2. Expiration guidée par la contraction de l’animation et un son respiratoire.
 3. Répétition jusqu’au nombre configuré, avec affichage du compteur actuel.
+   Pendant cette phase, un double-tap sur la zone de séance passe directement à
+   la rétention ; le round est enregistré avec le nombre de respirations réellement
+   effectuées.
 4. Rétention poumons vides avec chronomètre visible.
 5. L’utilisateur touche la grande zone centrale pour terminer la rétention.
 6. Grande inspiration de récupération.
@@ -53,7 +58,8 @@ L’écran reste allumé durant la séance lorsque le navigateur autorise cette 
 ## 4. Son et mouvement
 
 - Aucun guidage vocal.
-- Sons générés d’inspiration par le nez et d’expiration.
+- Sons humains d’inspiration par le nez et d’expiration, issus d'une source CC0
+  documentée dans `public/audio/SOURCES.md`.
 - Trois ambiances musicales initiales : Glacier, Lagon et Aurore.
 - Volume de la musique et volume respiratoire réglables séparément de 0 à 100 %.
 - Mettre un volume à 0 désactive la catégorie correspondante.
@@ -61,7 +67,15 @@ L’écran reste allumé durant la séance lorsque le navigateur autorise cette 
 - Animation synchronisée avec la vitesse choisie.
 - Les animations non essentielles sont fortement réduites si l’appareil demande moins de mouvement.
 
-La V1 génère ses textures sonores directement dans le navigateur. Une évolution possible consiste à faire enregistrer de vrais sons de respiration et de vraies compositions ambiantes, puis à les servir sous forme de fichiers audio optimisés.
+Les sons respiratoires sont servis comme fichiers audio locaux et joués avec Web
+Audio. L’ambiance musicale reste générée dans le navigateur afin de rester légère
+et réglable.
+
+Sur iOS 17 et les navigateurs qui exposent `navigator.audioSession`, Eole demande
+le mode `playback` pour éviter que le mode silencieux matériel coupe le son. Les
+versions plus anciennes et certains réglages système peuvent encore imposer le
+mode silencieux : une application web ne peut pas garantir ce contournement sur
+tous les iPhone.
 
 ## 5. Données et statistiques
 
@@ -219,6 +233,12 @@ Passe UX mobile du 8 août 2026 :
 - Navigation basse, marges de sécurité de l’iPhone et zones tactiles d’au moins 44 px.
 - Geste de retour et fermeture protégés pendant une séance, avec confirmation avant l’arrêt.
 - États distincts pour la préparation du son, l’enregistrement, l’échec, l’arrêt et la fin normale.
+- Démarrage direct après les réglages avec compte à rebours sonore de 3 secondes.
+- Double-tap pendant les respirations pour accéder immédiatement à la rétention.
+- Visuels de séance enrichis : changement de phase instantané, contraste plus
+  sombre à l’expiration/rétention et halos animés réduits avec `prefers-reduced-motion`.
+- Sons humains CC0 intégrés et demande de session audio `playback` sur les iPhone
+  compatibles.
 - Résultats conservés à l’écran si la sauvegarde échoue, avec un bouton pour réessayer.
 - Bouton « Lancer » placé immédiatement sous le titre sur iPhone, avec les réglages détaillés accessibles plus bas et une action persistante pendant le défilement.
 - Statistiques sans faux zéros les jours sans séance et écran vide centré sur la prochaine action utile.
@@ -229,7 +249,9 @@ Passe UX mobile du 8 août 2026 :
 Avant le partage à des amis :
 
 1. Configurer un serveur SMTP personnalisé. Le serveur d’essai Supabase refuse les destinataires qui ne font pas partie de l’équipe du projet.
-2. Tester le son, le verrouillage de l’écran et la veille avec un iPhone physique, une fois avec écouteurs et une fois avec le haut-parleur.
+2. Tester le son, le verrouillage de l’écran et la veille avec un iPhone physique,
+   une fois avec écouteurs et une fois avec le haut-parleur, notamment avec le
+   bouton silencieux activé et sur une version iOS antérieure à 17.
 3. Faire un dernier essai de récupération de mot de passe avec une véritable boîte e-mail.
 
 ## 13. Définition de terminé
