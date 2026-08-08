@@ -20,9 +20,10 @@ export function BreathingVisual({ phase, breath, total, durationMs }: { phase: B
     <>
       <p className="phase-label" aria-live="polite"><DirectionIcon size={18} strokeWidth={1.8} aria-hidden="true" />{label}</p>
       <div className="breath-stage" style={style} role="img" aria-label={`${label}, respiration ${breath} sur ${total}`}>
-        <span className="breath-flow breath-flow-one" aria-hidden="true" />
-        <span className="breath-flow breath-flow-two" aria-hidden="true" />
-        <div className="breath-orb">
+        <div className="breath-circles" aria-hidden="true">
+          <span /><span /><span /><span /><span /><span /><span />
+        </div>
+        <div className="breath-core">
           <span className="orb-light" aria-hidden="true" />
           <span className="orb-motion-icon" aria-hidden="true"><DirectionIcon size={30} strokeWidth={1.4} /></span>
           <strong>{label}</strong>
