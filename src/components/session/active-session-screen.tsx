@@ -108,17 +108,17 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
 
   const isBreathing = session.phase === "inhale" || session.phase === "exhale";
   const isRetention = session.phase === "retention";
-  const canSkipToRetention = session.phase === "inhale" || session.phase === "exhale";
+  const canEndRetention = session.phase === "retention";
   const handleSessionPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
-    if (!canSkipToRetention) return;
-    if (event.target instanceof Element && event.target.closest("button, a, dialog")) {
+    if (!canEndRetention) return;
+    if (event.target instanceof Element && event.target.closest("button:not(.retention-target), a, dialog")) {
       lastSessionTapRef.current = 0;
       return;
     }
     const now = performance.now();
     if (now - lastSessionTapRef.current < 420) {
       lastSessionTapRef.current = 0;
-      session.skipToRetention();
+      session.endRetention();
       return;
     }
     lastSessionTapRef.current = now;
@@ -132,9 +132,9 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
     <main className={`session-screen session-running phase-${session.phase}`} onPointerUp={handleSessionPointerUp}>
       <header className="session-topbar"><span>Round {session.round} / {config.rounds}</span><button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} /></button></header>
       <div className="session-center">
-        {isBreathing && <><p className="phase-label">{phaseLabel}</p><div className="breath-orb" style={{ animationDuration: `${animationDuration / 1000}s` }} role="img" aria-label={`${phaseLabel}, respiration ${session.breath} sur ${config.breathsPerRound}`}><span className="orb-light" /><strong>{session.breath}</strong><small>sur {config.breathsPerRound}</small></div><p className="session-guidance">Suis le mouvement et le son</p><p className="session-skip-hint">Double-tape pour passer à la rétention</p></>}
-        {isRetention && <><p className="phase-label">Rétention</p><button className="retention-target" type="button" onClick={session.endRetention} aria-label={`Rétention ${session.retentionSeconds} secondes. Toucher pour terminer.`}><strong>{formatClock(session.retentionSeconds)}</strong><span>Toucher pour terminer</span></button><p className="session-guidance">Reste détendu, sans forcer</p></>}
-        {!isBreathing && !isRetention && <><p className="phase-label">Récupération</p><div className="recovery-orb"><strong>{session.phase === "recovery-hold" ? session.recoverySeconds : phaseLabel}</strong><small>{session.phase === "recovery-hold" ? "secondes" : ""}</small></div><p className="session-guidance">{session.phase === "recovery-hold" ? "Maintiens pendant 15 secondes" : "Suis le son"}</p></>}
+        {isBreathing && <><p className="phase-label">{phaseLabel}</p><div className="breath-orb" style={{ animationDuration: `${animationDuration / 1000}s` }} role="img" aria-label={`${phaseLabel}, respiration ${session.breath} sur ${config.breathsPerRound}`}><span className="orb-light" /><strong>{session.breath}</strong><small>sur {config.breathsPerRound}</small></div><p className="session-guidance">Termine les {config.breathsPerRound} respirations</p></>}
+        {isRetention && <><p className="phase-label">Rétention libre</p><button className="retention-target" type="button" onClick={(event) => { if (event.detail === 0) session.endRetention(); }} aria-label={`Rétention ${session.retentionSeconds} secondes. Double-taper pour terminer.`}><strong>{formatClock(session.retentionSeconds)}</strong><span>Double-tape pour terminer</span></button><p className="session-guidance">Le minuteur continue jusqu’à ton double-tap</p></>}
+        {!isBreathing && !isRetention && <><p className="phase-label">Respiration de récupération</p><div className="recovery-orb"><strong>{session.phase === "recovery-hold" ? session.recoverySeconds : phaseLabel}</strong><small>{session.phase === "recovery-hold" ? "secondes" : ""}</small></div><p className="session-guidance">{session.phase === "recovery-hold" ? "Garde l’air jusqu’à zéro" : "Prends une grande inspiration"}</p></>}
       </div>
       <div className="round-dots" role="progressbar" aria-label="Progression des rounds" aria-valuemin={1} aria-valuemax={config.rounds} aria-valuenow={session.round}>{Array.from({ length: config.rounds }).map((_, index) => <span data-active={index + 1 <= session.round} key={index} />)}</div>
       <dialog className="confirm-dialog" ref={dialogRef} onCancel={() => setConfirmStop(false)}><button className="dialog-close" type="button" onClick={() => setConfirmStop(false)} aria-label="Fermer"><X size={20} /></button><h2>Arrêter la séance ?</h2><p>{session.results.length ? `${session.results.length} round${session.results.length > 1 ? "s" : ""} terminé${session.results.length > 1 ? "s" : ""} ${session.results.length > 1 ? "seront conservés" : "sera conservé"}.` : "Aucun round n’est encore terminé."}</p><div><button className="button button-danger" type="button" onClick={session.stop}>Arrêter</button><button className="button button-secondary" type="button" onClick={() => setConfirmStop(false)}>Continuer</button></div></dialog>

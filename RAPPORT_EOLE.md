@@ -37,11 +37,9 @@ aucune page intermédiaire ne demande de confirmer le départ.
 1. Inspiration guidée par l’expansion de l’animation et un son respiratoire.
 2. Expiration guidée par la contraction de l’animation et un son respiratoire.
 3. Répétition jusqu’au nombre configuré, avec affichage du compteur actuel.
-   Pendant cette phase, un double-tap sur la zone de séance passe directement à
-   la rétention ; le round est enregistré avec le nombre de respirations réellement
-   effectuées.
-4. Rétention poumons vides avec chronomètre visible.
-5. L’utilisateur touche la grande zone centrale pour terminer la rétention.
+4. Après la dernière expiration, rétention poumons vides avec chronomètre visible
+   et sans limite automatique.
+5. L’utilisateur double-tape n’importe où sur l’écran pour arrêter sa rétention.
 6. Grande inspiration de récupération.
 7. Maintien fixe de 15 secondes.
 8. Expiration, puis passage au round suivant.
@@ -234,7 +232,8 @@ Passe UX mobile du 8 août 2026 :
 - Geste de retour et fermeture protégés pendant une séance, avec confirmation avant l’arrêt.
 - États distincts pour la préparation du son, l’enregistrement, l’échec, l’arrêt et la fin normale.
 - Démarrage direct après les réglages avec compte à rebours sonore de 3 secondes.
-- Double-tap pendant les respirations pour accéder immédiatement à la rétention.
+- Rétention lancée automatiquement après toutes les respirations, sans durée
+  maximale ; un double-tap pendant la rétention arrête le chronomètre.
 - Visuels de séance enrichis : changement de phase instantané, contraste plus
   sombre à l’expiration/rétention et halos animés réduits avec `prefers-reduced-motion`.
 - Sons humains CC0 intégrés et demande de session audio `playback` sur les iPhone

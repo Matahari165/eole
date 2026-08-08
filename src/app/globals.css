@@ -165,7 +165,7 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 .countdown-orb { width: min(44vw, 210px); aspect-ratio: 1; border: 1px solid rgba(255,255,255,.28); border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 28%, rgba(255,255,255,.3), rgba(255,255,255,.08) 58%, transparent 72%); box-shadow: inset 0 0 48px rgba(255,255,255,.12), 0 0 60px rgba(116, 225, 229, .2); animation: countdown-breathe 1s ease-in-out infinite; }
 .countdown-orb strong { font-family: var(--font-display); font-size: clamp(5.5rem, 20vw, 8rem); font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; }
 .session-audio-note { color: rgba(255,255,255,.64) !important; font-size: .72rem; }
-.session-running { isolation: isolate; display: flex; flex-direction: column; align-items: center; color: #fff; background: radial-gradient(circle at 50% 42%, #27b7b9 0%, #087f93 43%, #064f67 100%); }
+.session-running { isolation: isolate; display: flex; flex-direction: column; align-items: center; color: #fff; background: radial-gradient(circle at 50% 42%, #27b7b9 0%, #087f93 43%, #064f67 100%); touch-action: manipulation; }
 .session-running::before { content: ""; position: absolute; z-index: -1; inset: -18%; pointer-events: none; background: radial-gradient(circle at 50% 44%, rgba(200,255,247,.28), transparent 38%), radial-gradient(circle at 16% 82%, rgba(39,181,198,.18), transparent 30%); animation: session-aura 11s ease-in-out infinite alternate; }
 .session-running::after { content: ""; position: absolute; z-index: -1; inset: 9% 8%; border: 1px solid rgba(190,255,248,.08); border-radius: 48% 52% 45% 55% / 55% 46% 54% 45%; pointer-events: none; animation: aura-ring 9s ease-in-out infinite alternate; }
 .session-running > * { position: relative; z-index: 1; }
@@ -186,8 +186,8 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 .breath-orb strong { position: relative; font-family: var(--font-display); font-size: clamp(4.5rem, 18vw, 7rem); font-weight: 400; line-height: .9; }
 .breath-orb small { position: relative; margin-top: .55rem; color: rgba(255,255,255,.76); font-size: .78rem; }
 .session-guidance { color: rgba(255,255,255,.76); font-size: .8rem; }
-.session-skip-hint { color: rgba(255,255,255,.55); font-size: .68rem; letter-spacing: .04em; }
-.retention-target { width: min(84vw, 480px); min-height: 220px; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; cursor: pointer; background: transparent; }
+.retention-target { width: min(84vw, 480px); min-height: 220px; border: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; cursor: pointer; background: transparent; transition: opacity 150ms ease; }
+.retention-target:active { opacity: .84; }
 .retention-target::before { content: ""; position: absolute; width: min(72vw, 340px); aspect-ratio: 1; border: 1px solid rgba(255,255,255,.13); border-radius: 50%; animation: retention-pulse 4s ease-in-out infinite; }
 .retention-target strong { position: relative; font-family: var(--font-display); font-size: clamp(5rem, 22vw, 8rem); font-weight: 400; letter-spacing: -.05em; line-height: 1; font-variant-numeric: tabular-nums; }
 .retention-target span { position: relative; margin-top: 1rem; min-height: 44px; padding: .7rem 1rem; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; color: rgba(255,255,255,.78); font-size: .76rem; }

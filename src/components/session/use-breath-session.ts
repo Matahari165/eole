@@ -107,10 +107,6 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     setPhase("retention");
   }, [cue]);
 
-  const skipToRetention = useCallback(() => {
-    if (phase === "inhale" || phase === "exhale") beginRetention();
-  }, [beginRetention, phase]);
-
   useEffect(() => {
     if (phase !== "inhale" && phase !== "exhale") return;
     const duration = PACE_TIMINGS[config.pace][phase];
@@ -138,7 +134,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
 
   const endRetention = useCallback(() => {
     if (phase !== "retention") return;
-    pendingRetentionRef.current = Math.max(1, Math.round((performance.now() - retentionStartedRef.current) / 1000));
+    pendingRetentionRef.current = Math.floor((performance.now() - retentionStartedRef.current) / 1000);
     cue(620);
     setPhase("recovery-inhale");
   }, [cue, phase]);
@@ -219,7 +215,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     if (phase !== "recovery-exhale") return;
     audioRef.current?.playBreath("exhale", 2000);
     const timeout = window.setTimeout(() => {
-      const completed = [...results, { roundIndex: round, breathsCompleted: Math.min(breath, config.breathsPerRound), retentionSeconds: pendingRetentionRef.current }];
+      const completed = [...results, { roundIndex: round, breathsCompleted: config.breathsPerRound, retentionSeconds: pendingRetentionRef.current }];
       setResults(completed);
       if (round >= config.rounds) {
         void persist("completed", completed);
@@ -230,11 +226,11 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
       }
     }, 2000);
     return () => window.clearTimeout(timeout);
-  }, [breath, config.breathsPerRound, config.rounds, persist, phase, results, round]);
+  }, [config.breathsPerRound, config.rounds, persist, phase, results, round]);
 
   const stop = useCallback(() => {
     void persist("stopped", results);
   }, [persist, results]);
 
-  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, start, stop, endRetention, skipToRetention, retrySave };
+  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, start, stop, endRetention, retrySave };
 }
