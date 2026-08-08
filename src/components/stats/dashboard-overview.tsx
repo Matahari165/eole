@@ -55,22 +55,22 @@ export function DashboardOverview() {
         </div>
       </section>
 
-      <SummaryCards stats={stats} compact />
+      {stats.sessionCount > 0 && <SummaryCards stats={stats} compact />}
 
-      <div className="dashboard-lower">
+      {stats.sessionCount > 0 && <div className="dashboard-lower">
         <section className="content-card recent-card">
           <div className="section-heading"><div><p className="eyebrow">Dernière séance</p><h2>{last ? new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date(last.completedAt)) : "Aucune séance"}</h2></div><Link href="/app/statistiques">Tout voir</Link></div>
           {last ? (
             <div className="recent-rounds">
               {last.rounds.map((round) => <div key={round.roundIndex}><span>Round {round.roundIndex}</span><strong>{formatDuration(round.retentionSeconds)}</strong></div>)}
             </div>
-          ) : <p className="empty-copy">Ta première session apparaîtra ici.</p>}
+          ) : null}
         </section>
         <section className="content-card milestone-card">
           <span className="milestone-icon"><TrophyMark /></span>
           <div><p className="eyebrow">Prochain repère</p><h2>{formatDuration(nextMilestone)}</h2><p>Tu es à {formatDuration(stats.maxRetention)}. Chaque souffle compte.</p></div>
         </section>
-      </div>
+      </div>}
     </div>
   );
 }

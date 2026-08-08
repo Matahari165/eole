@@ -132,7 +132,7 @@ export function SettingsPanel() {
       <header className="page-header"><div><p className="eyebrow">Réglages</p><h1>Ton espace, ton ambiance.</h1><p>Ajuste le son sans interrompre la simplicité de la pratique.</p></div></header>
       <div className="settings-layout">
         <section className="content-card settings-section">
-          <div className="settings-title"><span><Music2 size={21} /></span><div><h2>Ambiance musicale</h2><p>Choisis la texture de fond de tes séances.</p></div></div>
+          <div className="settings-title"><span><Music2 size={21} aria-hidden="true" /></span><div><h2>Ambiance musicale</h2><p>Choisis la texture de fond de tes séances.</p></div></div>
           <fieldset className="track-fieldset"><legend className="sr-only">Ambiance musicale</legend><div className="track-grid">{tracks.map((track) => <label className="track-option" data-selected={settings.musicTrack === track.value} key={track.value}><input type="radio" name="track" checked={settings.musicTrack === track.value} onChange={() => setSettings({ ...settings, musicTrack: track.value })} /><span className="track-visual" aria-hidden="true"><i /><i /><i /></span><strong>{track.label}</strong><small>{track.description}</small>{settings.musicTrack === track.value && <Check className="track-check" size={17} aria-hidden="true" />}</label>)}</div></fieldset>
           <RangeSetting icon={<Music2 size={19} />} label="Volume de la musique" value={settings.musicVolume} onChange={(musicVolume) => setSettings({ ...settings, musicVolume })} />
           <RangeSetting icon={<Waves size={19} />} label="Volume de la respiration" value={settings.breathVolume} onChange={(breathVolume) => setSettings({ ...settings, breathVolume })} />
@@ -144,13 +144,13 @@ export function SettingsPanel() {
           <section className="content-card settings-section compact-section"><div className="settings-title"><span><UserRound size={21} aria-hidden="true" /></span><div><h2>Compte</h2><p>{profile ? `${profile.firstName} · @${profile.username}` : "Profil indisponible"}</p></div></div><button className="text-button danger-text" type="button" disabled={signingOut} onClick={signOut}>{signingOut ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <LogOut size={17} aria-hidden="true" />}{signingOut ? "Déconnexion…" : "Se déconnecter"}</button></section>
         </div>
       </div>
-      <div className="settings-actions">
+      {(feedback || dirty || pending || saved) && <div className="settings-actions">
         {feedback && <p className="form-error" role="alert">{feedback}</p>}
-        <button className="button button-primary" type="button" disabled={pending || !dirty} onClick={save}>
+        {(dirty || pending || saved) && <button className="button button-primary" type="button" disabled={pending || !dirty} onClick={save}>
           {pending ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : saved || !dirty ? <Check size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
-          {saved ? "Enregistré" : pending ? "Enregistrement…" : dirty ? "Enregistrer les réglages" : "Réglages à jour"}
-        </button>
-      </div>
+          {saved ? "Enregistré" : pending ? "Enregistrement…" : "Enregistrer les changements"}
+        </button>}
+      </div>}
     </div>
   );
 }

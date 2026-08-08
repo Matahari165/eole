@@ -3,6 +3,7 @@
 import { BarChart3, House, Settings, Wind } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { Brand } from "@/components/layout/brand";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -15,7 +16,15 @@ const links = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPathnameRef = useRef(pathname);
   const sessionActive = pathname === "/app/session/active";
+
+  useEffect(() => {
+    if (previousPathnameRef.current === pathname) return;
+    previousPathnameRef.current = pathname;
+    mainRef.current?.focus({ preventScroll: true });
+  }, [pathname]);
 
   if (sessionActive) return <>{children}</>;
 
@@ -36,7 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
       </aside>
-      <main className="app-main" id="main-content">
+      <main className="app-main" id="main-content" ref={mainRef} tabIndex={-1}>
         {!isSupabaseConfigured() && (
           <div className="demo-banner" role="status">
             Mode aperçu — connecte Supabase pour activer les vrais comptes et la sauvegarde serveur.

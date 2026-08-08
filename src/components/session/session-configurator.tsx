@@ -17,6 +17,7 @@ export function SessionConfigurator() {
   const [breaths, setBreaths] = useState(DEFAULT_SESSION_CONFIG.breathsPerRound);
   const [pace, setPace] = useState<Pace>(DEFAULT_SESSION_CONFIG.pace);
   const paceSummary = pace === "slow" ? "lent" : pace === "fast" ? "rapide" : "normal";
+  const customized = rounds !== DEFAULT_SESSION_CONFIG.rounds || breaths !== DEFAULT_SESSION_CONFIG.breathsPerRound || pace !== DEFAULT_SESSION_CONFIG.pace;
 
   function start() {
     const params = new URLSearchParams({ rounds: String(rounds), breaths: String(breaths), pace });
@@ -27,7 +28,6 @@ export function SessionConfigurator() {
     <div className="page-stack setup-page">
       <header className="page-header">
         <div><p className="eyebrow">Nouvelle séance</p><h1>Prépare ton rythme.</h1><p>Ajuste seulement ce dont tu as besoin aujourd’hui.</p></div>
-        <button className="button button-ghost" type="button" onClick={() => { setRounds(3); setBreaths(35); setPace("normal"); }}><RotateCcw size={17} aria-hidden="true" /> Valeurs par défaut</button>
       </header>
 
       <section className="setup-quick-start" aria-labelledby="quick-start-title">
@@ -41,30 +41,23 @@ export function SessionConfigurator() {
         </button>
       </section>
 
-      <div className="setup-layout">
-        <section className="setup-controls" aria-labelledby="setup-details-title">
-          <div className="setup-details-heading">
-            <div><p className="eyebrow">Optionnel</p><h2 id="setup-details-title">Personnaliser la séance</h2></div>
-            <span className="setup-details-note">Les réglages de base sont déjà prêts.</span>
-          </div>
+      <section className="setup-controls" aria-labelledby="setup-details-title">
+        <div className="setup-details-heading">
+          <div><p className="eyebrow">Optionnel</p><h2 id="setup-details-title">Personnaliser la séance</h2></div>
+          {customized && <button className="reset-settings" type="button" onClick={() => { setRounds(DEFAULT_SESSION_CONFIG.rounds); setBreaths(DEFAULT_SESSION_CONFIG.breathsPerRound); setPace(DEFAULT_SESSION_CONFIG.pace); }}><RotateCcw size={16} aria-hidden="true" /> Réinitialiser</button>}
+        </div>
+        <div className="setup-control-grid">
           <Stepper icon={<RotateCcw size={20} />} label="Nombre de rounds" hint="Cycles complets" value={rounds} min={1} max={8} onChange={setRounds} />
           <Stepper icon={<Wind size={20} />} label="Respirations" hint="Avant chaque rétention" value={breaths} min={10} max={60} step={5} onChange={setBreaths} />
           <fieldset className="setting-card pace-card">
-            <legend><span className="setting-icon"><Gauge size={20} aria-hidden="true" /></span><span><strong>Vitesse</strong><small>Rythme inspiration / expiration</small></span></legend>
+            <legend className="sr-only">Vitesse</legend>
+            <div className="setting-label"><span className="setting-icon" aria-hidden="true"><Gauge size={20} /></span><span><strong>Vitesse</strong><small>Rythme inspiration / expiration</small></span></div>
             <div className="pace-options">
               {paceOptions.map((option) => <label className="pace-option" data-selected={pace === option.value} key={option.value}><input type="radio" name="pace" value={option.value} checked={pace === option.value} onChange={() => setPace(option.value)} /><span>{option.label}</span><small>{option.detail}</small></label>)}
             </div>
           </fieldset>
-        </section>
-
-        <aside className="session-preview">
-          <div className="preview-orb" aria-hidden="true"><span /></div>
-          <p className="eyebrow">Ta séance</p>
-          <h2>{rounds} round{rounds > 1 ? "s" : ""}</h2>
-          <div className="preview-details"><span>{breaths} respirations</span><span>Rétention libre</span><span>Récupération 15 s</span></div>
-          <p className="preview-note">Le bouton « Lancer » reste accessible en haut de la page. Après le clic, un compte à rebours sonore de 3 secondes lance directement le premier souffle.</p>
-        </aside>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

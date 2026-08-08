@@ -73,6 +73,14 @@ export function ProgressDashboard() {
   const recent = sessions.filter((session) => session.rounds.length > 0).slice(0, 8);
   const periodSessionCount = series.reduce((total, day) => total + day.sessions, 0);
   const periodDaysWithData = series.filter((day) => day.averageRetention !== null).length;
+  const retentionDataSummary = series
+    .filter((day) => day.averageRetention !== null)
+    .map((day) => `${day.label} : ${formatDuration(day.averageRetention ?? 0)}`)
+    .join(" ; ");
+  const sessionDataSummary = series
+    .filter((day) => day.sessions > 0)
+    .map((day) => `${day.label} : ${day.sessions} session${day.sessions > 1 ? "s" : ""}`)
+    .join(" ; ");
 
   if (!stats.sessionCount) {
     return (
@@ -97,13 +105,14 @@ export function ProgressDashboard() {
 
       <section className="content-card chart-card">
         <div className="section-heading"><div><p className="eyebrow">Rétention moyenne</p><h2>{period === 7 ? "Ces 7 derniers jours" : "Ces 30 derniers jours"}</h2></div></div>
-        <div className="chart-wrap" role="img" aria-label={`Rétention moyenne quotidienne sur les ${period} derniers jours. ${periodDaysWithData} jour${periodDaysWithData > 1 ? "s" : ""} avec une séance.`}>
-          <div className="chart-inner" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><AreaChart data={series} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}><defs><linearGradient id="retentionFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#138ea8" stopOpacity={0.25} /><stop offset="100%" stopColor="#138ea8" stopOpacity={0.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#dfeef2" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} /><YAxis axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} unit="s" /><Tooltip content={<RetentionTooltip />} /><Area type="monotone" dataKey="averageRetention" stroke="#087d9d" strokeWidth={2.5} fill="url(#retentionFill)" connectNulls /></AreaChart></ResponsiveContainer></div>
+        <p className="sr-only">{`Rétention moyenne quotidienne sur les ${period} derniers jours. ${periodDaysWithData} jour${periodDaysWithData > 1 ? "s" : ""} avec une séance. ${retentionDataSummary}`}</p>
+        <div className="chart-wrap" aria-hidden="true">
+          <div className="chart-inner"><ResponsiveContainer width="100%" height="100%"><AreaChart accessibilityLayer={false} data={series} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}><defs><linearGradient id="retentionFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#138ea8" stopOpacity={0.25} /><stop offset="100%" stopColor="#138ea8" stopOpacity={0.02} /></linearGradient></defs><CartesianGrid vertical={false} stroke="#dfeef2" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} /><YAxis axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} unit="s" /><Tooltip content={<RetentionTooltip />} /><Area type="monotone" dataKey="averageRetention" stroke="#087d9d" strokeWidth={2.5} fill="url(#retentionFill)" connectNulls /></AreaChart></ResponsiveContainer></div>
         </div>
       </section>
 
       <div className="stats-secondary">
-        <section className="content-card chart-card compact-chart"><div className="section-heading"><div><p className="eyebrow">Régularité</p><h2>Sessions par jour</h2></div><CalendarRange size={20} aria-hidden="true" /></div><div className="chart-wrap small" role="img" aria-label={`${periodSessionCount} session${periodSessionCount > 1 ? "s" : ""} sur les ${period} derniers jours.`}><div className="chart-inner" aria-hidden="true"><ResponsiveContainer width="100%" height="100%"><BarChart data={series} margin={{ top: 8, right: 0, left: -32, bottom: 0 }}><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} /><Tooltip content={<SessionTooltip />} /><Bar dataKey="sessions" fill="#62c2cf" radius={[5, 5, 2, 2]} maxBarSize={24} /></BarChart></ResponsiveContainer></div></div></section>
+        <section className="content-card chart-card compact-chart"><div className="section-heading"><div><p className="eyebrow">Régularité</p><h2>Sessions par jour</h2></div><CalendarRange size={20} aria-hidden="true" /></div><p className="sr-only">{`${periodSessionCount} session${periodSessionCount > 1 ? "s" : ""} sur les ${period} derniers jours. ${sessionDataSummary}`}</p><div className="chart-wrap small" aria-hidden="true"><div className="chart-inner"><ResponsiveContainer width="100%" height="100%"><BarChart accessibilityLayer={false} data={series} margin={{ top: 8, right: 0, left: -32, bottom: 0 }}><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "#59737d", fontSize: 12 }} /><Tooltip content={<SessionTooltip />} /><Bar dataKey="sessions" fill="#62c2cf" radius={[5, 5, 2, 2]} maxBarSize={24} /></BarChart></ResponsiveContainer></div></div></section>
         <section className="content-card practice-card"><div><span className="practice-icon"><Clock3 size={20} /></span><p>Temps de pratique</p><strong>{formatDuration(stats.totalPracticeSeconds)}</strong></div><div><span className="practice-icon"><Layers3 size={20} /></span><p>Rounds moyens</p><strong>{stats.averageRounds.toFixed(1).replace(".0", "")}</strong></div></section>
       </div>
 
@@ -115,11 +124,11 @@ export function ProgressDashboard() {
           return <article key={session.id} role="listitem"><div className="history-main"><strong>{dateLabel}</strong><span>{session.rounds.length} / {session.plannedRounds} round{session.plannedRounds > 1 ? "s" : ""} · {session.status === "stopped" ? "arrêtée" : "terminée"}</span></div><div className="retention-chips">{session.rounds.map((round) => <span key={round.roundIndex}>R{round.roundIndex} <strong>{formatDuration(round.retentionSeconds)}</strong></span>)}</div><button className="history-delete" type="button" disabled={Boolean(deletingId)} onClick={(event) => requestDelete(session, event)} aria-label={`Supprimer la séance du ${dateLabel}`} title="Supprimer cette séance">{isDeleting ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Trash2 size={18} aria-hidden="true" />}</button></article>;
         })}</div> : <p className="empty-copy">Termine un round pour commencer ton historique.</p>}
       </section>
-      <dialog className="confirm-dialog history-delete-dialog" ref={deleteDialogRef} onCancel={(event) => { if (deletingId) event.preventDefault(); else cancelDelete(); }}>
+      <dialog className="confirm-dialog history-delete-dialog" ref={deleteDialogRef} aria-labelledby="delete-session-title" onCancel={(event) => { if (deletingId) event.preventDefault(); else cancelDelete(); }}>
         <button className="dialog-close" type="button" onClick={cancelDelete} aria-label="Fermer" disabled={Boolean(deletingId)}><X size={20} aria-hidden="true" /></button>
         <p className="eyebrow">Historique</p>
-        <h2>Supprimer cette séance&nbsp;?</h2>
-        <p>{deleteTarget ? `La séance du ${formatSessionDate(deleteTarget.completedAt)} et ses ${deleteTarget.rounds.length} round${deleteTarget.rounds.length > 1 ? "s" : ""} seront retirés de ton historique et de tes statistiques. Cette action est définitive.` : ""}</p>
+        <h2 id="delete-session-title">Supprimer cette séance&nbsp;?</h2>
+        <p>{deleteTarget ? `La séance du ${formatSessionDate(deleteTarget.completedAt)} et ${deleteTarget.rounds.length > 1 ? `ses ${deleteTarget.rounds.length} rounds` : "son round"} seront retirés de ton historique et de tes statistiques. Cette action est définitive.` : ""}</p>
         {deleteError && <p className="form-error" role="alert">{deleteError}</p>}
         <div><button className="button button-secondary" type="button" onClick={cancelDelete} ref={cancelDeleteRef} disabled={Boolean(deletingId)}>Garder</button><button className="button button-danger" type="button" onClick={confirmDelete} disabled={Boolean(deletingId)}>{deletingId ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <Trash2 size={17} aria-hidden="true" />}{deletingId ? "Suppression…" : "Supprimer"}</button></div>
       </dialog>
