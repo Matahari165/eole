@@ -114,6 +114,15 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 
 .setup-layout { display: grid; grid-template-columns: 1.35fr .82fr; align-items: start; gap: 1.25rem; }
 .setup-controls { display: grid; gap: .85rem; }
+.setup-quick-start { padding: 1.1rem 1.25rem; border: 1px solid #cce8ed; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: linear-gradient(110deg, #e5f6f8, #fafdfe 72%); box-shadow: var(--shadow-soft); }
+.quick-start-copy { display: grid; gap: .18rem; }
+.quick-start-copy h2 { font-family: var(--font-display); font-size: 1.55rem; font-weight: 500; }
+.quick-start-copy > p:last-child { color: var(--color-muted); font-size: .82rem; }
+.quick-start-action { flex: 0 0 auto; min-width: 140px; }
+.setup-details-heading { min-height: 44px; padding: .1rem .15rem .2rem; display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+.setup-details-heading > div { display: grid; gap: .2rem; }
+.setup-details-heading h2 { font-size: 1.2rem; }
+.setup-details-note { color: var(--color-muted); font-size: .76rem; text-align: right; }
 .setting-card { min-width: 0; margin: 0; padding: 1.1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: rgba(255,255,255,.84); }
 .stepper-card { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .setting-label, .pace-card legend { display: flex; align-items: center; gap: .8rem; }
@@ -360,6 +369,12 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
   .dashboard-lower { grid-template-columns: 1fr; }
   .recent-rounds { gap: .35rem; }
   .recent-rounds > div { padding: .6rem; }
+  .setup-quick-start { position: sticky; top: max(.5rem, env(safe-area-inset-top)); z-index: 10; padding: .9rem; align-items: flex-start; background: rgba(247, 252, 253, .94); backdrop-filter: blur(16px); }
+  .quick-start-copy h2 { font-size: 1.3rem; }
+  .quick-start-copy > p:last-child { font-size: .76rem; }
+  .quick-start-action { min-width: 112px; min-height: 50px; padding-inline: .9rem; }
+  .setup-details-heading { align-items: flex-start; padding-top: .25rem; }
+  .setup-details-note { max-width: 130px; }
   .stepper-card { padding: .9rem; }
   .setting-icon { width: 36px; height: 36px; }
   .stepper { gap: .25rem; }

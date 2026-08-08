@@ -220,6 +220,7 @@ Passe UX mobile du 8 août 2026 :
 - Geste de retour et fermeture protégés pendant une séance, avec confirmation avant l’arrêt.
 - États distincts pour la préparation du son, l’enregistrement, l’échec, l’arrêt et la fin normale.
 - Résultats conservés à l’écran si la sauvegarde échoue, avec un bouton pour réessayer.
+- Bouton « Lancer » placé immédiatement sous le titre sur iPhone, avec les réglages détaillés accessibles plus bas et une action persistante pendant le défilement.
 - Statistiques sans faux zéros les jours sans séance et écran vide centré sur la prochaine action utile.
 - Messages de connexion traduits en français sans exposer les erreurs techniques du serveur.
 - Sons respiratoires préparés à l’avance pour éviter les saccades pendant l’animation.
