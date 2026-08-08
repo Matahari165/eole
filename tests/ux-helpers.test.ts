@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getFriendlyAuthError } from "@/lib/auth-errors";
 import { parseSessionConfig } from "@/lib/session-config";
+import { getNewRetentionMinute } from "@/lib/retention-timing";
 
 describe("getFriendlyAuthError", () => {
   it("traduit les erreurs de connexion sans exposer le message technique", () => {
@@ -37,5 +38,19 @@ describe("parseSessionConfig", () => {
       pace: "normal",
     });
     expect(parseSessionConfig({ breaths: "17" }).breathsPerRound).toBe(15);
+  });
+});
+
+describe("getNewRetentionMinute", () => {
+  it("déclenche un repère à chaque minute complète, jamais avant", () => {
+    expect(getNewRetentionMinute(59, 0)).toBeNull();
+    expect(getNewRetentionMinute(60, 0)).toBe(1);
+    expect(getNewRetentionMinute(119, 1)).toBeNull();
+    expect(getNewRetentionMinute(120, 1)).toBe(2);
+  });
+
+  it("ne rejoue pas un ding déjà déclenché et rattrape un minuteur ralenti", () => {
+    expect(getNewRetentionMinute(60, 1)).toBeNull();
+    expect(getNewRetentionMinute(181, 1)).toBe(3);
   });
 });

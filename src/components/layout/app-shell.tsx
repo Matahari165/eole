@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, House, Settings, Wind } from "lucide-react";
+import { BarChart3, House, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
@@ -9,7 +9,6 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const links = [
   { href: "/app", label: "Accueil", icon: House, exact: true },
-  { href: "/app/session/nouvelle", label: "Respirer", icon: Wind },
   { href: "/app/statistiques", label: "Progrès", icon: BarChart3 },
   { href: "/app/parametres", label: "Réglages", icon: Settings },
 ];

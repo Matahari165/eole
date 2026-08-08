@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
 import { saveSession } from "@/lib/repository";
+import { getNewRetentionMinute } from "@/lib/retention-timing";
 import { PACE_TIMINGS, type BreathSession, type RoundResult, type SessionConfig, type SoundSettings } from "@/lib/types";
 
 export type SessionPhase = "ready" | "starting" | "countdown" | "inhale" | "exhale" | "retention" | "recovery-inhale" | "recovery-hold" | "recovery-exhale" | "saving" | "complete" | "error";
@@ -21,6 +22,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const startedAtRef = useRef<string | null>(null);
   const startingRef = useRef(false);
   const retentionStartedRef = useRef(0);
+  const lastRetentionDingMinuteRef = useRef(0);
   const pendingRetentionRef = useRef(0);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const persistingRef = useRef(false);
@@ -39,6 +41,11 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const cue = useCallback((frequency?: number) => {
     audioRef.current?.playCue(frequency);
     if (settings.hapticsEnabled && "vibrate" in navigator) navigator.vibrate(35);
+  }, [settings.hapticsEnabled]);
+
+  const ding = useCallback(() => {
+    audioRef.current?.playDing();
+    if (settings.hapticsEnabled && "vibrate" in navigator) navigator.vibrate([24, 35, 24]);
   }, [settings.hapticsEnabled]);
 
   const start = useCallback(async () => {
@@ -102,10 +109,11 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
 
   const beginRetention = useCallback(() => {
     retentionStartedRef.current = performance.now();
+    lastRetentionDingMinuteRef.current = 0;
     setRetentionSeconds(0);
-    cue(430);
+    ding();
     setPhase("retention");
-  }, [cue]);
+  }, [ding]);
 
   useEffect(() => {
     if (phase !== "inhale" && phase !== "exhale") return;
@@ -127,10 +135,16 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   useEffect(() => {
     if (phase !== "retention") return;
     const interval = window.setInterval(() => {
-      setRetentionSeconds(Math.floor((performance.now() - retentionStartedRef.current) / 1000));
+      const elapsedSeconds = Math.floor((performance.now() - retentionStartedRef.current) / 1000);
+      const newMinute = getNewRetentionMinute(elapsedSeconds, lastRetentionDingMinuteRef.current);
+      if (newMinute !== null) {
+        lastRetentionDingMinuteRef.current = newMinute;
+        ding();
+      }
+      setRetentionSeconds(elapsedSeconds);
     }, 100);
     return () => window.clearInterval(interval);
-  }, [phase]);
+  }, [ding, phase]);
 
   const endRetention = useCallback(() => {
     if (phase !== "retention") return;

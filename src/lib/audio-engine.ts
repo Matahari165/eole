@@ -127,6 +127,44 @@ export class AudioEngine {
     oscillator.stop(now + 0.56);
   }
 
+  playDing() {
+    if (!this.context || this.settings.breathVolume === 0) return;
+    const now = this.context.currentTime;
+    const output = this.context.createGain();
+    const volume = (this.settings.breathVolume / 100) * 0.22;
+    output.gain.setValueAtTime(0.001, now);
+    output.gain.exponentialRampToValueAtTime(volume, now + 0.008);
+    output.gain.exponentialRampToValueAtTime(0.001, now + 1.65);
+    output.connect(this.context.destination);
+
+    const partials = [
+      { frequency: 1046.5, level: 1, duration: 1.55 },
+      { frequency: 2098, level: 0.38, duration: 1.05 },
+      { frequency: 3136, level: 0.16, duration: 0.72 },
+      { frequency: 4186, level: 0.07, duration: 0.46 },
+    ];
+    let activePartials = partials.length;
+
+    partials.forEach(({ frequency, level, duration }, index) => {
+      const oscillator = this.context!.createOscillator();
+      const gain = this.context!.createGain();
+      oscillator.type = index === 0 ? "sine" : "triangle";
+      oscillator.frequency.setValueAtTime(frequency, now);
+      oscillator.detune.setValueAtTime(index % 2 === 0 ? -2 : 3, now);
+      gain.gain.setValueAtTime(level, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      oscillator.connect(gain).connect(output);
+      oscillator.addEventListener("ended", () => {
+        oscillator.disconnect();
+        gain.disconnect();
+        activePartials -= 1;
+        if (activePartials === 0) output.disconnect();
+      }, { once: true });
+      oscillator.start(now);
+      oscillator.stop(now + duration + 0.02);
+    });
+  }
+
   destroy() {
     this.stopAmbient();
     void this.context?.close();
