@@ -17,12 +17,15 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const [recoverySeconds, setRecoverySeconds] = useState(15);
   const [results, setResults] = useState<RoundResult[]>([]);
   const [savedSession, setSavedSession] = useState<BreathSession | null>(null);
+  const [tapHint, setTapHint] = useState(false);
+  
   const audioRef = useRef<AudioEngine | null>(null);
   const audioStartCancelledRef = useRef(false);
   const startedAtRef = useRef<string | null>(null);
   const startingRef = useRef(false);
   const retentionStartedRef = useRef(0);
   const lastRetentionDingMinuteRef = useRef(0);
+  const lastRenderedSecondRef = useRef(0);
   const pendingRetentionRef = useRef(0);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const persistingRef = useRef(false);
@@ -110,6 +113,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const beginRetention = useCallback(() => {
     retentionStartedRef.current = performance.now();
     lastRetentionDingMinuteRef.current = 0;
+    lastRenderedSecondRef.current = 0;
     setRetentionSeconds(0);
     ding();
     setPhase("retention");
@@ -135,13 +139,17 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   useEffect(() => {
     if (phase !== "retention") return;
     const interval = window.setInterval(() => {
-      const elapsedSeconds = Math.floor((performance.now() - retentionStartedRef.current) / 1000);
+      const elapsedMilliseconds = performance.now() - retentionStartedRef.current;
+      const elapsedSeconds = Math.floor(elapsedMilliseconds / 1000);
       const newMinute = getNewRetentionMinute(elapsedSeconds, lastRetentionDingMinuteRef.current);
       if (newMinute !== null) {
         lastRetentionDingMinuteRef.current = newMinute;
         ding();
       }
-      setRetentionSeconds(elapsedSeconds);
+      if (elapsedSeconds !== lastRenderedSecondRef.current) {
+        lastRenderedSecondRef.current = elapsedSeconds;
+        setRetentionSeconds(elapsedSeconds);
+      }
     }, 100);
     return () => window.clearInterval(interval);
   }, [ding, phase]);
@@ -246,5 +254,5 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     void persist("stopped", results);
   }, [persist, results]);
 
-  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, start, stop, endRetention, retrySave };
+  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, start, stop, endRetention, retrySave, setTapHint };
 }

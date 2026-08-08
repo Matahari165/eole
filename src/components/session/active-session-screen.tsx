@@ -19,6 +19,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   const session = useBreathSession(config, settings);
   const sessionPhase = session.phase;
   const startSession = session.start;
+  const setTapHint = session.setTapHint;
 
   useEffect(() => {
     let active = true;
@@ -48,7 +49,8 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
 
   useEffect(() => {
     lastSessionTapRef.current = 0;
-  }, [sessionPhase]);
+    setTapHint(false);
+  }, [sessionPhase, setTapHint]);
 
   const sessionInProgress = !["ready", "complete", "error"].includes(session.phase);
   useEffect(() => {
@@ -115,6 +117,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   const recoveryPhase = session.phase === "recovery-inhale" || session.phase === "recovery-hold" || session.phase === "recovery-exhale" ? session.phase : null;
   const isRetention = session.phase === "retention";
   const canEndRetention = session.phase === "retention";
+  
   const handleSessionPointerUp = (event: ReactPointerEvent<HTMLElement>) => {
     if (!canEndRetention) return;
     if (event.target instanceof Element && event.target.closest("button:not(.retention-target), a, dialog")) {
@@ -124,11 +127,14 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
     const now = performance.now();
     if (now - lastSessionTapRef.current < 420) {
       lastSessionTapRef.current = 0;
+      setTapHint(false);
       session.endRetention();
       return;
     }
     lastSessionTapRef.current = now;
+    setTapHint(true);
   };
+  
   const animationDuration = session.phase === "inhale" || session.phase === "exhale"
     ? PACE_TIMINGS[config.pace][session.phase]
     : 2000;
@@ -136,13 +142,31 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   return (
     <main className={`session-screen session-running phase-${session.phase}`} onPointerUp={handleSessionPointerUp}>
       <SessionMotionField />
-      <header className="session-topbar"><span>Round {session.round} / {config.rounds}</span><button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} /></button></header>
-      <div className="session-center">
-        {breathingPhase && <BreathingVisual phase={breathingPhase} breath={session.breath} total={config.breathsPerRound} durationMs={animationDuration} />}
-        {isRetention && <RetentionVisual seconds={session.retentionSeconds} />}
-        {recoveryPhase && <RecoveryVisual phase={recoveryPhase} seconds={session.recoverySeconds} />}
+      
+      <div className="session-bg" aria-hidden="true">
+        <div className="session-bg-layer session-bg-inhale" data-active={session.phase === "inhale"} />
+        <div className="session-bg-layer session-bg-exhale" data-active={session.phase === "exhale"} />
+        <div className="session-bg-layer session-bg-retention" data-active={session.phase === "retention"} />
+        <div className="session-bg-layer session-bg-recovery" data-active={["recovery-inhale", "recovery-hold", "recovery-exhale"].includes(session.phase)} />
       </div>
+
+      <header className="session-topbar"><span>Round {session.round} / {config.rounds}</span><button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} /></button></header>
+      
+      <div className="session-center">
+        <div className="visual-layer" data-visible={!!breathingPhase}>
+          <BreathingVisual phase={breathingPhase ?? "inhale"} breath={session.breath} total={config.breathsPerRound} durationMs={animationDuration} />
+        </div>
+        <div className="visual-layer" data-visible={isRetention}>
+          <RetentionVisual seconds={session.retentionSeconds} />
+        </div>
+        <div className="visual-layer" data-visible={!!recoveryPhase}>
+          <RecoveryVisual phase={recoveryPhase ?? "recovery-inhale"} seconds={session.recoverySeconds} />
+        </div>
+        {isRetention && session.tapHint && <p className="retention-tap-hint" aria-live="polite">Double-tape pour terminer</p>}
+      </div>
+      
       {isRetention && <button className="sr-only session-end-accessible" type="button" onClick={session.endRetention}>Arrêter la rétention</button>}
+      
       <div className="round-dots" role="progressbar" aria-label="Progression des rounds" aria-valuemin={1} aria-valuemax={config.rounds} aria-valuenow={session.round}>{Array.from({ length: config.rounds }).map((_, index) => <span data-active={index + 1 <= session.round} key={index} />)}</div>
       <dialog className="confirm-dialog" ref={dialogRef} aria-labelledby="stop-dialog-title" onCancel={() => setConfirmStop(false)}><button className="dialog-close" type="button" onClick={() => setConfirmStop(false)} aria-label="Fermer"><X size={20} /></button><h2 id="stop-dialog-title">Arrêter la séance ?</h2><p>{session.results.length ? `${session.results.length} round${session.results.length > 1 ? "s" : ""} terminé${session.results.length > 1 ? "s" : ""} ${session.results.length > 1 ? "seront conservés" : "sera conservé"}.` : "Aucun round n’est encore terminé."}</p><div><button className="button button-primary" type="button" onClick={() => setConfirmStop(false)} ref={continueRef}>Continuer la séance</button><button className="button button-quiet-danger" type="button" onClick={session.stop}>Arrêter</button></div></dialog>
     </main>

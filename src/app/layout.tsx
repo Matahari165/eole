@@ -19,7 +19,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="fr">
-      <body>{children}</body>
+      <body>
+        <div className="ambient-background" aria-hidden="true">
+          <div />
+          <div />
+          <div />
+        </div>
+        {children}
+      </body>
     </html>
   );
 }
