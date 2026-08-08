@@ -211,7 +211,7 @@ Hors périmètre initial :
 - URL principale et retour `/auth/callback` de production autorisés dans Supabase.
 - Inscription immédiate, connexion, séance complète, sauvegarde, reconnexion, statistiques et réglages vérifiés sur le site public.
 - Comptes et séances de validation supprimés après les tests.
-- Suppression individuelle d’une séance implémentée dans l’interface et le dépôt local ; la migration `20260808100000_allow_session_deletion.sql` doit être appliquée à Supabase avant la mise en production de cette fonction.
+- Suppression individuelle d’une séance implémentée dans l’interface, le dépôt et Supabase ; la migration `20260808100000_allow_session_deletion.sql` est appliquée et la politique RLS a été vérifiée.
 
 Passe UX mobile du 8 août 2026 :
 
