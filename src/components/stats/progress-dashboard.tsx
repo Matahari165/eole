@@ -100,7 +100,7 @@ export function ProgressDashboard() {
   return (
     <div className="page-stack stats-page">
       {deleteNotice && <p className="sr-only" role="status">{deleteNotice}</p>}
-      <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1><p>Observe les tendances sans transformer la pratique en compétition.</p></div><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></header>
+      <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1></div><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></header>
       <SummaryCards stats={stats} />
 
       <section className="content-card chart-card">

@@ -129,10 +129,10 @@ export function SettingsPanel() {
 
   return (
     <div className="page-stack settings-page">
-      <header className="page-header"><div><p className="eyebrow">Réglages</p><h1>Ton espace, ton ambiance.</h1><p>Ajuste le son sans interrompre la simplicité de la pratique.</p></div></header>
+      <header className="page-header"><div><p className="eyebrow">Réglages</p><h1>Ton espace, ton ambiance.</h1></div></header>
       <div className="settings-layout">
         <section className="content-card settings-section">
-          <div className="settings-title"><span><Music2 size={21} aria-hidden="true" /></span><div><h2>Ambiance musicale</h2><p>Choisis la texture de fond de tes séances.</p></div></div>
+          <div className="settings-title"><span><Music2 size={21} aria-hidden="true" /></span><div><h2>Ambiance musicale</h2></div></div>
           <fieldset className="track-fieldset"><legend className="sr-only">Ambiance musicale</legend><div className="track-grid">{tracks.map((track) => <label className="track-option" data-selected={settings.musicTrack === track.value} key={track.value}><input type="radio" name="track" checked={settings.musicTrack === track.value} onChange={() => setSettings({ ...settings, musicTrack: track.value })} /><span className="track-visual" aria-hidden="true"><i /><i /><i /></span><strong>{track.label}</strong><small>{track.description}</small>{settings.musicTrack === track.value && <Check className="track-check" size={17} aria-hidden="true" />}</label>)}</div></fieldset>
           <RangeSetting icon={<Music2 size={19} />} label="Volume de la musique" value={settings.musicVolume} onChange={(musicVolume) => setSettings({ ...settings, musicVolume })} />
           <RangeSetting icon={<Waves size={19} />} label="Volume de la respiration" value={settings.breathVolume} onChange={(breathVolume) => setSettings({ ...settings, breathVolume })} />
