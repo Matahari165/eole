@@ -9,9 +9,9 @@ import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_SOUND_SETTINGS, type SoundSettings, type UserProfile } from "@/lib/types";
 
 const tracks: { value: SoundSettings["musicTrack"]; label: string; description: string }[] = [
-  { value: "glacier", label: "Glacier", description: "Claire et profonde" },
-  { value: "lagon", label: "Lagon", description: "Douce et enveloppante" },
-  { value: "aurore", label: "Aurore", description: "Légère et lumineuse" },
+  { value: "pluie", label: "Pluie douce", description: "Bruit blanc naturel" },
+  { value: "ocean", label: "Vagues de l'océan", description: "Flux et reflux apaisant" },
+  { value: "foret", label: "Forêt paisible", description: "Ambiance zen" },
 ];
 
 export function SettingsPanel() {

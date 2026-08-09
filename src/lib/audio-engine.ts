@@ -1,18 +1,11 @@
 import type { SoundSettings } from "@/lib/types";
 
-type AmbientNodes = {
-  gains: GainNode[];
-  oscillators: OscillatorNode[];
-  lfos: OscillatorNode[];
-  lfoGains: GainNode[];
-};
-
 type BreathDirection = "inhale" | "exhale";
 
-const TRACK_FREQUENCIES: Record<SoundSettings["musicTrack"], number[]> = {
-  glacier: [110, 164.81, 220],
-  lagon: [130.81, 196, 261.63],
-  aurore: [98, 146.83, 246.94],
+const AMBIENT_PATHS: Record<SoundSettings["musicTrack"], string> = {
+  pluie: "/audio/eole-pluie.mp3",
+  ocean: "/audio/eole-ocean.mp3",
+  foret: "/audio/eole-foret.mp3",
 };
 
 const BREATH_AUDIO_PATHS: Record<BreathDirection, string> = {
@@ -27,12 +20,14 @@ export class AudioEngine {
   private reverb: ConvolverNode | null = null;
   private reverbGain: GainNode | null = null;
 
-  private ambient: AmbientNodes | null = null;
-  private fadingAmbients: AmbientNodes[] = [];
+  private ambientSource: AudioBufferSourceNode | null = null;
+  private ambientGain: GainNode | null = null;
+  private fadingAmbients: { source: AudioBufferSourceNode, gain: GainNode }[] = [];
   
+  private ambientBuffers = new Map<string, AudioBuffer>();
   private noiseBuffers = new Map<number, AudioBuffer[]>();
   private breathBuffers = new Map<BreathDirection, AudioBuffer>();
-  private breathLoadPromise: Promise<void> | null = null;
+  private assetsLoadPromise: Promise<void> | null = null;
   private noiseCursor = 0;
   private settings: SoundSettings;
 
@@ -71,164 +66,94 @@ export class AudioEngine {
     }
 
     if (this.context.state === "suspended") await this.context.resume();
-    if (this.settings.breathVolume > 0) await this.loadBreathBuffers();
+    await this.loadAssets();
   }
 
   updateSettings(settings: SoundSettings) {
     const trackChanged = this.settings.musicTrack !== settings.musicTrack;
     this.settings = settings;
-    if (trackChanged && this.ambient) {
+    if (trackChanged && this.ambientSource) {
       this.crossfadeAmbient();
       return;
     }
-    this.ambient?.gains.forEach((gain, index) => {
-      const isHarmonic = index === 3;
-      const level = (settings.musicVolume / 100) * (isHarmonic ? 0.006 : (index === 0 ? 0.035 : 0.018));
-      gain.gain.setTargetAtTime(level, this.context?.currentTime ?? 0, 0.2);
-    });
+    if (this.ambientGain) {
+      const level = (settings.musicVolume / 100) * 0.5;
+      this.ambientGain.gain.setTargetAtTime(level, this.context?.currentTime ?? 0, 0.2);
+    }
   }
 
   startAmbient(isCrossfade = false) {
-    if (!this.context || this.ambient || this.settings.musicVolume === 0 || !this.masterGain) return;
+    if (!this.context || this.settings.musicVolume === 0 || !this.masterGain) return;
+    const buffer = this.ambientBuffers.get(this.settings.musicTrack);
+    if (!buffer) return;
+
     const now = this.context.currentTime;
-    const oscillators: OscillatorNode[] = [];
-    const gains: GainNode[] = [];
-    const lfos: OscillatorNode[] = [];
-    const lfoGains: GainNode[] = [];
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
 
-    const freqs = TRACK_FREQUENCIES[this.settings.musicTrack];
-    const rootFreq = freqs[0];
+    source.buffer = buffer;
+    source.loop = true;
 
-    freqs.forEach((frequency, index) => {
-      const oscillator = this.context!.createOscillator();
-      const gain = this.context!.createGain();
-      const filter = this.context!.createBiquadFilter();
+    const targetLevel = (this.settings.musicVolume / 100) * 0.5;
+    gain.gain.setValueAtTime(0.001, now);
 
-      oscillator.type = index === 0 ? "sine" : "triangle";
-      oscillator.frequency.value = frequency / (index === 2 ? 2 : 1);
-
-      filter.type = "lowpass";
-      filter.frequency.value = 460 + index * 90;
-
-      // Subtle LFO modulating the ambient lowpass filter cutoff
-      const lfo = this.context!.createOscillator();
-      const lfoGain = this.context!.createGain();
-      lfo.type = "sine";
-      lfo.frequency.value = 0.06; // 0.06Hz -> ~17s cycle
-      lfoGain.gain.value = 80;
-      lfo.connect(lfoGain).connect(filter.frequency);
-      lfo.start(now);
-      lfos.push(lfo);
-      lfoGains.push(lfoGain);
-
-      const targetLevel = (this.settings.musicVolume / 100) * (index === 0 ? 0.035 : 0.018);
-      gain.gain.setValueAtTime(0.001, now);
-
-      if (isCrossfade) {
-        gain.gain.exponentialRampToValueAtTime(targetLevel, now + 0.8);
-      } else {
-        // Fade in over 1.5s (time constant 0.4)
-        gain.gain.setTargetAtTime(targetLevel, now, 0.4);
-      }
-
-      oscillator.connect(filter).connect(gain).connect(this.masterGain!);
-      oscillator.start(now);
-      oscillators.push(oscillator);
-      gains.push(gain);
-    });
-
-    // Richer Ambient Harmonics: 1 extra subtle harmonic
-    const harmonicOsc = this.context!.createOscillator();
-    const harmonicGain = this.context!.createGain();
-    const harmonicFilter = this.context!.createBiquadFilter();
-    harmonicOsc.type = "sine";
-    harmonicOsc.frequency.value = rootFreq * 2;
-    
-    harmonicFilter.type = "lowpass";
-    harmonicFilter.frequency.value = 800;
-    
-    const harmLfo = this.context!.createOscillator();
-    const harmLfoGain = this.context!.createGain();
-    harmLfo.type = "sine";
-    harmLfo.frequency.value = 0.06;
-    harmLfoGain.gain.value = 80;
-    harmLfo.connect(harmLfoGain).connect(harmonicFilter.frequency);
-    harmLfo.start(now);
-    lfos.push(harmLfo);
-    lfoGains.push(harmLfoGain);
-
-    const harmonicTargetLevel = (this.settings.musicVolume / 100) * 0.006;
-    harmonicGain.gain.setValueAtTime(0.001, now);
     if (isCrossfade) {
-      harmonicGain.gain.exponentialRampToValueAtTime(Math.max(0.001, harmonicTargetLevel), now + 0.8);
+      gain.gain.exponentialRampToValueAtTime(targetLevel, now + 0.8);
     } else {
-      harmonicGain.gain.setTargetAtTime(harmonicTargetLevel, now, 0.4);
+      gain.gain.setTargetAtTime(targetLevel, now, 0.4);
     }
 
-    harmonicOsc.connect(harmonicFilter).connect(harmonicGain).connect(this.masterGain!);
-    harmonicOsc.start(now);
-    oscillators.push(harmonicOsc);
-    gains.push(harmonicGain);
+    source.connect(gain).connect(this.masterGain);
+    source.start(now);
 
-    this.ambient = { oscillators, gains, lfos, lfoGains };
+    this.ambientSource = source;
+    this.ambientGain = gain;
   }
 
   stopAmbient() {
-    if (!this.context || !this.ambient) return;
+    if (!this.context || !this.ambientSource || !this.ambientGain) return;
     const now = this.context.currentTime;
-    const currentAmbient = this.ambient;
-    this.ambient = null;
+    const currentSource = this.ambientSource;
+    const currentGain = this.ambientGain;
+    
+    this.ambientSource = null;
+    this.ambientGain = null;
 
-    currentAmbient.gains.forEach((gain) => {
-      gain.gain.cancelScheduledValues(now);
-      // Fast 120ms fade out to avoid clicks
-      gain.gain.setTargetAtTime(0.001, now, 0.035); 
-    });
+    currentGain.gain.cancelScheduledValues(now);
+    currentGain.gain.setTargetAtTime(0.001, now, 0.035); 
 
-    currentAmbient.oscillators.forEach((osc) => {
-      osc.stop(now + 0.15);
-    });
+    currentSource.stop(now + 0.15);
 
     setTimeout(() => {
-      this.cleanupAmbient(currentAmbient);
+      try { currentSource.disconnect(); } catch {}
+      try { currentGain.disconnect(); } catch {}
     }, 160);
   }
 
   private crossfadeAmbient() {
-    if (!this.context || !this.ambient || !this.masterGain) return;
+    if (!this.context || !this.ambientSource || !this.ambientGain || !this.masterGain) return;
     const now = this.context.currentTime;
-    const oldAmbient = this.ambient;
-    this.fadingAmbients.push(oldAmbient);
+    const oldSource = this.ambientSource;
+    const oldGain = this.ambientGain;
+    
+    this.fadingAmbients.push({ source: oldSource, gain: oldGain });
 
-    oldAmbient.gains.forEach((gain) => {
-      gain.gain.cancelScheduledValues(now);
-      const startVal = Math.max(0.001, gain.gain.value);
-      gain.gain.setValueAtTime(startVal, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-    });
+    oldGain.gain.cancelScheduledValues(now);
+    const startVal = Math.max(0.001, oldGain.gain.value);
+    oldGain.gain.setValueAtTime(startVal, now);
+    oldGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
 
-    oldAmbient.oscillators.forEach(osc => osc.stop(now + 0.85));
+    oldSource.stop(now + 0.85);
 
     setTimeout(() => {
-      this.cleanupAmbient(oldAmbient);
-      this.fadingAmbients = this.fadingAmbients.filter(a => a !== oldAmbient);
+      try { oldSource.disconnect(); } catch {}
+      try { oldGain.disconnect(); } catch {}
+      this.fadingAmbients = this.fadingAmbients.filter(a => a.source !== oldSource);
     }, 900);
 
-    this.ambient = null;
+    this.ambientSource = null;
+    this.ambientGain = null;
     this.startAmbient(true);
-  }
-
-  private cleanupAmbient(nodes: AmbientNodes) {
-    nodes.oscillators.forEach((osc) => {
-      try { osc.stop(); } catch {}
-      osc.disconnect();
-    });
-    nodes.gains.forEach((gain) => gain.disconnect());
-    nodes.lfos.forEach((lfo) => {
-      try { lfo.stop(); } catch {}
-      lfo.disconnect();
-    });
-    nodes.lfoGains.forEach((gain) => gain.disconnect());
   }
 
   playBreath(direction: BreathDirection, durationMs: number) {
@@ -327,11 +252,11 @@ export class AudioEngine {
     output.connect(this.masterGain);
 
     const partials = [
-      { frequency: 1046.5, level: 1, duration: 1.55 * 1.3 }, // ~2.0
-      { frequency: 2098, level: 0.38, duration: 1.05 * 1.3 }, // ~1.365
-      { frequency: 3136, level: 0.16, duration: 0.72 * 1.3 }, // ~0.936
-      { frequency: 4186, level: 0.07, duration: 0.46 * 1.3 }, // ~0.598
-      { frequency: 5230, level: 0.03, duration: 0.3 }, // 5th partial sparkle
+      { frequency: 1046.5, level: 1, duration: 1.55 * 1.3 },
+      { frequency: 2098, level: 0.38, duration: 1.05 * 1.3 },
+      { frequency: 3136, level: 0.16, duration: 0.72 * 1.3 },
+      { frequency: 4186, level: 0.07, duration: 0.46 * 1.3 },
+      { frequency: 5230, level: 0.03, duration: 0.3 },
     ];
     let activePartials = partials.length;
 
@@ -341,7 +266,7 @@ export class AudioEngine {
       oscillator.type = index === 0 ? "sine" : "triangle";
       
       oscillator.frequency.setValueAtTime(frequency, now);
-      oscillator.detune.setValueAtTime(Math.random() * 6 - 3, now); // Slight random detune
+      oscillator.detune.setValueAtTime(Math.random() * 6 - 3, now);
       
       gain.gain.setValueAtTime(level, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
@@ -362,7 +287,10 @@ export class AudioEngine {
 
   destroy() {
     this.stopAmbient();
-    this.fadingAmbients.forEach(a => this.cleanupAmbient(a));
+    this.fadingAmbients.forEach(a => {
+      try { a.source.disconnect(); } catch {}
+      try { a.gain.disconnect(); } catch {}
+    });
     this.fadingAmbients = [];
 
     if (this.masterGain) this.masterGain.disconnect();
@@ -377,15 +305,16 @@ export class AudioEngine {
     this.reverb = null;
     this.reverbGain = null;
 
+    this.ambientBuffers.clear();
     this.noiseBuffers.clear();
     this.breathBuffers.clear();
-    this.breathLoadPromise = null;
+    this.assetsLoadPromise = null;
     this.restoreAudioSession();
   }
 
   private generateImpulseResponse(context: AudioContext): AudioBuffer {
     const sampleRate = context.sampleRate;
-    const length = sampleRate * 2.5; // 2.5 seconds
+    const length = sampleRate * 2.5;
     const impulse = context.createBuffer(2, length, sampleRate);
     const left = impulse.getChannelData(0);
     const right = impulse.getChannelData(1);
@@ -398,23 +327,31 @@ export class AudioEngine {
     return impulse;
   }
 
-  private async loadBreathBuffers() {
-    if (this.breathLoadPromise || !this.context) return this.breathLoadPromise;
+  private async loadAssets() {
+    if (this.assetsLoadPromise || !this.context) return this.assetsLoadPromise;
     const context = this.context;
-    this.breathLoadPromise = (async () => {
-      await Promise.all(Object.entries(BREATH_AUDIO_PATHS).map(async ([direction, path]) => {
-        try {
-          const response = await fetch(path);
-          if (!response.ok) throw new Error(`Breath audio request failed: ${response.status}`);
-          const audioData = await response.arrayBuffer();
-          const buffer = await context.decodeAudioData(audioData);
-          this.breathBuffers.set(direction as BreathDirection, buffer);
-        } catch {
-          // Le bruit filtré reste disponible si un fichier ne se charge pas.
-        }
-      }));
+    this.assetsLoadPromise = (async () => {
+      const loadBuffer = async (path: string) => {
+        const response = await fetch(path);
+        if (!response.ok) throw new Error(`Audio request failed: ${response.status}`);
+        const audioData = await response.arrayBuffer();
+        return await context.decodeAudioData(audioData);
+      };
+
+      await Promise.all([
+        ...Object.entries(BREATH_AUDIO_PATHS).map(async ([direction, path]) => {
+          try {
+            this.breathBuffers.set(direction as BreathDirection, await loadBuffer(path));
+          } catch {}
+        }),
+        ...Object.entries(AMBIENT_PATHS).map(async ([track, path]) => {
+          try {
+            this.ambientBuffers.set(track, await loadBuffer(path));
+          } catch {}
+        })
+      ]);
     })();
-    return this.breathLoadPromise;
+    return this.assetsLoadPromise;
   }
 
   private playRecordedBreath(buffer: AudioBuffer, durationMs: number) {
@@ -453,9 +390,7 @@ export class AudioEngine {
     if (!audioSession) return;
     try {
       audioSession.type = "playback";
-    } catch {
-      // Les versions d’iOS sans AudioSession Web API utilisent le comportement par défaut.
-    }
+    } catch {}
   }
 
   private restoreAudioSession() {
@@ -463,9 +398,7 @@ export class AudioEngine {
     if (!audioSession) return;
     try {
       audioSession.type = "ambient";
-    } catch {
-      // La restauration est optionnelle et peut être refusée par le navigateur.
-    }
+    } catch {}
   }
 
   private getNoiseBuffers(durationMs: number) {

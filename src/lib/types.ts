@@ -30,7 +30,7 @@ export interface UserProfile {
 }
 
 export interface SoundSettings {
-  musicTrack: "glacier" | "lagon" | "aurore";
+  musicTrack: "pluie" | "ocean" | "foret";
   musicVolume: number;
   breathVolume: number;
   hapticsEnabled: boolean;
@@ -43,7 +43,7 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
 };
 
 export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
-  musicTrack: "glacier",
+  musicTrack: "pluie",
   musicVolume: 32,
   breathVolume: 72,
   hapticsEnabled: false,
