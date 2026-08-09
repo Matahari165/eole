@@ -244,19 +244,21 @@ export class AudioEngine {
     if (!this.context || this.settings.breathVolume === 0 || !this.masterGain) return;
     const now = this.context.currentTime;
     const output = this.context.createGain();
-    const volume = (this.settings.breathVolume / 100) * 0.22;
+    const volume = (this.settings.breathVolume / 100) * 0.4;
     
     output.gain.setValueAtTime(0.001, now);
-    output.gain.exponentialRampToValueAtTime(volume, now + 0.008);
-    output.gain.exponentialRampToValueAtTime(0.001, now + 2.1);
+    output.gain.exponentialRampToValueAtTime(volume, now + 0.02);
+    output.gain.exponentialRampToValueAtTime(0.001, now + 6.5);
     output.connect(this.masterGain);
 
+    // Frequencies modeled after a deep Tibetan singing bowl
+    const baseFreq = 216;
     const partials = [
-      { frequency: 1046.5, level: 1, duration: 1.55 * 1.3 },
-      { frequency: 2098, level: 0.38, duration: 1.05 * 1.3 },
-      { frequency: 3136, level: 0.16, duration: 0.72 * 1.3 },
-      { frequency: 4186, level: 0.07, duration: 0.46 * 1.3 },
-      { frequency: 5230, level: 0.03, duration: 0.3 },
+      { frequency: baseFreq, level: 1, duration: 6.0 },
+      { frequency: baseFreq * 2.76, level: 0.45, duration: 4.5 },
+      { frequency: baseFreq * 5.4, level: 0.2, duration: 3.0 },
+      { frequency: baseFreq * 8.9, level: 0.08, duration: 1.5 },
+      { frequency: baseFreq * 13.2, level: 0.02, duration: 0.8 },
     ];
     let activePartials = partials.length;
 
