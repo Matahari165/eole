@@ -27,12 +27,11 @@ export function SessionConfigurator() {
   return (
     <div className="page-stack setup-page">
       <header className="page-header">
-        <div><p className="eyebrow">Nouvelle séance</p><h1>Prépare ton rythme.</h1><p>Ajuste seulement ce dont tu as besoin aujourd’hui.</p></div>
+        <div><p className="eyebrow">Nouvelle séance</p><h1>Prépare ton rythme.</h1></div>
       </header>
 
       <section className="setup-quick-start" aria-labelledby="quick-start-title">
         <div className="quick-start-copy">
-          <p className="eyebrow">Prêt quand tu l’es</p>
           <h2 id="quick-start-title">Lance ta séance</h2>
           <p>{rounds} rounds · {breaths} respirations · rythme {paceSummary}</p>
         </div>
@@ -43,15 +42,15 @@ export function SessionConfigurator() {
 
       <section className="setup-controls" aria-labelledby="setup-details-title">
         <div className="setup-details-heading">
-          <div><p className="eyebrow">Optionnel</p><h2 id="setup-details-title">Personnaliser la séance</h2></div>
+          <div><h2 id="setup-details-title">Personnaliser la séance</h2></div>
           {customized && <button className="reset-settings" type="button" onClick={() => { setRounds(DEFAULT_SESSION_CONFIG.rounds); setBreaths(DEFAULT_SESSION_CONFIG.breathsPerRound); setPace(DEFAULT_SESSION_CONFIG.pace); }}><RotateCcw size={16} aria-hidden="true" /> Réinitialiser</button>}
         </div>
         <div className="setup-control-grid">
-          <Stepper icon={<RotateCcw size={20} />} label="Nombre de rounds" hint="Cycles complets" value={rounds} min={1} max={8} onChange={setRounds} />
-          <Stepper icon={<Wind size={20} />} label="Respirations" hint="Avant chaque rétention" value={breaths} min={10} max={60} step={5} onChange={setBreaths} />
+          <Stepper icon={<RotateCcw size={20} />} label="Nombre de rounds" value={rounds} min={1} max={8} onChange={setRounds} />
+          <Stepper icon={<Wind size={20} />} label="Respirations" value={breaths} min={10} max={60} step={5} onChange={setBreaths} />
           <fieldset className="setting-card pace-card">
             <legend className="sr-only">Vitesse</legend>
-            <div className="setting-label"><span className="setting-icon" aria-hidden="true"><Gauge size={20} /></span><span><strong>Vitesse</strong><small>Rythme inspiration / expiration</small></span></div>
+            <div className="setting-label"><span className="setting-icon" aria-hidden="true"><Gauge size={20} /></span><span><strong>Vitesse</strong></span></div>
             <div className="pace-options">
               {paceOptions.map((option) => <label className="pace-option" data-selected={pace === option.value} key={option.value}><input type="radio" name="pace" value={option.value} checked={pace === option.value} onChange={() => setPace(option.value)} /><span>{option.label}</span><small>{option.detail}</small></label>)}
             </div>
@@ -62,10 +61,10 @@ export function SessionConfigurator() {
   );
 }
 
-function Stepper({ icon, label, hint, value, min, max, step = 1, onChange }: { icon: React.ReactNode; label: string; hint: string; value: number; min: number; max: number; step?: number; onChange: (value: number) => void }) {
+function Stepper({ icon, label, hint, value, min, max, step = 1, onChange }: { icon: React.ReactNode; label: string; hint?: string; value: number; min: number; max: number; step?: number; onChange: (value: number) => void }) {
   return (
     <div className="setting-card stepper-card">
-      <div className="setting-label"><span className="setting-icon" aria-hidden="true">{icon}</span><span><strong>{label}</strong><small>{hint}</small></span></div>
+      <div className="setting-label"><span className="setting-icon" aria-hidden="true">{icon}</span><span><strong>{label}</strong>{hint && <small>{hint}</small>}</span></div>
       <div className="stepper"><button type="button" onClick={() => onChange(Math.max(min, value - step))} disabled={value <= min} aria-label={`Diminuer ${label.toLowerCase()}`}><Minus size={19} /></button><output aria-live="polite">{value}</output><button type="button" onClick={() => onChange(Math.min(max, value + step))} disabled={value >= max} aria-label={`Augmenter ${label.toLowerCase()}`}><Plus size={19} /></button></div>
     </div>
   );

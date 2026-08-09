@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CalendarDays, Sparkles, Trophy, Wind } from "lucide-react";
+import { ArrowRight, CalendarDays, Trophy, Wind } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SummaryCards } from "@/components/stats/summary-cards";
@@ -8,12 +8,42 @@ import { calculateStats, formatDuration } from "@/lib/analytics";
 import { getProfile, getSessions } from "@/lib/repository";
 import type { BreathSession, UserProfile } from "@/lib/types";
 
+function getRandomGreeting() {
+  const hour = new Date().getHours();
+  let phrases = [];
+  if (hour < 12) {
+    phrases = [
+      "Commence ta journée en douceur.",
+      "Un souffle pour bien démarrer.",
+      "Réveille ton corps et ton esprit.",
+      "Prends un instant pour respirer ce matin."
+    ];
+  } else if (hour < 18) {
+    phrases = [
+      "Fais une pause, respire.",
+      "Prends un instant pour respirer.",
+      "Un moment de calme dans ta journée.",
+      "Recharge tes énergies."
+    ];
+  } else {
+    phrases = [
+      "Relâche les tensions de la journée.",
+      "Prépare-toi à une nuit paisible.",
+      "Un souffle pour apaiser ta soirée.",
+      "Détends-toi, la journée est finie."
+    ];
+  }
+  return phrases[Math.floor(Math.random() * phrases.length)];
+}
+
 export function DashboardOverview() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sessions, setSessions] = useState<BreathSession[] | null>(null);
   const [error, setError] = useState(false);
+  const [greeting, setGreeting] = useState("Prends un instant pour respirer.");
 
   useEffect(() => {
+    setGreeting(getRandomGreeting());
     Promise.all([getProfile(), getSessions()])
       .then(([nextProfile, nextSessions]) => {
         setProfile(nextProfile);
@@ -36,15 +66,13 @@ export function DashboardOverview() {
       <header className="page-header dashboard-header">
         <div>
           <p className="eyebrow">Bonjour {profile.firstName}</p>
-          <h1>Prends un instant pour respirer.</h1>
-          <p>Une séance guidée, à ton rythme.</p>
+          <h1>{greeting}</h1>
         </div>
         <span className="date-pill"><CalendarDays size={16} aria-hidden="true" />{new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span>
       </header>
 
       <section className="breath-hero">
         <div className="hero-copy">
-          <span className="hero-kicker"><Sparkles size={15} aria-hidden="true" /> Prêt pour ta prochaine session</span>
           <h2>Inspire. Relâche.<br />Reste présent.</h2>
           <p>3 rounds · 35 respirations · rythme normal</p>
           <Link className="button button-light" href="/app/session/nouvelle">Commencer <ArrowRight size={18} aria-hidden="true" /></Link>
