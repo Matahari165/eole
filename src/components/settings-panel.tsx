@@ -1,12 +1,10 @@
 "use client";
 
-import { Check, LoaderCircle, LogOut, Music2, Save, UserRound, Volume2, VolumeX, Waves } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Check, LoaderCircle, Music2, Save, Volume2, VolumeX, Waves } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
-import { getProfile, getSoundSettings, saveSoundSettings } from "@/lib/repository";
-import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_SOUND_SETTINGS, type SoundSettings, type UserProfile } from "@/lib/types";
+import { getSoundSettings, saveSoundSettings } from "@/lib/repository";
+import { DEFAULT_SOUND_SETTINGS, type SoundSettings } from "@/lib/types";
 
 const tracks: { value: SoundSettings["musicTrack"]; label: string; description: string }[] = [
   { value: "pluie", label: "Pluie douce", description: "Bruit blanc naturel" },
@@ -15,17 +13,14 @@ const tracks: { value: SoundSettings["musicTrack"]; label: string; description: 
 ];
 
 export function SettingsPanel() {
-  const router = useRouter();
   const [settings, setSettings] = useState(DEFAULT_SOUND_SETTINGS);
   const [initialSettings, setInitialSettings] = useState(DEFAULT_SOUND_SETTINGS);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const [ready, setReady] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [previewPending, setPreviewPending] = useState(false);
-  const [signingOut, setSigningOut] = useState(false);
   const [supportsHaptics, setSupportsHaptics] = useState(false);
   const previewRef = useRef<AudioEngine | null>(null);
   const previewTimersRef = useRef<number[]>([]);
@@ -33,19 +28,14 @@ export function SettingsPanel() {
 
   useEffect(() => {
     let active = true;
-    Promise.allSettled([getSoundSettings(), getProfile()])
-      .then(([settingsResult, profileResult]) => {
+    getSoundSettings()
+      .then((nextSettings) => {
         if (!active) return;
         setSupportsHaptics("vibrate" in navigator);
-        if (settingsResult.status === "fulfilled") {
-          setInitialSettings(settingsResult.value);
-          setSettings(settingsResult.value);
-        }
-        if (profileResult.status === "fulfilled") setProfile(profileResult.value);
-        if (settingsResult.status === "rejected" || profileResult.status === "rejected") {
-          setFeedback("Certains réglages n’ont pas pu être chargés. Les valeurs disponibles restent utilisables.");
-        }
+        setInitialSettings(nextSettings);
+        setSettings(nextSettings);
       })
+      .catch(() => active && setFeedback("Les réglages n’ont pas pu être chargés. Les valeurs par défaut restent utilisables."))
       .finally(() => active && setReady(true));
     return () => {
       active = false;
@@ -107,20 +97,6 @@ export function SettingsPanel() {
     }
   }
 
-  async function signOut() {
-    if (signingOut) return;
-    setSigningOut(true);
-    setFeedback(null);
-    try {
-      await createClient()?.auth.signOut();
-      router.replace("/connexion");
-      router.refresh();
-    } catch {
-      setFeedback("La déconnexion a échoué. Réessaie dans un instant.");
-      setSigningOut(false);
-    }
-  }
-
   const dirty = ready && JSON.stringify(settings) !== JSON.stringify(initialSettings);
 
   if (!ready) {
@@ -141,7 +117,6 @@ export function SettingsPanel() {
 
         <div className="settings-side">
           {supportsHaptics && <section className="content-card settings-section compact-section"><div className="settings-title"><span><Waves size={21} aria-hidden="true" /></span><div><h2>Vibrations</h2><p>Désactivées par défaut.</p></div></div><label className="toggle-row"><span>Signaler les changements de phase</span><input type="checkbox" checked={settings.hapticsEnabled} onChange={(event) => setSettings({ ...settings, hapticsEnabled: event.target.checked })} /><i aria-hidden="true" /></label></section>}
-          <section className="content-card settings-section compact-section"><div className="settings-title"><span><UserRound size={21} aria-hidden="true" /></span><div><h2>Compte</h2><p>{profile ? `${profile.firstName} · @${profile.username}` : "Profil indisponible"}</p></div></div><button className="text-button danger-text" type="button" disabled={signingOut} onClick={signOut}>{signingOut ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <LogOut size={17} aria-hidden="true" />}{signingOut ? "Déconnexion…" : "Se déconnecter"}</button></section>
         </div>
       </div>
       {(feedback || dirty || pending || saved) && <div className="settings-actions">

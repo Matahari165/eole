@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const isDevelopment = process.env.NODE_ENV !== "production";
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${isDevelopment ? " ws: http:" : ""}`,
+  `connect-src 'self'${isDevelopment ? " ws: http:" : ""}`,
   "img-src 'self' data:",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",

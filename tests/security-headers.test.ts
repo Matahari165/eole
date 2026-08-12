@@ -17,11 +17,11 @@ describe("security headers", () => {
     expect(headers.get("Permissions-Policy")).toContain("microphone=()");
   });
 
-  it("autorise Supabase sans permettre les objets ni l’intégration en iframe", async () => {
+  it("garde Neon côté serveur et interdit les objets et les iframes", async () => {
     const headers = await getSecurityHeaders();
     const policy = headers.get("Content-Security-Policy");
 
-    expect(policy).toContain("https://*.supabase.co");
+    expect(policy).not.toContain("neon.tech");
     expect(policy).toContain("object-src 'none'");
     expect(policy).toContain("frame-ancestors 'none'");
   });

@@ -4,17 +4,16 @@
 
 Eole est une application web de respiration guidée, pensée d’abord pour l’iPhone et utilisable sur Mac. Elle reprend le protocole respiratoire cyclique popularisé par la méthode Wim Hof, sans employer ce nom dans le produit et sans suggérer d’affiliation officielle.
 
-La promesse est simple : permettre de démarrer une séance personnalisée, la suivre les yeux fermés grâce au son, enregistrer automatiquement les rétentions et observer sa progression privée dans le temps.
+La promesse est simple : permettre de démarrer une séance personnalisée, la suivre les yeux fermés grâce au son, enregistrer automatiquement les rétentions et observer sa progression dans le temps.
 
 ## 2. Public et diffusion
 
 - Usage personnel dans un premier temps.
-- Partage ensuite avec un petit cercle de proches.
-- Chaque personne possède son propre compte et ses propres données.
+- Espace personnel unique, sans compte ni mot de passe.
 - L’application n’est pas référencée publiquement dans la V1 ; les utilisateurs y accèdent grâce au lien transmis.
-- Les données et statistiques restent privées. Aucun classement, ami ou partage social.
+- Aucun classement, ami ou partage social.
 
-Important : un lien non référencé n’est pas un véritable contrôle d’accès. Toute personne à qui le lien est transféré pourra créer un compte tant que les inscriptions sont ouvertes. Un système d’invitations pourra être ajouté plus tard si nécessaire.
+Important : un lien non référencé n’est pas un véritable contrôle d’accès. Toute personne qui possède l’adresse peut consulter, ajouter ou supprimer les données de cet espace unique.
 
 ## 3. Expérience d’une séance
 
@@ -116,30 +115,26 @@ Les séries quotidiennes et records servent de repères motivants. Le ton reste 
 
 ### Serveur
 
-- **Supabase Auth** pour les comptes e-mail et mot de passe.
-- **PostgreSQL Supabase** pour les profils, réglages, séances et rounds.
-- Sessions de connexion conservées dans des cookies via `@supabase/ssr`.
-- Politiques RLS : toutes les lectures et écritures sont limitées au propriétaire connecté. La suppression de séance ajoute la même protection dans la migration dédiée.
+- **Neon Postgres** pour le profil personnel, les réglages, les séances et les rounds.
+- Une route serveur Vercel utilise `DATABASE_URL`; le mot de passe Neon n’est jamais envoyé au navigateur.
+- Aucun système d’authentification. L’application publique et son API partagent le même espace personnel.
 
 ### Modèle de données
 
 | Table | Utilité |
 |---|---|
-| `profiles` | Prénom et pseudo de l’utilisateur |
+| `profiles` | Prénom et pseudo de l’espace personnel |
 | `user_settings` | Ambiance, volumes et vibrations |
 | `sessions` | Configuration et état général d’une séance |
 | `rounds` | Rétention et respirations de chaque round terminé |
 
-La suppression d’un compte entraîne la suppression de ses données par cascade dans PostgreSQL. L’interface de suppression et l’export CSV ne sont toutefois pas prioritaires pour la V1.
+La suppression individuelle d’une séance entraîne la suppression de ses rounds par cascade dans PostgreSQL. L’export CSV n’est pas prioritaire pour la V1.
 
-## 7. Authentification
+## 7. Accès
 
-- Inscription avec prénom, pseudo, e-mail et mot de passe.
-- Connexion par e-mail et mot de passe uniquement.
-- Aucun code ni lien de confirmation à chaque inscription, conformément au choix produit.
-- Réinitialisation du mot de passe par lien e-mail.
-
-Supabase active normalement la confirmation d’e-mail sur ses projets hébergés. Il faut la désactiver manuellement. Cela rend l’inscription plus directe mais permet aussi de créer un compte avec une adresse qui n’appartient pas réellement à la personne. Pour une diffusion plus large, il faudra réévaluer ce compromis et ajouter au minimum une protection anti-robot.
+- Aucun compte, mot de passe ou code de confirmation.
+- Accès direct à l’application avec son adresse publique.
+- La simplicité est volontaire pour cet usage personnel ; l’adresse ne constitue pas une protection.
 
 ## 8. Identité visuelle
 
@@ -172,14 +167,11 @@ Eole ne doit présenter aucun résultat comme un conseil médical ou une preuve 
 ## 10. États et erreurs à traiter
 
 - Chargement des données.
-- Compte ou session de connexion absent.
 - Connexion Internet interrompue.
 - Sauvegarde serveur échouée après une séance.
 - Aucune séance enregistrée.
 - Son bloqué avant le premier geste utilisateur.
 - Wake Lock indisponible.
-- Pseudo déjà utilisé.
-- E-mail de réinitialisation non envoyé.
 
 Une sauvegarde échouée ne doit jamais être présentée comme réussie.
 
@@ -203,13 +195,13 @@ Hors périmètre initial :
 - Programmes personnalisés enregistrés.
 - Partage social ou classement.
 - Notes de ressenti.
-- Export CSV et suppression autonome du compte.
+- Export CSV.
 - Mode sombre.
 - Pause pendant une séance.
 
 ## 12. État de mise en service
 
-État vérifié le 8 août 2026 :
+État historique vérifié le 8 août 2026, avant migration :
 
 - Projet Supabase créé et migration SQL appliquée.
 - Confirmation obligatoire des e-mails désactivée.
@@ -224,6 +216,19 @@ Hors périmètre initial :
 - Inscription immédiate, connexion, séance complète, sauvegarde, reconnexion, statistiques et réglages vérifiés sur le site public.
 - Comptes et séances de validation supprimés après les tests.
 - Suppression individuelle d’une séance implémentée dans l’interface, le dépôt et Supabase ; la migration `20260808100000_allow_session_deletion.sql` est appliquée et la politique RLS a été vérifiée.
+
+Migration Neon du 12 août 2026 :
+
+- Nouveau projet Neon `Eole` créé à Francfort sur l’offre gratuite.
+- La première version avec Neon Auth et Data API a été validée puis simplifiée à la demande du propriétaire.
+- Schéma applicatif recréé dans `neon/migrations/20260812130000_initial_eole_schema.sql`.
+- La migration additive `neon/migrations/20260812140000_personal_cloud_storage.sql` crée l’espace personnel unique sans supprimer l’ancien schéma lié à Neon Auth.
+- Le code utilise `@neondatabase/serverless` uniquement côté serveur ; les dépendances Neon Auth, Neon Data API et Supabase actives ont été retirées.
+- L’ancien projet Supabase est inaccessible au compte actuel et déclaré `Unhealthy` ; aucun ancien compte, mot de passe ou historique de séance n’a pu être repris.
+- `DATABASE_URL` et `NEXT_PUBLIC_EOLE_CLOUD_ENABLED` sont configurées dans Vercel pour Production et Preview ; les deux anciennes variables Supabase ont été supprimées.
+- Le déploiement Vercel `dpl_A6uuMTKvhFPfGSnZ9tLpPT8ba85c` est `READY` et sert `eole-sandy.vercel.app`.
+- Une séance publique d’un round et 26 secondes a été enregistrée, relue dans les statistiques puis supprimée ; les tables de séances et rounds sont revenues à zéro donnée de test.
+- Aucun groupe d’erreurs Vercel n’a été observé sur `/api/data` après ce parcours.
 
 Passe UX mobile du 8 août 2026 :
 
@@ -241,29 +246,25 @@ Passe UX mobile du 8 août 2026 :
 - Résultats conservés à l’écran si la sauvegarde échoue, avec un bouton pour réessayer.
 - Bouton « Lancer » placé immédiatement sous le titre sur iPhone, avec les réglages détaillés accessibles plus bas et une action persistante pendant le défilement.
 - Statistiques sans faux zéros les jours sans séance et écran vide centré sur la prochaine action utile.
-- Messages de connexion traduits en français sans exposer les erreurs techniques du serveur.
 - Sons respiratoires préparés à l’avance pour éviter les saccades pendant l’animation.
 - Contrastes, libellés des graphiques, navigation active et réduction des animations améliorés pour l’accessibilité.
 
 Avant le partage à des amis :
 
-1. Configurer un serveur SMTP personnalisé. Le serveur d’essai Supabase refuse les destinataires qui ne font pas partie de l’équipe du projet.
+1. Décider si l’accès public sans mot de passe reste acceptable, car toutes les données utilisent le même espace.
 2. Tester le son, le verrouillage de l’écran et la veille avec un iPhone physique,
    une fois avec écouteurs et une fois avec le haut-parleur, notamment avec le
    bouton silencieux activé et sur une version iOS antérieure à 17.
-3. Faire un dernier essai de récupération de mot de passe avec une véritable boîte e-mail.
 
 ## 13. Définition de terminé
 
 Eole V1 est réellement terminée lorsque :
 
-- un nouvel utilisateur peut créer son compte sans confirmer son e-mail ;
-- il peut se reconnecter et réinitialiser son mot de passe ;
+- l’application s’ouvre directement sans compte ;
 - une séance complète suit exactement les phases prévues ;
 - les sons restent synchronisés avec l’animation pour les trois vitesses ;
 - arrêter une séance conserve uniquement les rounds terminés ;
-- les résultats persistent après fermeture et reconnexion ;
-- deux utilisateurs ne peuvent jamais accéder aux données l’un de l’autre ;
+- les résultats persistent après fermeture puis réouverture ;
 - les statistiques sont justes sur 7 et 30 jours ;
 - l’interface est utilisable à 320, 375, 768, 1024 et 1440 pixels ;
 - l’application a été testée dans Safari sur un iPhone réel et sur Mac ;

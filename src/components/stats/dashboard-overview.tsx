@@ -43,13 +43,14 @@ export function DashboardOverview() {
   const [greeting, setGreeting] = useState("Prends un instant pour respirer.");
 
   useEffect(() => {
-    setGreeting(getRandomGreeting());
+    const greetingTimer = window.setTimeout(() => setGreeting(getRandomGreeting()), 0);
     Promise.all([getProfile(), getSessions()])
       .then(([nextProfile, nextSessions]) => {
         setProfile(nextProfile);
         setSessions(nextSessions);
       })
       .catch(() => setError(true));
+    return () => window.clearTimeout(greetingTimer);
   }, []);
 
   if (error) {

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { Brand } from "@/components/layout/brand";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isNeonConfigured } from "@/lib/neon/config";
 
 const links = [
   { href: "/app", label: "Accueil", icon: House, exact: true },
@@ -45,9 +45,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       </aside>
       <main className="app-main" id="main-content" ref={mainRef} tabIndex={-1}>
-        {!isSupabaseConfigured() && (
+        {!isNeonConfigured() && (
           <div className="demo-banner" role="status">
-            Mode aperçu — connecte Supabase pour activer les vrais comptes et la sauvegarde serveur.
+            Mode aperçu — connecte Neon pour activer la sauvegarde permanente.
           </div>
         )}
         {children}

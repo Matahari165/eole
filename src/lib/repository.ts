@@ -1,7 +1,7 @@
 "use client";
 
 import { demoProfile, demoSessions } from "@/lib/demo-data";
-import { createClient } from "@/lib/supabase/client";
+import { isNeonConfigured } from "@/lib/neon/config";
 import {
   DEFAULT_SOUND_SETTINGS,
   type BreathSession,
@@ -13,21 +13,10 @@ const DEMO_SESSION_KEY = "eole-demo-sessions";
 const DEMO_DELETED_SESSION_KEY = "eole-demo-deleted-sessions";
 const DEMO_SETTINGS_KEY = "eole-demo-settings";
 
-interface RawRound {
-  round_index: number;
-  breaths_completed: number;
-  retention_seconds: number;
-}
-
-interface RawSession {
-  id: string;
-  status: BreathSession["status"];
-  planned_rounds: number;
-  breaths_per_round: number;
-  pace: BreathSession["pace"];
-  started_at: string;
-  completed_at: string;
-  rounds: RawRound[];
+interface CloudState {
+  profile: UserProfile;
+  sessions: BreathSession[];
+  settings: SoundSettings;
 }
 
 function readDemoSessions() {
@@ -44,66 +33,41 @@ function readDeletedDemoSessionIds() {
   return new Set<string>(saved ? JSON.parse(saved) : []);
 }
 
+async function requestCloud<T>(init?: RequestInit): Promise<T> {
+  const response = await fetch("/api/data", {
+    cache: "no-store",
+    headers: { "Content-Type": "application/json", ...init?.headers },
+    ...init,
+  });
+  if (!response.ok) throw new Error(`Cloud storage unavailable (${response.status})`);
+  return response.json() as Promise<T>;
+}
+
+async function getCloudState() {
+  return requestCloud<CloudState>();
+}
+
 export async function getProfile(): Promise<UserProfile> {
-  const supabase = createClient();
-  if (!supabase) return demoProfile;
-  const { data, error } = await supabase.from("profiles").select("first_name, username").single();
-  if (error) throw error;
-  return { firstName: data.first_name, username: data.username };
+  if (!isNeonConfigured()) return demoProfile;
+  return (await getCloudState()).profile;
 }
 
 export async function getSessions(): Promise<BreathSession[]> {
-  const supabase = createClient();
-  if (!supabase) return readDemoSessions();
-  const { data, error } = await supabase
-    .from("sessions")
-    .select("id, status, planned_rounds, breaths_per_round, pace, started_at, completed_at, rounds(round_index, breaths_completed, retention_seconds)")
-    .order("completed_at", { ascending: false })
-    .limit(500);
-  if (error) throw error;
-  return ((data ?? []) as RawSession[]).map((session) => ({
-    id: session.id,
-    status: session.status,
-    plannedRounds: session.planned_rounds,
-    breathsPerRound: session.breaths_per_round,
-    pace: session.pace,
-    startedAt: session.started_at,
-    completedAt: session.completed_at,
-    rounds: [...(session.rounds ?? [])]
-      .sort((a, b) => a.round_index - b.round_index)
-      .map((round) => ({
-        roundIndex: round.round_index,
-        breathsCompleted: round.breaths_completed,
-        retentionSeconds: round.retention_seconds,
-      })),
-  })) as BreathSession[];
+  if (!isNeonConfigured()) return readDemoSessions();
+  return (await getCloudState()).sessions;
 }
 
 export async function saveSession(session: BreathSession) {
-  const supabase = createClient();
-  if (!supabase) {
+  if (!isNeonConfigured()) {
     const existing = typeof window === "undefined" ? [] : JSON.parse(window.localStorage.getItem(DEMO_SESSION_KEY) ?? "[]");
     window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify([session, ...existing]));
     return;
   }
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) throw userError ?? new Error("Session utilisateur absente");
-  const { error } = await supabase.rpc("save_breath_session", {
-    p_session_id: session.id,
-    p_status: session.status,
-    p_planned_rounds: session.plannedRounds,
-    p_breaths_per_round: session.breathsPerRound,
-    p_pace: session.pace,
-    p_started_at: session.startedAt,
-    p_completed_at: session.completedAt,
-    p_rounds: session.rounds,
-  });
-  if (error) throw error;
+  await requestCloud({ method: "POST", body: JSON.stringify({ type: "session", session }) });
 }
 
 export async function deleteSession(sessionId: string) {
-  const supabase = createClient();
-  if (!supabase) {
+  if (!isNeonConfigured()) {
     if (typeof window === "undefined") return;
     const existing = JSON.parse(window.localStorage.getItem(DEMO_SESSION_KEY) ?? "[]") as BreathSession[];
     window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(existing.filter((session) => session.id !== sessionId)));
@@ -112,45 +76,21 @@ export async function deleteSession(sessionId: string) {
     window.localStorage.setItem(DEMO_DELETED_SESSION_KEY, JSON.stringify([...deleted]));
     return;
   }
-  const { error } = await supabase.from("sessions").delete().eq("id", sessionId);
-  if (error) throw error;
+  await requestCloud({ method: "DELETE", body: JSON.stringify({ sessionId }) });
 }
 
 export async function getSoundSettings(): Promise<SoundSettings> {
-  const supabase = createClient();
-  if (!supabase) {
+  if (!isNeonConfigured()) {
     const saved = typeof window === "undefined" ? null : window.localStorage.getItem(DEMO_SETTINGS_KEY);
     return saved ? JSON.parse(saved) : DEFAULT_SOUND_SETTINGS;
   }
-  const { data, error } = await supabase
-    .from("user_settings")
-    .select("music_track, music_volume, breath_volume, haptics_enabled")
-    .maybeSingle();
-  if (error) throw error;
-  return data
-    ? {
-        musicTrack: data.music_track,
-        musicVolume: data.music_volume,
-        breathVolume: data.breath_volume,
-        hapticsEnabled: data.haptics_enabled,
-      }
-    : DEFAULT_SOUND_SETTINGS;
+  return (await getCloudState()).settings;
 }
 
 export async function saveSoundSettings(settings: SoundSettings) {
-  const supabase = createClient();
-  if (!supabase) {
+  if (!isNeonConfigured()) {
     window.localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify(settings));
     return;
   }
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) throw userError ?? new Error("Session utilisateur absente");
-  const { error } = await supabase.from("user_settings").upsert({
-    user_id: userData.user.id,
-    music_track: settings.musicTrack,
-    music_volume: settings.musicVolume,
-    breath_volume: settings.breathVolume,
-    haptics_enabled: settings.hapticsEnabled,
-  });
-  if (error) throw error;
+  await requestCloud({ method: "POST", body: JSON.stringify({ type: "settings", settings }) });
 }
