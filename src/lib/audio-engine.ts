@@ -27,7 +27,7 @@ export class AudioEngine {
   private ambientBuffers = new Map<string, AudioBuffer>();
   private noiseBuffers = new Map<number, AudioBuffer[]>();
   private breathBuffers = new Map<BreathDirection, AudioBuffer>();
-  private assetsLoadPromise: Promise<void> | null = null;
+  private assetLoadPromises = new Map<string, Promise<AudioBuffer | null>>();
   private noiseCursor = 0;
   private settings: SoundSettings;
 
@@ -72,11 +72,13 @@ export class AudioEngine {
   updateSettings(settings: SoundSettings) {
     const trackChanged = this.settings.musicTrack !== settings.musicTrack;
     this.settings = settings;
-    if (trackChanged && this.ambientSource) {
-      this.crossfadeAmbient();
-      return;
+    if (trackChanged && this.context) {
+      const requestedTrack = settings.musicTrack;
+      void this.ensureAmbientBuffer(requestedTrack).then((buffer) => {
+        if (buffer && this.settings.musicTrack === requestedTrack && this.ambientSource) this.crossfadeAmbient();
+      });
     }
-    if (this.ambientGain) {
+    if (!trackChanged && this.ambientGain) {
       const level = (settings.musicVolume / 100) * 0.5;
       this.ambientGain.gain.setTargetAtTime(level, this.context?.currentTime ?? 0, 0.2);
     }
@@ -85,7 +87,13 @@ export class AudioEngine {
   startAmbient(isCrossfade = false) {
     if (!this.context || this.settings.musicVolume === 0 || !this.masterGain) return;
     const buffer = this.ambientBuffers.get(this.settings.musicTrack);
-    if (!buffer) return;
+    if (!buffer) {
+      const requestedTrack = this.settings.musicTrack;
+      void this.ensureAmbientBuffer(requestedTrack).then((loadedBuffer) => {
+        if (loadedBuffer && this.settings.musicTrack === requestedTrack && !this.ambientSource) this.startAmbient(isCrossfade);
+      });
+      return;
+    }
 
     const now = this.context.currentTime;
     const source = this.context.createBufferSource();
@@ -310,7 +318,7 @@ export class AudioEngine {
     this.ambientBuffers.clear();
     this.noiseBuffers.clear();
     this.breathBuffers.clear();
-    this.assetsLoadPromise = null;
+    this.assetLoadPromises.clear();
     this.restoreAudioSession();
   }
 
@@ -330,30 +338,46 @@ export class AudioEngine {
   }
 
   private async loadAssets() {
-    if (this.assetsLoadPromise || !this.context) return this.assetsLoadPromise;
-    const context = this.context;
-    this.assetsLoadPromise = (async () => {
-      const loadBuffer = async (path: string) => {
-        const response = await fetch(path);
-        if (!response.ok) throw new Error(`Audio request failed: ${response.status}`);
-        const audioData = await response.arrayBuffer();
-        return await context.decodeAudioData(audioData);
-      };
+    if (!this.context) return;
+    await Promise.all([
+      ...Object.keys(BREATH_AUDIO_PATHS).map((direction) => this.ensureBreathBuffer(direction as BreathDirection)),
+      this.ensureAmbientBuffer(this.settings.musicTrack),
+    ]);
+  }
 
-      await Promise.all([
-        ...Object.entries(BREATH_AUDIO_PATHS).map(async ([direction, path]) => {
-          try {
-            this.breathBuffers.set(direction as BreathDirection, await loadBuffer(path));
-          } catch {}
-        }),
-        ...Object.entries(AMBIENT_PATHS).map(async ([track, path]) => {
-          try {
-            this.ambientBuffers.set(track, await loadBuffer(path));
-          } catch {}
-        })
-      ]);
-    })();
-    return this.assetsLoadPromise;
+  private async ensureBreathBuffer(direction: BreathDirection) {
+    const existing = this.breathBuffers.get(direction);
+    if (existing) return existing;
+    const buffer = await this.loadBuffer(BREATH_AUDIO_PATHS[direction]);
+    if (buffer) this.breathBuffers.set(direction, buffer);
+    return buffer;
+  }
+
+  private async ensureAmbientBuffer(track: SoundSettings["musicTrack"]) {
+    const existing = this.ambientBuffers.get(track);
+    if (existing) return existing;
+    const buffer = await this.loadBuffer(AMBIENT_PATHS[track]);
+    if (buffer) this.ambientBuffers.set(track, buffer);
+    return buffer;
+  }
+
+  private loadBuffer(path: string) {
+    const pending = this.assetLoadPromises.get(path);
+    if (pending) return pending;
+    const context = this.context;
+    if (!context) return Promise.resolve(null);
+    const request = fetch(path)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Audio request failed: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((audioData) => context.decodeAudioData(audioData))
+      .catch(() => {
+        this.assetLoadPromises.delete(path);
+        return null;
+      });
+    this.assetLoadPromises.set(path, request);
+    return request;
   }
 
   private playRecordedBreath(buffer: AudioBuffer, durationMs: number) {

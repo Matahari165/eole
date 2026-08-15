@@ -6,7 +6,7 @@ type BreathingPhase = Extract<SessionPhase, "inhale" | "exhale">;
 type RecoveryPhase = Extract<SessionPhase, "recovery-inhale" | "recovery-hold" | "recovery-exhale">;
 
 export function SessionMotionField() {
-  return <div className="session-motion-field" aria-hidden="true"><i /><i /><i /><span /><span /><span /><span /><span /></div>;
+  return <div className="session-motion-field" aria-hidden="true"><i /><span /><span /></div>;
 }
 
 export function BreathingVisual({ phase, breath, total, durationMs }: { phase: BreathingPhase; breath: number; total: number; durationMs: number }) {
@@ -16,7 +16,7 @@ export function BreathingVisual({ phase, breath, total, durationMs }: { phase: B
 
   return (
     <>
-      <p className="phase-label" aria-live="polite" style={{ visibility: "hidden" }}>{label}</p>
+      <p className="phase-label" aria-live="polite">{label}</p>
       <div className="breath-stage" style={style} role="img" aria-label={`${label}, respiration ${breath} sur ${total}`}>
         <div className="breath-circles" aria-hidden="true">
           <span /><span /><span /><span /><span /><span /><span />
@@ -24,6 +24,7 @@ export function BreathingVisual({ phase, breath, total, durationMs }: { phase: B
         <div className="breath-core">
           <span className="orb-light" aria-hidden="true" />
           <strong>{breath}</strong>
+          <small>sur {total}</small>
         </div>
       </div>
     </>

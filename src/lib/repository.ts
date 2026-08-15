@@ -19,6 +19,11 @@ interface CloudState {
   settings: SoundSettings;
 }
 
+export interface DashboardData {
+  profile: UserProfile;
+  sessions: BreathSession[];
+}
+
 function readDemoSessions() {
   if (typeof window === "undefined") return demoSessions;
   const saved = window.localStorage.getItem(DEMO_SESSION_KEY);
@@ -33,8 +38,9 @@ function readDeletedDemoSessionIds() {
   return new Set<string>(saved ? JSON.parse(saved) : []);
 }
 
-async function requestCloud<T>(init?: RequestInit): Promise<T> {
-  const response = await fetch("/api/data", {
+async function requestCloud<T>(view?: "dashboard" | "profile" | "sessions" | "settings", init?: RequestInit): Promise<T> {
+  const endpoint = view ? `/api/data?view=${view}` : "/api/data";
+  const response = await fetch(endpoint, {
     cache: "no-store",
     headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
@@ -43,18 +49,19 @@ async function requestCloud<T>(init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function getCloudState() {
-  return requestCloud<CloudState>();
-}
-
 export async function getProfile(): Promise<UserProfile> {
   if (!isNeonConfigured()) return demoProfile;
-  return (await getCloudState()).profile;
+  return (await requestCloud<Pick<CloudState, "profile">>("profile")).profile;
 }
 
 export async function getSessions(): Promise<BreathSession[]> {
   if (!isNeonConfigured()) return readDemoSessions();
-  return (await getCloudState()).sessions;
+  return (await requestCloud<Pick<CloudState, "sessions">>("sessions")).sessions;
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  if (!isNeonConfigured()) return { profile: demoProfile, sessions: readDemoSessions() };
+  return requestCloud<DashboardData>("dashboard");
 }
 
 export async function saveSession(session: BreathSession) {
@@ -63,7 +70,7 @@ export async function saveSession(session: BreathSession) {
     window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify([session, ...existing]));
     return;
   }
-  await requestCloud({ method: "POST", body: JSON.stringify({ type: "session", session }) });
+  await requestCloud(undefined, { method: "POST", body: JSON.stringify({ type: "session", session }) });
 }
 
 export async function deleteSession(sessionId: string) {
@@ -76,7 +83,7 @@ export async function deleteSession(sessionId: string) {
     window.localStorage.setItem(DEMO_DELETED_SESSION_KEY, JSON.stringify([...deleted]));
     return;
   }
-  await requestCloud({ method: "DELETE", body: JSON.stringify({ sessionId }) });
+  await requestCloud(undefined, { method: "DELETE", body: JSON.stringify({ sessionId }) });
 }
 
 export async function getSoundSettings(): Promise<SoundSettings> {
@@ -84,7 +91,7 @@ export async function getSoundSettings(): Promise<SoundSettings> {
     const saved = typeof window === "undefined" ? null : window.localStorage.getItem(DEMO_SETTINGS_KEY);
     return saved ? JSON.parse(saved) : DEFAULT_SOUND_SETTINGS;
   }
-  return (await getCloudState()).settings;
+  return (await requestCloud<Pick<CloudState, "settings">>("settings")).settings;
 }
 
 export async function saveSoundSettings(settings: SoundSettings) {
@@ -92,5 +99,5 @@ export async function saveSoundSettings(settings: SoundSettings) {
     window.localStorage.setItem(DEMO_SETTINGS_KEY, JSON.stringify(settings));
     return;
   }
-  await requestCloud({ method: "POST", body: JSON.stringify({ type: "settings", settings }) });
+  await requestCloud(undefined, { method: "POST", body: JSON.stringify({ type: "settings", settings }) });
 }

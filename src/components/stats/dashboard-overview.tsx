@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowRight, CalendarDays, Trophy, Wind } from "lucide-react";
+import { ArrowRight, CalendarDays, SlidersHorizontal, Trophy, Wind } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SummaryCards } from "@/components/stats/summary-cards";
 import { calculateStats, formatDuration } from "@/lib/analytics";
-import { getProfile, getSessions } from "@/lib/repository";
+import { getDashboardData } from "@/lib/repository";
 import type { BreathSession, UserProfile } from "@/lib/types";
 
 function getRandomGreeting() {
@@ -44,8 +44,8 @@ export function DashboardOverview() {
 
   useEffect(() => {
     const greetingTimer = window.setTimeout(() => setGreeting(getRandomGreeting()), 0);
-    Promise.all([getProfile(), getSessions()])
-      .then(([nextProfile, nextSessions]) => {
+    getDashboardData()
+      .then(({ profile: nextProfile, sessions: nextSessions }) => {
         setProfile(nextProfile);
         setSessions(nextSessions);
       })
@@ -53,20 +53,15 @@ export function DashboardOverview() {
     return () => window.clearTimeout(greetingTimer);
   }, []);
 
-  if (error) {
-    return <div className="state-card" role="alert"><h1>Impossible de charger ton espace.</h1><p>Vérifie ta connexion puis réessaie.</p><button className="button button-primary" type="button" onClick={() => window.location.reload()}>Réessayer</button></div>;
-  }
-  if (!profile || !sessions) return <DashboardSkeleton />;
-
-  const stats = calculateStats(sessions);
-  const last = sessions.find((session) => session.rounds.length > 0);
-  const nextMilestone = Math.ceil((stats.maxRetention + 1) / 15) * 15;
+  const stats = sessions ? calculateStats(sessions) : null;
+  const last = sessions?.find((session) => session.rounds.length > 0);
+  const nextMilestone = stats ? Math.ceil((stats.maxRetention + 1) / 15) * 15 : 0;
 
   return (
     <div className="page-stack dashboard-page">
       <header className="page-header dashboard-header">
         <div>
-          <p className="eyebrow">Bonjour {profile.firstName}</p>
+          <p className="eyebrow">{profile ? `Bonjour ${profile.firstName}` : "Ton espace Eole"}</p>
           <h1>{greeting}</h1>
         </div>
         <span className="date-pill"><CalendarDays size={16} aria-hidden="true" />{new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span>
@@ -76,7 +71,10 @@ export function DashboardOverview() {
         <div className="hero-copy">
           <h2>Inspire. Relâche.<br />Reste présent.</h2>
           <p>3 rounds · 35 respirations · rythme normal</p>
-          <Link className="button button-light" href="/app/session/nouvelle">Commencer <ArrowRight size={18} aria-hidden="true" /></Link>
+          <div className="hero-actions">
+            <Link className="button button-light" href="/app/session/active?rounds=3&breaths=35&pace=normal">Commencer <ArrowRight size={18} aria-hidden="true" /></Link>
+            <Link className="hero-adjust" href="/app/session/nouvelle"><SlidersHorizontal size={17} aria-hidden="true" /> Ajuster</Link>
+          </div>
         </div>
         <div className="hero-orb" aria-hidden="true">
           <span className="hero-orb-ring" />
@@ -84,9 +82,13 @@ export function DashboardOverview() {
         </div>
       </section>
 
-      {stats.sessionCount > 0 && <SummaryCards stats={stats} compact />}
+      {error && <section className="dashboard-inline-error" role="alert"><div><strong>Impossible de charger tes données.</strong><span>Tu peux toujours lancer une séance. Réessaie pour retrouver tes progrès.</span></div><button className="button button-secondary" type="button" onClick={() => window.location.reload()}>Réessayer</button></section>}
 
-      {stats.sessionCount > 0 && <div className="dashboard-lower">
+      {!error && !stats && <DashboardStatsSkeleton />}
+
+      {stats && stats.sessionCount > 0 && <SummaryCards stats={stats} compact />}
+
+      {stats && stats.sessionCount > 0 && <div className="dashboard-lower">
         <section className="content-card recent-card">
           <div className="section-heading"><div><p className="eyebrow">Dernière séance</p><h2>{last ? new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date(last.completedAt)) : "Aucune séance"}</h2></div><Link href="/app/statistiques">Tout voir</Link></div>
           {last ? (
@@ -108,6 +110,6 @@ function TrophyMark() {
   return <Trophy size={24} strokeWidth={1.8} aria-hidden="true" />;
 }
 
-function DashboardSkeleton() {
-  return <div className="page-stack" aria-busy="true" aria-label="Chargement de l’accueil"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-hero" /><div className="summary-grid">{Array.from({ length: 4 }).map((_, index) => <div className="skeleton skeleton-card" key={index} />)}</div></div>;
+function DashboardStatsSkeleton() {
+  return <div className="summary-grid" aria-busy="true" aria-label="Chargement de tes progrès">{Array.from({ length: 4 }).map((_, index) => <div className="skeleton skeleton-card" key={index} />)}</div>;
 }

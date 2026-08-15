@@ -39,14 +39,20 @@ function invalid() {
   return NextResponse.json({ error: "Données invalides" }, { status: 400 });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const sql = getDatabase();
   if (!sql) return unavailable();
 
+  const view = request.nextUrl.searchParams.get("view");
+  if (view && !["dashboard", "profile", "sessions", "settings"].includes(view)) return invalid();
+  const includeProfile = !view || view === "dashboard" || view === "profile";
+  const includeSessions = !view || view === "dashboard" || view === "sessions";
+  const includeSettings = !view || view === "settings";
+
   const [profiles, settingsRows, sessions] = await Promise.all([
-    sql`select first_name, username from public.personal_profile where id = 1`,
-    sql`select music_track, music_volume, breath_volume, haptics_enabled from public.personal_settings where id = 1`,
-    sql`
+    includeProfile ? sql`select first_name, username from public.personal_profile where id = 1` : Promise.resolve([]),
+    includeSettings ? sql`select music_track, music_volume, breath_volume, haptics_enabled from public.personal_settings where id = 1` : Promise.resolve([]),
+    includeSessions ? sql`
       select
         s.id,
         s.status,
@@ -70,22 +76,27 @@ export async function GET() {
       group by s.id
       order by s.completed_at desc
       limit 500
-    `,
+    ` : Promise.resolve([]),
   ]);
 
   const profile = profiles[0] as ProfileRow | undefined;
   const settings = settingsRows[0] as SettingsRow | undefined;
-  if (!profile || !settings) return NextResponse.json({ error: "Espace personnel non initialisé" }, { status: 500 });
+  if ((includeProfile && !profile) || (includeSettings && !settings)) {
+    return NextResponse.json({ error: "Espace personnel non initialisé" }, { status: 500 });
+  }
 
-  return NextResponse.json({
-    profile: { firstName: profile.first_name, username: profile.username },
-    settings: {
+  const payload: Record<string, unknown> = {};
+  if (profile) payload.profile = { firstName: profile.first_name, username: profile.username };
+  if (settings) {
+    payload.settings = {
       musicTrack: settings.music_track,
       musicVolume: settings.music_volume,
       breathVolume: settings.breath_volume,
       hapticsEnabled: settings.haptics_enabled,
-    },
-    sessions: (sessions as SessionRow[]).map((session) => ({
+    };
+  }
+  if (includeSessions) {
+    payload.sessions = (sessions as SessionRow[]).map((session) => ({
       id: session.id,
       status: session.status,
       plannedRounds: session.planned_rounds,
@@ -94,8 +105,10 @@ export async function GET() {
       startedAt: session.started_at,
       completedAt: session.completed_at,
       rounds: session.rounds,
-    })),
-  }, { headers: { "Cache-Control": "no-store" } });
+    }));
+  }
+
+  return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: NextRequest) {

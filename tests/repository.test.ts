@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { deleteSession, getSessions } from "@/lib/repository";
+import { deleteSession, getDashboardData, getSessions } from "@/lib/repository";
 
 describe("deleteSession", () => {
   beforeEach(() => {
@@ -16,5 +16,14 @@ describe("deleteSession", () => {
     expect(remaining).toHaveLength(sessions.length - 1);
     expect(remaining.some((session) => session.id === target.id)).toBe(false);
     expect(remaining[0]?.id).not.toBe(target.id);
+  });
+});
+
+describe("getDashboardData", () => {
+  it("regroupe le profil et les séances nécessaires à l’accueil", async () => {
+    const dashboard = await getDashboardData();
+
+    expect(dashboard.profile.firstName).toBeTruthy();
+    expect(dashboard.sessions.length).toBeGreaterThan(0);
   });
 });
