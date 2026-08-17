@@ -36,12 +36,18 @@ describe("AudioEngine", () => {
     });
 
     let startedSources = 0;
+    let currentTime = 0;
+    const gainParams: ReturnType<typeof audioParam>[] = [];
     class FakeAudioContext {
-      currentTime = 0;
+      get currentTime() { return currentTime; }
       destination = audioNode();
       sampleRate = 4;
       state = "running";
-      createGain = () => audioNode({ gain: audioParam() });
+      createGain = () => {
+        const gain = audioParam();
+        gainParams.push(gain);
+        return audioNode({ gain });
+      };
       createDynamicsCompressor = () => audioNode({ threshold: audioParam(), knee: audioParam(), ratio: audioParam(), attack: audioParam(), release: audioParam() });
       createConvolver = () => audioNode({ buffer: null });
       createBuffer = (channels: number, length: number) => ({ duration: 2, getChannelData: () => new Float32Array(length), numberOfChannels: channels });
@@ -64,6 +70,13 @@ describe("AudioEngine", () => {
 
     resolveOcean?.({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) });
     await vi.waitFor(() => expect(startedSources).toBe(1));
+    engine.startAmbient();
+    expect(startedSources).toBe(1);
+
+    currentTime = 3;
+    engine.playBreath("inhale", 2000);
+    expect(gainParams[2].cancelScheduledValues).toHaveBeenCalledOnce();
+    expect(gainParams[2].exponentialRampToValueAtTime).toHaveBeenCalledWith(expect.any(Number), 3.12);
     engine.destroy();
   });
 });

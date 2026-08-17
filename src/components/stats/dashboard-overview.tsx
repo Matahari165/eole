@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CalendarDays, SlidersHorizontal, Trophy, Wind } from "lucide-react";
+import { ArrowRight, CalendarDays, SlidersHorizontal, Trophy, Waves, Wind } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SummaryCards } from "@/components/stats/summary-cards";
@@ -8,49 +8,18 @@ import { calculateStats, formatDuration } from "@/lib/analytics";
 import { getDashboardData } from "@/lib/repository";
 import type { BreathSession, UserProfile } from "@/lib/types";
 
-function getRandomGreeting() {
-  const hour = new Date().getHours();
-  let phrases = [];
-  if (hour < 12) {
-    phrases = [
-      "Commence ta journée en douceur.",
-      "Un souffle pour bien démarrer.",
-      "Réveille ton corps et ton esprit.",
-      "Prends un instant pour respirer ce matin."
-    ];
-  } else if (hour < 18) {
-    phrases = [
-      "Fais une pause, respire.",
-      "Prends un instant pour respirer.",
-      "Un moment de calme dans ta journée.",
-      "Recharge tes énergies."
-    ];
-  } else {
-    phrases = [
-      "Relâche les tensions de la journée.",
-      "Prépare-toi à une nuit paisible.",
-      "Un souffle pour apaiser ta soirée.",
-      "Détends-toi, la journée est finie."
-    ];
-  }
-  return phrases[Math.floor(Math.random() * phrases.length)];
-}
-
 export function DashboardOverview() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sessions, setSessions] = useState<BreathSession[] | null>(null);
   const [error, setError] = useState(false);
-  const [greeting, setGreeting] = useState("Prends un instant pour respirer.");
 
   useEffect(() => {
-    const greetingTimer = window.setTimeout(() => setGreeting(getRandomGreeting()), 0);
     getDashboardData()
       .then(({ profile: nextProfile, sessions: nextSessions }) => {
         setProfile(nextProfile);
         setSessions(nextSessions);
       })
       .catch(() => setError(true));
-    return () => window.clearTimeout(greetingTimer);
   }, []);
 
   const stats = sessions ? calculateStats(sessions) : null;
@@ -62,14 +31,15 @@ export function DashboardOverview() {
       <header className="page-header dashboard-header">
         <div>
           <p className="eyebrow">{profile ? `Bonjour ${profile.firstName}` : "Ton espace Eole"}</p>
-          <h1>{greeting}</h1>
+          <h1>Prends un instant pour respirer.</h1>
         </div>
         <span className="date-pill"><CalendarDays size={16} aria-hidden="true" />{new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span>
       </header>
 
-      <section className="breath-hero">
+      <section className="breath-hero" aria-labelledby="daily-practice-title">
         <div className="hero-copy">
-          <h2>Inspire. Relâche.<br />Reste présent.</h2>
+          <p className="hero-kicker"><Waves size={16} strokeWidth={1.8} aria-hidden="true" /> Séance guidée</p>
+          <h2 id="daily-practice-title">Inspire. Relâche.<br />Reste présent.</h2>
           <p>3 rounds · 35 respirations · rythme normal</p>
           <div className="hero-actions">
             <Link className="button button-light" href="/app/session/active?rounds=3&breaths=35&pace=normal">Commencer <ArrowRight size={18} aria-hidden="true" /></Link>

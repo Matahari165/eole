@@ -142,7 +142,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   return (
     <main className={`session-screen session-running phase-${session.phase}`} onPointerUp={handleSessionPointerUp}>
       <SessionMotionField />
-      
+
       <div className="session-bg" aria-hidden="true">
         <div className="session-bg-layer session-bg-inhale" data-active={session.phase === "inhale"} />
         <div className="session-bg-layer session-bg-exhale" data-active={session.phase === "exhale"} />
@@ -150,17 +150,19 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
         <div className="session-bg-layer session-bg-recovery" data-active={["recovery-inhale", "recovery-hold", "recovery-exhale"].includes(session.phase)} />
       </div>
 
-      <header className="session-topbar"><span>Round {session.round} / {config.rounds}</span><button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} /></button></header>
-      
-      <div className="session-center">
-        <div className="visual-layer" data-visible={!!breathingPhase}>
-          <BreathingVisual phase={breathingPhase ?? "inhale"} breath={session.breath} total={config.breathsPerRound} durationMs={animationDuration} />
+      <header className="session-topbar">
+        <div className="session-position">
+          <span>Round {session.round} / {config.rounds}</span>
+          <small>{breathingPhase ? `Souffle ${session.breath} sur ${config.breathsPerRound}` : isRetention ? "Rétention libre" : "Récupération"}</small>
         </div>
-        <div className="visual-layer" data-visible={isRetention}>
-          <RetentionVisual seconds={session.retentionSeconds} />
-        </div>
-        <div className="visual-layer" data-visible={!!recoveryPhase}>
-          <RecoveryVisual phase={recoveryPhase ?? "recovery-inhale"} seconds={session.recoverySeconds} />
+        <button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} aria-hidden="true" /></button>
+      </header>
+
+      <div className="session-center" data-phase={session.phase}>
+        <div className="visual-layer" key={breathingPhase ? "breathing" : isRetention ? "retention" : "recovery"}>
+          {breathingPhase ? <BreathingVisual phase={breathingPhase} breath={session.breath} total={config.breathsPerRound} durationMs={animationDuration} /> : null}
+          {isRetention ? <RetentionVisual seconds={session.retentionSeconds} /> : null}
+          {recoveryPhase ? <RecoveryVisual phase={recoveryPhase} seconds={session.recoverySeconds} /> : null}
         </div>
         {isRetention && session.tapHint && <p className="retention-tap-hint" aria-live="polite">Double-tape pour terminer</p>}
       </div>

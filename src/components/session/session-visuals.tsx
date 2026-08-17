@@ -12,7 +12,11 @@ export function SessionMotionField() {
 export function BreathingVisual({ phase, breath, total, durationMs }: { phase: BreathingPhase; breath: number; total: number; durationMs: number }) {
   const inhale = phase === "inhale";
   const label = inhale ? "Inspire" : "Expire";
-  const style = { "--breath-duration": `${durationMs / 1000}s` } as CSSProperties;
+  const guidance = inhale ? "Laisse l’air entrer." : "Relâche sans forcer.";
+  const style = {
+    "--breath-duration": `${durationMs / 1000}s`,
+    "--breath-progress": `${(breath / total) * 360}deg`,
+  } as CSSProperties;
 
   return (
     <>
@@ -27,6 +31,7 @@ export function BreathingVisual({ phase, breath, total, durationMs }: { phase: B
           <small>sur {total}</small>
         </div>
       </div>
+      <p className="phase-guidance">{guidance}</p>
     </>
   );
 }
@@ -47,6 +52,7 @@ export function RetentionVisual({ seconds }: { seconds: number }) {
           {completedMinutes > 0 && <small>{completedMinutes} min franchie{completedMinutes > 1 ? "s" : ""}</small>}
         </div>
       </div>
+      <p className="phase-guidance">Reste détendu, sans chercher la performance.</p>
     </>
   );
 }
@@ -65,6 +71,7 @@ export function RecoveryVisual({ phase, seconds }: { phase: RecoveryPhase; secon
           <strong>{holding ? seconds : label}</strong>
         </div>
       </div>
+      <p className="phase-guidance">{holding ? "Garde le corps souple." : inhale ? "Remplis doucement." : "Relâche complètement."}</p>
     </>
   );
 }

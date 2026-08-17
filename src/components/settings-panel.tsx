@@ -1,15 +1,15 @@
 "use client";
 
-import { Check, LoaderCircle, Music2, Save, Volume2, VolumeX, Waves } from "lucide-react";
+import { Check, CloudRain, LoaderCircle, Music2, Save, Trees, Volume2, VolumeX, Waves, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
 import { getSoundSettings, saveSoundSettings } from "@/lib/repository";
 import { DEFAULT_SOUND_SETTINGS, type SoundSettings } from "@/lib/types";
 
-const tracks: { value: SoundSettings["musicTrack"]; label: string; description: string }[] = [
-  { value: "pluie", label: "Pluie douce", description: "Bruit blanc naturel" },
-  { value: "ocean", label: "Vagues de l'océan", description: "Flux et reflux apaisant" },
-  { value: "foret", label: "Forêt paisible", description: "Ambiance zen" },
+const tracks: { value: SoundSettings["musicTrack"]; label: string; description: string; icon: LucideIcon }[] = [
+  { value: "pluie", label: "Pluie douce", description: "Fine et régulière", icon: CloudRain },
+  { value: "ocean", label: "Océan calme", description: "Ressac ample et lent", icon: Waves },
+  { value: "foret", label: "Forêt paisible", description: "Feuillage lointain", icon: Trees },
 ];
 
 export function SettingsPanel() {
@@ -108,11 +108,11 @@ export function SettingsPanel() {
       <header className="page-header"><div><p className="eyebrow">Réglages</p><h1>Ton espace, ton ambiance.</h1></div></header>
       <div className="settings-layout">
         <section className="content-card settings-section">
-          <div className="settings-title"><span><Music2 size={21} aria-hidden="true" /></span><div><h2>Ambiance musicale</h2></div></div>
-          <fieldset className="track-fieldset"><legend className="sr-only">Ambiance musicale</legend><div className="track-grid">{tracks.map((track) => <label className="track-option" data-selected={settings.musicTrack === track.value} key={track.value}><input type="radio" name="track" checked={settings.musicTrack === track.value} onChange={() => setSettings({ ...settings, musicTrack: track.value })} /><span className="track-visual" aria-hidden="true"><i /><i /><i /></span><strong>{track.label}</strong><small>{track.description}</small>{settings.musicTrack === track.value && <Check className="track-check" size={17} aria-hidden="true" />}</label>)}</div></fieldset>
+          <div className="settings-title"><span><Music2 size={21} aria-hidden="true" /></span><div><h2>Paysage sonore</h2><p>Un fond discret, toujours sous les sons-guides.</p></div></div>
+          <fieldset className="track-fieldset"><legend className="sr-only">Paysage sonore</legend><div className="track-grid">{tracks.map((track) => { const TrackIcon = track.icon; return <label className="track-option" data-selected={settings.musicTrack === track.value} data-track={track.value} key={track.value}><input type="radio" name="track" checked={settings.musicTrack === track.value} onChange={() => setSettings({ ...settings, musicTrack: track.value })} /><span className="track-visual" aria-hidden="true"><TrackIcon size={27} strokeWidth={1.45} /><i /><i /><i /></span><strong>{track.label}</strong><small>{track.description}</small>{settings.musicTrack === track.value && <Check className="track-check" size={17} aria-hidden="true" />}</label>; })}</div></fieldset>
           <RangeSetting icon={<Music2 size={19} />} label="Volume de la musique" value={settings.musicVolume} onChange={(musicVolume) => setSettings({ ...settings, musicVolume })} />
           <RangeSetting icon={<Waves size={19} />} label="Volume de la respiration" value={settings.breathVolume} onChange={(breathVolume) => setSettings({ ...settings, breathVolume })} />
-          <button className="button button-secondary" type="button" disabled={previewPending} onClick={preview}>{previewPending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : previewing ? <VolumeX size={17} aria-hidden="true" /> : <Volume2 size={17} aria-hidden="true" />}{previewPending ? "Préparation du son…" : previewing ? "Arrêter l’aperçu" : "Écouter un aperçu"}</button>
+          <button className="button button-secondary" type="button" disabled={previewPending} aria-pressed={previewing} onClick={preview}>{previewPending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : previewing ? <VolumeX size={17} aria-hidden="true" /> : <Volume2 size={17} aria-hidden="true" />}{previewPending ? "Préparation du son…" : previewing ? "Arrêter l’aperçu" : "Écouter un aperçu"}</button>
         </section>
 
         <div className="settings-side">

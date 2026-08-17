@@ -8,7 +8,7 @@
 
 **Project:** Eole
 **Generated:** 2026-08-07 22:46:44
-**Updated:** 2026-08-14
+**Updated:** 2026-08-17
 **Category:** Guided breathwork and meditation
 **Direction:** Clarte aquatique - quiet, precise, reassuring
 **Design Dials:** Variance 4/10 | Motion 3/10 | Density 4/10
@@ -177,13 +177,21 @@ button.card:hover {
 - **During practice:** one dominant visual, one instruction, progress kept secondary.
 - **After practice:** factual result and a quiet next action; no gamification pressure.
 
+### Premium experience rules
+
+- Only the current practice phase is mounted and animated. Hidden phases never consume rendering work or remain exposed to assistive technologies.
+- The breathing guide owns the continuous motion. Other screens use short transitions for feedback and continuity only.
+- Ambient sound fades in over several seconds and automatically steps back under breath cues and bells.
+- Mobile translucent surfaces become near-solid to protect readability and reduce costly backdrop compositing.
+- Greeting and loading copy remain stable between server render and hydration to avoid visual shifts.
+
 ---
 
 ## Motion
 
 - Page entry: opacity only, `320ms`, standard ease-out.
 - Interaction feedback: `120-200ms`; never animate layout dimensions.
-- Session phase transitions: `520ms`, smooth ease-in-out.
+- Session phase transitions: background crossfade `520ms`; phase content enter `360ms`.
 - Continuous motion is reserved for the active breathing guide and explicit loading states.
 - `prefers-reduced-motion` removes every decorative and page-entry animation.
 
@@ -193,6 +201,8 @@ button.card:hover {
 - Ambient loops target about `-30 LUFS`, then are attenuated by the user-controlled gain.
 - True peaks stay below `-3 dBTP` and every loop uses soft fades.
 - Startup loads only the two breath cues and the selected ambience; other ambiences load on demand.
+- Ambience fade-in: `2.4s`; fade-out: `850ms`; track crossfade: `1.8s`.
+- Breath cues and bells duck ambience temporarily instead of competing for attention.
 
 ---
 
