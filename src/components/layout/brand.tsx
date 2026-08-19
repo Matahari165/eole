@@ -10,26 +10,13 @@ function EoleMark({ size = 35 }: { size?: number }) {
       height={size}
       aria-hidden="true"
     >
-      <defs>
-        <linearGradient id="brand-orb" x1="30%" y1="10%" x2="70%" y2="90%">
-          <stop offset="0%" stopColor="#35b7ca" />
-          <stop offset="52%" stopColor="#0d8fa5" />
-          <stop offset="100%" stopColor="#075e77" />
-        </linearGradient>
-        <radialGradient id="brand-glow" cx="42%" cy="36%" r="44%">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.3)" />
-          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-        </radialGradient>
-      </defs>
-      <circle cx="64" cy="64" r="42" fill="url(#brand-orb)" />
-      <circle cx="64" cy="64" r="42" fill="url(#brand-glow)" />
-      <circle cx="64" cy="64" r="45" fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
       <path
-        d="M28 64 C40 48, 52 48, 64 64 S88 80, 100 64"
-        fill="none"
-        stroke="rgba(255,255,255,0.9)"
-        strokeWidth="4.5"
-        strokeLinecap="round"
+        d="M21 69C34 43 54 31 76 34C91 36 103 45 109 59C91 48 70 47 51 54C39 58 29 63 21 69Z"
+        fill="#35B7CA"
+      />
+      <path
+        d="M21 69C39 59 59 55 78 58C91 60 102 65 109 72C96 89 77 97 57 93C41 90 29 81 21 69Z"
+        fill="#087D99"
       />
     </svg>
   );
