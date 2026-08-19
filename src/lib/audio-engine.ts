@@ -1,17 +1,50 @@
 import type { SoundSettings } from "@/lib/types";
 
 type BreathDirection = "inhale" | "exhale";
+type BreathVariant = "fast" | "normal" | "slow";
+
+export interface AudioReadiness {
+  breathGuides: boolean;
+  music: boolean;
+}
 
 const AMBIENT_PATHS: Record<SoundSettings["musicTrack"], string> = {
-  pluie: "/audio/eole-pluie.mp3",
-  ocean: "/audio/eole-ocean.mp3",
-  foret: "/audio/eole-foret.mp3",
+  bambou: "/audio/eole-bambou.mp3",
+  meditation: "/audio/eole-meditation.mp3",
+  serenite: "/audio/eole-serenite.mp3",
 };
 
-const BREATH_AUDIO_PATHS: Record<BreathDirection, string> = {
-  inhale: "/audio/eole-inhale.mp3",
-  exhale: "/audio/eole-exhale.mp3",
+const BREATH_AUDIO_PATHS: Record<BreathDirection, Record<BreathVariant, string>> = {
+  inhale: {
+    fast: "/audio/eole-inhale-fast.mp3",
+    normal: "/audio/eole-inhale-normal.mp3",
+    slow: "/audio/eole-inhale-slow.mp3",
+  },
+  exhale: {
+    fast: "/audio/eole-exhale-fast.mp3",
+    normal: "/audio/eole-exhale-normal.mp3",
+    slow: "/audio/eole-exhale-slow.mp3",
+  },
 };
+
+const BREATH_VARIANT_DURATIONS: Record<BreathVariant, number> = {
+  fast: 1250,
+  normal: 2000,
+  slow: 3000,
+};
+
+export function getBreathAssetPath(direction: BreathDirection, durationMs: number) {
+  const variants = Object.keys(BREATH_VARIANT_DURATIONS) as BreathVariant[];
+  const variant = variants.reduce(
+    (closest, candidate) => (
+      Math.abs(BREATH_VARIANT_DURATIONS[candidate] - durationMs) < Math.abs(BREATH_VARIANT_DURATIONS[closest] - durationMs)
+        ? candidate
+        : closest
+    ),
+    "normal",
+  );
+  return BREATH_AUDIO_PATHS[direction][variant];
+}
 
 const AMBIENT_FADE_IN_SECONDS = 2.4;
 const AMBIENT_FADE_OUT_SECONDS = 0.85;
@@ -31,7 +64,7 @@ export class AudioEngine {
   
   private ambientBuffers = new Map<string, AudioBuffer>();
   private noiseBuffers = new Map<number, AudioBuffer[]>();
-  private breathBuffers = new Map<BreathDirection, AudioBuffer>();
+  private breathBuffers = new Map<string, AudioBuffer>();
   private assetLoadPromises = new Map<string, Promise<AudioBuffer | null>>();
   private noiseCursor = 0;
   private settings: SoundSettings;
@@ -40,7 +73,7 @@ export class AudioEngine {
     this.settings = settings;
   }
 
-  async unlock() {
+  async unlock(breathDurationsMs: readonly number[] = [1250, 2000, 3000]) {
     this.setPlaybackAudioSession();
     this.context ??= new AudioContext();
 
@@ -71,7 +104,7 @@ export class AudioEngine {
     }
 
     if (this.context.state === "suspended") await this.context.resume();
-    await this.loadAssets();
+    return this.loadAssets(breathDurationsMs);
   }
 
   updateSettings(settings: SoundSettings) {
@@ -176,7 +209,7 @@ export class AudioEngine {
   playBreath(direction: BreathDirection, durationMs: number) {
     if (!this.context || this.settings.breathVolume === 0 || !this.masterGain) return;
     this.duckAmbient(durationMs / 1000, 0.68);
-    const recordedBreath = this.breathBuffers.get(direction);
+    const recordedBreath = this.breathBuffers.get(getBreathAssetPath(direction, durationMs));
     if (recordedBreath) {
       this.playRecordedBreath(recordedBreath, durationMs);
       return;
@@ -350,19 +383,30 @@ export class AudioEngine {
     this.ambientGain.gain.exponentialRampToValueAtTime(target, releaseAt + 0.34);
   }
 
-  private async loadAssets() {
-    if (!this.context) return;
-    await Promise.all([
-      ...Object.keys(BREATH_AUDIO_PATHS).map((direction) => this.ensureBreathBuffer(direction as BreathDirection)),
+  private async loadAssets(breathDurationsMs: readonly number[]): Promise<AudioReadiness> {
+    if (!this.context) return { breathGuides: false, music: false };
+    const breathPaths = new Set(
+      breathDurationsMs.flatMap((durationMs) => [
+        getBreathAssetPath("inhale", durationMs),
+        getBreathAssetPath("exhale", durationMs),
+      ]),
+    );
+    const paths = Array.from(breathPaths);
+    const [breathBuffers, ambientBuffer] = await Promise.all([
+      Promise.all(paths.map((path) => this.ensureBreathBuffer(path))),
       this.ensureAmbientBuffer(this.settings.musicTrack),
     ]);
+    return {
+      breathGuides: breathBuffers.every(Boolean),
+      music: Boolean(ambientBuffer),
+    };
   }
 
-  private async ensureBreathBuffer(direction: BreathDirection) {
-    const existing = this.breathBuffers.get(direction);
+  private async ensureBreathBuffer(path: string) {
+    const existing = this.breathBuffers.get(path);
     if (existing) return existing;
-    const buffer = await this.loadBuffer(BREATH_AUDIO_PATHS[direction]);
-    if (buffer) this.breathBuffers.set(direction, buffer);
+    const buffer = await this.loadBuffer(path);
+    if (buffer) this.breathBuffers.set(path, buffer);
     return buffer;
   }
 
@@ -401,11 +445,7 @@ export class AudioEngine {
     const duration = durationMs / 1000;
     const end = now + duration;
     
-    const requiredRate = buffer.duration / duration;
-    const playbackRate = Math.min(1.35, Math.max(0.7, requiredRate));
-
     source.buffer = buffer;
-    source.playbackRate.setValueAtTime(playbackRate, now);
     
     const volume = (this.settings.breathVolume / 100) * 0.7;
     gain.gain.setValueAtTime(0.001, now);
@@ -421,7 +461,7 @@ export class AudioEngine {
     }, { once: true });
     
     source.start(now);
-    source.stop(end + 0.02);
+    source.stop(end);
   }
 
   private setPlaybackAudioSession() {

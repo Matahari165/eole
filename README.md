@@ -7,10 +7,12 @@ Application en production : [eole-sandy.vercel.app](https://eole-sandy.vercel.ap
 ## Backend
 
 - Le projet Neon `Eole` est hébergé à Francfort sur l’offre gratuite.
-- Il n’y a ni compte, ni mot de passe, ni écran de connexion.
+- L’espace personnel est protégé par un code d’accès côté serveur et un cookie
+  signé, `HttpOnly` et limité au même site.
 - Le navigateur appelle uniquement l’API serveur d’Eole ; le mot de passe Neon reste secret dans Vercel.
 - Les réglages, les séances et les rounds sont communs à cet espace personnel unique.
-- Toute personne possédant l’adresse publique de l’application peut consulter ou modifier ces données.
+- Les routes de données refusent toute requête non authentifiée. Les écritures
+  vérifient aussi leur origine pour limiter les requêtes intersites.
 
 ## Lancer le projet
 
@@ -24,7 +26,10 @@ Sans configuration Neon, Eole fonctionne en mode aperçu avec des données local
 Pour activer la sauvegarde permanente, copier `.env.example` vers `.env.local`, puis renseigner :
 
 - `DATABASE_URL` avec la chaîne de connexion Neon groupée ;
-- `NEXT_PUBLIC_EOLE_CLOUD_ENABLED=true`.
+- `NEXT_PUBLIC_EOLE_CLOUD_ENABLED=true` ;
+- `EOLE_ACCESS_SECRET` avec un code personnel d’au moins 12 caractères, distinct
+  de tout autre mot de passe. Sans cette variable, le stockage cloud reste
+  volontairement verrouillé.
 
 Pour un nouveau projet Neon, exécuter uniquement `neon/migrations/20260812140000_personal_cloud_storage.sql`. Cette migration autonome crée l’espace personnel sans Neon Auth. Le fichier `20260812130000_initial_eole_schema.sql` conserve seulement l’historique de la première migration avec authentification.
 
@@ -35,6 +40,10 @@ npm run verify
 ```
 
 Cette commande contrôle le code, les types, les calculs statistiques et la compilation de production.
+
+Si la connexion disparaît après une séance, Eole garde temporairement le résultat
+sur l’iPhone et le synchronise au retour du réseau. Le service worker ne met en
+cache que les ressources statiques et audio, jamais les réponses de l’API privée.
 
 ## Ajouter l’application sur iPhone
 

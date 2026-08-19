@@ -1,15 +1,16 @@
 "use client";
 
-import { Check, CloudRain, LoaderCircle, Music2, Save, Trees, Volume2, VolumeX, Waves, type LucideIcon } from "lucide-react";
+import { Check, Leaf, LoaderCircle, LockKeyhole, MoonStar, Music2, Save, Sparkles, Volume2, VolumeX, Waves, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
+import { isNeonConfigured } from "@/lib/neon/config";
 import { getSoundSettings, saveSoundSettings } from "@/lib/repository";
 import { DEFAULT_SOUND_SETTINGS, type SoundSettings } from "@/lib/types";
 
 const tracks: { value: SoundSettings["musicTrack"]; label: string; description: string; icon: LucideIcon }[] = [
-  { value: "pluie", label: "Pluie douce", description: "Fine et régulière", icon: CloudRain },
-  { value: "ocean", label: "Océan calme", description: "Ressac ample et lent", icon: Waves },
-  { value: "foret", label: "Forêt paisible", description: "Feuillage lointain", icon: Trees },
+  { value: "bambou", label: "Flûte douce", description: "Bois, cordes et clochettes", icon: Leaf },
+  { value: "meditation", label: "Méditation", description: "Piano doux et nappes", icon: Sparkles },
+  { value: "serenite", label: "Sérénité", description: "Composition lente et aérienne", icon: MoonStar },
 ];
 
 export function SettingsPanel() {
@@ -21,6 +22,7 @@ export function SettingsPanel() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [previewPending, setPreviewPending] = useState(false);
+  const [locking, setLocking] = useState(false);
   const [supportsHaptics, setSupportsHaptics] = useState(false);
   const previewRef = useRef<AudioEngine | null>(null);
   const previewTimersRef = useRef<number[]>([]);
@@ -65,13 +67,13 @@ export function SettingsPanel() {
     setFeedback(null);
     previewRef.current = new AudioEngine(settings);
     try {
-      await previewRef.current.unlock();
+      await previewRef.current.unlock([2000]);
       previewRef.current.startAmbient();
-      previewRef.current.playBreath("inhale", 2200);
+      previewRef.current.playBreath("inhale", 2000);
       setPreviewing(true);
       previewTimersRef.current = [
-        window.setTimeout(() => previewRef.current?.playBreath("exhale", 2200), 2300),
-        window.setTimeout(stopPreview, 4800),
+        window.setTimeout(() => previewRef.current?.playBreath("exhale", 2000), 2100),
+        window.setTimeout(stopPreview, 4400),
       ];
     } catch {
       stopPreview();
@@ -97,6 +99,20 @@ export function SettingsPanel() {
     }
   }
 
+  async function lockDevice() {
+    if (locking) return;
+    setLocking(true);
+    setFeedback(null);
+    try {
+      const response = await fetch("/api/auth/lock", { method: "POST", credentials: "same-origin" });
+      if (!response.ok) throw new Error("lock failed");
+      window.location.reload();
+    } catch {
+      setFeedback("Cet iPhone n’a pas pu être verrouillé. Réessaie dans un instant.");
+      setLocking(false);
+    }
+  }
+
   const dirty = ready && JSON.stringify(settings) !== JSON.stringify(initialSettings);
 
   if (!ready) {
@@ -117,6 +133,7 @@ export function SettingsPanel() {
 
         <div className="settings-side">
           {supportsHaptics && <section className="content-card settings-section compact-section"><div className="settings-title"><span><Waves size={21} aria-hidden="true" /></span><div><h2>Vibrations</h2><p>Désactivées par défaut.</p></div></div><label className="toggle-row"><span>Signaler les changements de phase</span><input type="checkbox" checked={settings.hapticsEnabled} onChange={(event) => setSettings({ ...settings, hapticsEnabled: event.target.checked })} /><i aria-hidden="true" /></label></section>}
+          {isNeonConfigured() && <section className="content-card settings-section compact-section"><div className="settings-title"><span><LockKeyhole size={21} aria-hidden="true" /></span><div><h2>Accès</h2><p>Retire l’accès de cet appareil.</p></div></div><button className="button button-secondary button-wide" type="button" onClick={() => void lockDevice()} disabled={locking}>{locking ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <LockKeyhole size={17} aria-hidden="true" />}{locking ? "Verrouillage…" : "Verrouiller cet iPhone"}</button></section>}
         </div>
       </div>
       {(feedback || dirty || pending || saved) && <div className="settings-actions">

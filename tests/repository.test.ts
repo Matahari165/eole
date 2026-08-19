@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { deleteSession, getDashboardData, getSessions } from "@/lib/repository";
+import { deleteSession, getDashboardData, getSessions, getSoundSettings } from "@/lib/repository";
 
 describe("deleteSession", () => {
   beforeEach(() => {
@@ -25,5 +25,29 @@ describe("getDashboardData", () => {
 
     expect(dashboard.profile.firstName).toBeTruthy();
     expect(dashboard.sessions.length).toBeGreaterThan(0);
+  });
+});
+
+describe("getSoundSettings", () => {
+  it("convertit les anciens noms de piste sans perdre les volumes", async () => {
+    window.localStorage.setItem("eole-demo-settings", JSON.stringify({
+      musicTrack: "ocean",
+      musicVolume: 27,
+      breathVolume: 81,
+      hapticsEnabled: true,
+    }));
+
+    await expect(getSoundSettings()).resolves.toEqual({
+      musicTrack: "meditation",
+      musicVolume: 27,
+      breathVolume: 81,
+      hapticsEnabled: true,
+    });
+  });
+
+  it("ignore un réglage local corrompu", async () => {
+    window.localStorage.setItem("eole-demo-settings", "not-json");
+
+    await expect(getSoundSettings()).resolves.toMatchObject({ musicTrack: "bambou" });
   });
 });

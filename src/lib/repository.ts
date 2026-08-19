@@ -4,14 +4,17 @@ import { demoProfile, demoSessions } from "@/lib/demo-data";
 import { isNeonConfigured } from "@/lib/neon/config";
 import {
   DEFAULT_SOUND_SETTINGS,
+  normalizeMusicTrack,
   type BreathSession,
   type SoundSettings,
   type UserProfile,
 } from "@/lib/types";
+import { isValidSession, isValidSettings } from "@/lib/validation";
 
 const DEMO_SESSION_KEY = "eole-demo-sessions";
 const DEMO_DELETED_SESSION_KEY = "eole-demo-deleted-sessions";
 const DEMO_SETTINGS_KEY = "eole-demo-settings";
+const PENDING_SESSIONS_KEY = "eole-pending-sessions-v1";
 
 interface CloudState {
   profile: UserProfile;
@@ -24,18 +27,55 @@ export interface DashboardData {
   sessions: BreathSession[];
 }
 
+function readLocalJson(key: string): unknown {
+  if (typeof window === "undefined") return null;
+  try {
+    const saved = window.localStorage.getItem(key);
+    return saved ? JSON.parse(saved) as unknown : null;
+  } catch {
+    return null;
+  }
+}
+
 function readDemoSessions() {
   if (typeof window === "undefined") return demoSessions;
-  const saved = window.localStorage.getItem(DEMO_SESSION_KEY);
   const deleted = readDeletedDemoSessionIds();
-  const sessions = saved ? ([...JSON.parse(saved), ...demoSessions] as BreathSession[]) : demoSessions;
+  const stored = readLocalJson(DEMO_SESSION_KEY);
+  const sessions = [...(Array.isArray(stored) ? stored.filter(isValidSession) : []), ...demoSessions];
   return sessions.filter((session) => !deleted.has(session.id));
 }
 
 function readDeletedDemoSessionIds() {
   if (typeof window === "undefined") return new Set<string>();
-  const saved = window.localStorage.getItem(DEMO_DELETED_SESSION_KEY);
-  return new Set<string>(saved ? JSON.parse(saved) : []);
+  const values = readLocalJson(DEMO_DELETED_SESSION_KEY);
+  return new Set<string>(Array.isArray(values) ? values.filter((value): value is string => typeof value === "string") : []);
+}
+
+function readPendingSessions(): BreathSession[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = readLocalJson(PENDING_SESSIONS_KEY);
+    return Array.isArray(parsed) ? parsed.filter(isValidSession) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingSessions(sessions: BreathSession[]) {
+  window.localStorage.setItem(PENDING_SESSIONS_KEY, JSON.stringify(sessions));
+}
+
+function enqueuePendingSession(session: BreathSession) {
+  const pending = readPendingSessions().filter((item) => item.id !== session.id);
+  writePendingSessions([session, ...pending]);
+}
+
+function removePendingSession(sessionId: string) {
+  try {
+    writePendingSessions(readPendingSessions().filter((session) => session.id !== sessionId));
+  } catch {
+    // Une sauvegarde cloud réussie ne doit pas échouer à cause du stockage local.
+  }
 }
 
 async function requestCloud<T>(view?: "dashboard" | "profile" | "sessions" | "settings", init?: RequestInit): Promise<T> {
@@ -49,34 +89,65 @@ async function requestCloud<T>(view?: "dashboard" | "profile" | "sessions" | "se
   return response.json() as Promise<T>;
 }
 
-export async function getProfile(): Promise<UserProfile> {
-  if (!isNeonConfigured()) return demoProfile;
-  return (await requestCloud<Pick<CloudState, "profile">>("profile")).profile;
-}
-
 export async function getSessions(): Promise<BreathSession[]> {
   if (!isNeonConfigured()) return readDemoSessions();
-  return (await requestCloud<Pick<CloudState, "sessions">>("sessions")).sessions;
+  const pending = readPendingSessions();
+  try {
+    const cloudSessions = (await requestCloud<Pick<CloudState, "sessions">>("sessions")).sessions;
+    const pendingIds = new Set(pending.map((session) => session.id));
+    return [...pending, ...cloudSessions.filter((session) => !pendingIds.has(session.id))];
+  } catch (error) {
+    if (pending.length) return pending;
+    throw error;
+  }
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
   if (!isNeonConfigured()) return { profile: demoProfile, sessions: readDemoSessions() };
-  return requestCloud<DashboardData>("dashboard");
+  try {
+    return await requestCloud<DashboardData>("dashboard");
+  } catch (error) {
+    const pending = readPendingSessions();
+    if (pending.length) return { profile: demoProfile, sessions: pending };
+    throw error;
+  }
 }
 
-export async function saveSession(session: BreathSession) {
+export async function saveSession(session: BreathSession): Promise<{ sync: "cloud" | "local" | "pending" }> {
   if (!isNeonConfigured()) {
-    const existing = typeof window === "undefined" ? [] : JSON.parse(window.localStorage.getItem(DEMO_SESSION_KEY) ?? "[]");
+    const stored = readLocalJson(DEMO_SESSION_KEY);
+    const existing = Array.isArray(stored) ? stored.filter(isValidSession) : [];
     window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify([session, ...existing]));
-    return;
+    return { sync: "local" };
   }
-  await requestCloud(undefined, { method: "POST", body: JSON.stringify({ type: "session", session }) });
+  try {
+    await requestCloud(undefined, { method: "POST", body: JSON.stringify({ type: "session", session }) });
+    removePendingSession(session.id);
+    return { sync: "cloud" };
+  } catch {
+    enqueuePendingSession(session);
+    return { sync: "pending" };
+  }
+}
+
+export async function flushPendingSessions() {
+  if (!isNeonConfigured() || typeof window === "undefined" || !navigator.onLine) return;
+  for (const session of readPendingSessions()) {
+    try {
+      await requestCloud(undefined, { method: "POST", body: JSON.stringify({ type: "session", session }) });
+      removePendingSession(session.id);
+    } catch {
+      return;
+    }
+  }
 }
 
 export async function deleteSession(sessionId: string) {
+  if (typeof window !== "undefined") removePendingSession(sessionId);
   if (!isNeonConfigured()) {
     if (typeof window === "undefined") return;
-    const existing = JSON.parse(window.localStorage.getItem(DEMO_SESSION_KEY) ?? "[]") as BreathSession[];
+    const stored = readLocalJson(DEMO_SESSION_KEY);
+    const existing = Array.isArray(stored) ? stored.filter(isValidSession) : [];
     window.localStorage.setItem(DEMO_SESSION_KEY, JSON.stringify(existing.filter((session) => session.id !== sessionId)));
     const deleted = readDeletedDemoSessionIds();
     deleted.add(sessionId);
@@ -88,8 +159,14 @@ export async function deleteSession(sessionId: string) {
 
 export async function getSoundSettings(): Promise<SoundSettings> {
   if (!isNeonConfigured()) {
-    const saved = typeof window === "undefined" ? null : window.localStorage.getItem(DEMO_SETTINGS_KEY);
-    return saved ? JSON.parse(saved) : DEFAULT_SOUND_SETTINGS;
+    const parsed = readLocalJson(DEMO_SETTINGS_KEY) as (Partial<SoundSettings> & { musicTrack?: unknown }) | null;
+    if (!parsed || typeof parsed !== "object") return DEFAULT_SOUND_SETTINGS;
+    const normalized = {
+      ...DEFAULT_SOUND_SETTINGS,
+      ...parsed,
+      musicTrack: normalizeMusicTrack(parsed.musicTrack),
+    };
+    return isValidSettings(normalized) ? normalized : DEFAULT_SOUND_SETTINGS;
   }
   return (await requestCloud<Pick<CloudState, "settings">>("settings")).settings;
 }

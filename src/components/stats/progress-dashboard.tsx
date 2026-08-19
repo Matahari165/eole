@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowRight, CalendarRange, Clock3, Layers3, LoaderCircle, Trash2, Wind, X } from "lucide-react";
+import { ArrowRight, CalendarRange, Clock3, Download, Layers3, LoaderCircle, Trash2, Wind, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SummaryCards } from "@/components/stats/summary-cards";
 import { buildDailySeries, calculateStats, formatDuration } from "@/lib/analytics";
+import { buildSessionsCsv } from "@/lib/export-sessions";
 import { deleteSession, getSessions } from "@/lib/repository";
 import type { BreathSession } from "@/lib/types";
 
@@ -65,6 +66,19 @@ export function ProgressDashboard() {
     }
   }
 
+  function exportHistory() {
+    if (!sessions?.length) return;
+    const blob = new Blob([buildSessionsCsv(sessions)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `eole-historique-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   if (error) return <div className="state-card" role="alert"><h1>Les statistiques sont indisponibles.</h1><p>Vérifie ta connexion puis réessaie.</p><button className="button button-primary" type="button" onClick={() => window.location.reload()}>Réessayer</button></div>;
   if (!sessions) return <div className="page-stack" aria-busy="true" aria-label="Chargement des statistiques"><div className="skeleton skeleton-title" /><div className="skeleton skeleton-hero" /></div>;
 
@@ -100,7 +114,7 @@ export function ProgressDashboard() {
   return (
     <div className="page-stack stats-page">
       {deleteNotice && <p className="sr-only" role="status">{deleteNotice}</p>}
-      <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1></div><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></header>
+      <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1></div><div className="stats-header-actions"><button className="button button-secondary stats-export" type="button" onClick={exportHistory}><Download size={17} aria-hidden="true" /> Exporter</button><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></div></header>
       <SummaryCards stats={stats} />
 
       <section className="content-card chart-card">

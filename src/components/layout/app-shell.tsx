@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { Brand } from "@/components/layout/brand";
+import { AccessGate } from "@/components/auth/access-gate";
 import { isNeonConfigured } from "@/lib/neon/config";
+import { flushPendingSessions } from "@/lib/repository";
 
 const links = [
   { href: "/app", label: "Accueil", icon: House, exact: true },
@@ -25,10 +27,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     mainRef.current?.focus({ preventScroll: true });
   }, [pathname]);
 
-  if (sessionActive) return <>{children}</>;
+  useEffect(() => {
+    const sync = () => void flushPendingSessions();
+    sync();
+    window.addEventListener("online", sync);
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/sw.js");
+    }
+    return () => window.removeEventListener("online", sync);
+  }, []);
+
+  if (sessionActive) return <AccessGate>{children}</AccessGate>;
 
   return (
-    <div className="app-frame">
+    <AccessGate><div className="app-frame">
       <a className="skip-link" href="#main-content">Aller au contenu</a>
       <aside className="sidebar">
         <Brand />
@@ -63,6 +75,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
-    </div>
+    </div></AccessGate>
   );
 }

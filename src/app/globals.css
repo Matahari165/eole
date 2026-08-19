@@ -1,5 +1,5 @@
 :root {
-  --color-primary: #087d9d;
+  --color-primary: #066f8a;
   --color-primary-strong: #075e77;
   --color-secondary: #35b7ca;
   --color-accent: #7fd4dc;
@@ -10,7 +10,7 @@
   --color-muted: #59737d;
   --color-border: #d7e8ec;
   --color-danger: #b64343;
-  --color-ring: #087d9d;
+  --color-ring: #066f8a;
   --shadow-soft: 0 10px 32px rgba(31, 78, 91, 0.055);
   --shadow-float: 0 18px 52px rgba(18, 79, 94, 0.09);
   --radius-sm: 12px;
@@ -90,6 +90,8 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 .page-header > div:first-child { display: grid; gap: 0.42rem; }
 .page-header h1 { max-width: 740px; font-size: clamp(2.2rem, 5vw, 3.6rem); }
 .page-header > div > p:last-child { color: var(--color-muted); }
+.stats-header-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .65rem; }
+.stats-export { min-height: 42px; padding-block: .55rem; }
 .date-pill, .trend-pill { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--color-muted); background: rgba(255,255,255,.7); border: 1px solid var(--color-border); border-radius: 999px; padding: 0.5rem 0.75rem; font-size: 0.8rem; white-space: nowrap; }
 
 .breath-hero { position: relative; min-height: 340px; border-radius: var(--radius-lg); overflow: hidden; display: flex; align-items: center; padding: 3rem; color: #fff; background: linear-gradient(140deg, #075a70 0%, #0a7990 54%, #49afba 100%); box-shadow: var(--shadow-float); }
@@ -312,8 +314,8 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 .track-visual i { position: absolute; width: 38px; aspect-ratio: 1; border: 1px solid currentColor; border-radius: 50%; opacity: .08; }
 .track-visual i:nth-of-type(2) { width: 52px; opacity: .065; }
 .track-visual i:nth-of-type(3) { width: 66px; opacity: .05; }
-.track-option[data-track="ocean"] .track-visual { color: #187d9a; background: linear-gradient(155deg, #dceff4, #f8fcfd); }
-.track-option[data-track="foret"] .track-visual { color: #347f78; background: linear-gradient(155deg, #e2f2ed, #f8fcfd); }
+.track-option[data-track="meditation"] .track-visual { color: #187d9a; background: linear-gradient(155deg, #dceff4, #f8fcfd); }
+.track-option[data-track="serenite"] .track-visual { color: #347f78; background: linear-gradient(155deg, #e2f2ed, #f8fcfd); }
 .track-option strong { font-size: .82rem; }
 .track-option small { color: var(--color-muted); font-size: .75rem; }
 .track-check { position: absolute; top: .55rem; right: .55rem; padding: 3px; color: #fff; border-radius: 50%; background: var(--color-primary); }
@@ -365,6 +367,9 @@ h2 { font-weight: 600; letter-spacing: -0.025em; line-height: 1.16; }
 .auth-footer { margin-top: 1.3rem; padding-top: 1rem; border-top: 1px solid var(--color-border); color: var(--color-muted); text-align: center; font-size: .75rem; }
 .auth-footer a { color: var(--color-primary); font-weight: 650; }
 .auth-footer a { min-height: 44px; display: inline-flex; align-items: center; }
+.auth-checking { min-height: 190px; place-content: center; justify-items: center; text-align: center; }
+.auth-form .button, .auth-card > .button { width: 100%; }
+.auth-card code { overflow-wrap: anywhere; font-size: .72rem; }
 
 .state-card { width: min(600px, 100%); margin: 4rem auto; padding: 2rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: #fff; text-align: center; }
 .state-card h1 { font-size: 2rem; }
