@@ -1,15 +1,16 @@
 "use client";
 
-import { Check, LoaderCircle, Music2, Save, Volume2, VolumeX, Waves } from "lucide-react";
+import { Check, Leaf, LoaderCircle, LockKeyhole, MoonStar, Music2, Save, Sparkles, Volume2, VolumeX, Waves, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { AudioEngine } from "@/lib/audio-engine";
+import { isNeonConfigured } from "@/lib/neon/config";
 import { getSoundSettings, saveSoundSettings } from "@/lib/repository";
 import { DEFAULT_SOUND_SETTINGS, type SoundSettings } from "@/lib/types";
 
-const tracks: { value: SoundSettings["musicTrack"]; label: string; description: string }[] = [
-  { value: "pluie", label: "Pluie douce", description: "Bruit blanc naturel" },
-  { value: "ocean", label: "Vagues de l'océan", description: "Flux et reflux apaisant" },
-  { value: "foret", label: "Forêt paisible", description: "Ambiance zen" },
+const tracks: { value: SoundSettings["musicTrack"]; label: string; description: string; icon: LucideIcon }[] = [
+  { value: "bambou", label: "Flûte douce", description: "Bois, cordes et clochettes", icon: Leaf },
+  { value: "meditation", label: "Méditation", description: "Piano doux et nappes", icon: Sparkles },
+  { value: "serenite", label: "Sérénité", description: "Composition lente et aérienne", icon: MoonStar },
 ];
 
 export function SettingsPanel() {
@@ -21,6 +22,7 @@ export function SettingsPanel() {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const [previewPending, setPreviewPending] = useState(false);
+  const [locking, setLocking] = useState(false);
   const [supportsHaptics, setSupportsHaptics] = useState(false);
   const previewRef = useRef<AudioEngine | null>(null);
   const previewTimersRef = useRef<number[]>([]);
@@ -65,13 +67,13 @@ export function SettingsPanel() {
     setFeedback(null);
     previewRef.current = new AudioEngine(settings);
     try {
-      await previewRef.current.unlock();
+      await previewRef.current.unlock([2000]);
       previewRef.current.startAmbient();
-      previewRef.current.playBreath("inhale", 2200);
+      previewRef.current.playBreath("inhale", 2000);
       setPreviewing(true);
       previewTimersRef.current = [
-        window.setTimeout(() => previewRef.current?.playBreath("exhale", 2200), 2300),
-        window.setTimeout(stopPreview, 4800),
+        window.setTimeout(() => previewRef.current?.playBreath("exhale", 2000), 2100),
+        window.setTimeout(stopPreview, 4400),
       ];
     } catch {
       stopPreview();
@@ -97,6 +99,20 @@ export function SettingsPanel() {
     }
   }
 
+  async function lockDevice() {
+    if (locking) return;
+    setLocking(true);
+    setFeedback(null);
+    try {
+      const response = await fetch("/api/auth/lock", { method: "POST", credentials: "same-origin" });
+      if (!response.ok) throw new Error("lock failed");
+      window.location.reload();
+    } catch {
+      setFeedback("Cet iPhone n’a pas pu être verrouillé. Réessaie dans un instant.");
+      setLocking(false);
+    }
+  }
+
   const dirty = ready && JSON.stringify(settings) !== JSON.stringify(initialSettings);
 
   if (!ready) {
@@ -108,15 +124,16 @@ export function SettingsPanel() {
       <header className="page-header"><div><p className="eyebrow">Réglages</p><h1>Ton espace, ton ambiance.</h1></div></header>
       <div className="settings-layout">
         <section className="content-card settings-section">
-          <div className="settings-title"><span><Music2 size={21} aria-hidden="true" /></span><div><h2>Ambiance musicale</h2></div></div>
-          <fieldset className="track-fieldset"><legend className="sr-only">Ambiance musicale</legend><div className="track-grid">{tracks.map((track) => <label className="track-option" data-selected={settings.musicTrack === track.value} key={track.value}><input type="radio" name="track" checked={settings.musicTrack === track.value} onChange={() => setSettings({ ...settings, musicTrack: track.value })} /><span className="track-visual" aria-hidden="true"><i /><i /><i /></span><strong>{track.label}</strong><small>{track.description}</small>{settings.musicTrack === track.value && <Check className="track-check" size={17} aria-hidden="true" />}</label>)}</div></fieldset>
+          <div className="settings-title"><span><Music2 size={21} aria-hidden="true" /></span><div><h2>Paysage sonore</h2><p>Un fond discret, toujours sous les sons-guides.</p></div></div>
+          <fieldset className="track-fieldset"><legend className="sr-only">Paysage sonore</legend><div className="track-grid">{tracks.map((track) => { const TrackIcon = track.icon; return <label className="track-option" data-selected={settings.musicTrack === track.value} data-track={track.value} key={track.value}><input type="radio" name="track" checked={settings.musicTrack === track.value} onChange={() => setSettings({ ...settings, musicTrack: track.value })} /><span className="track-visual" aria-hidden="true"><TrackIcon size={27} strokeWidth={1.45} /><i /><i /><i /></span><strong>{track.label}</strong><small>{track.description}</small>{settings.musicTrack === track.value && <Check className="track-check" size={17} aria-hidden="true" />}</label>; })}</div></fieldset>
           <RangeSetting icon={<Music2 size={19} />} label="Volume de la musique" value={settings.musicVolume} onChange={(musicVolume) => setSettings({ ...settings, musicVolume })} />
           <RangeSetting icon={<Waves size={19} />} label="Volume de la respiration" value={settings.breathVolume} onChange={(breathVolume) => setSettings({ ...settings, breathVolume })} />
-          <button className="button button-secondary" type="button" disabled={previewPending} onClick={preview}>{previewPending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : previewing ? <VolumeX size={17} aria-hidden="true" /> : <Volume2 size={17} aria-hidden="true" />}{previewPending ? "Préparation du son…" : previewing ? "Arrêter l’aperçu" : "Écouter un aperçu"}</button>
+          <button className="button button-secondary" type="button" disabled={previewPending} aria-pressed={previewing} onClick={preview}>{previewPending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : previewing ? <VolumeX size={17} aria-hidden="true" /> : <Volume2 size={17} aria-hidden="true" />}{previewPending ? "Préparation du son…" : previewing ? "Arrêter l’aperçu" : "Écouter un aperçu"}</button>
         </section>
 
         <div className="settings-side">
           {supportsHaptics && <section className="content-card settings-section compact-section"><div className="settings-title"><span><Waves size={21} aria-hidden="true" /></span><div><h2>Vibrations</h2><p>Désactivées par défaut.</p></div></div><label className="toggle-row"><span>Signaler les changements de phase</span><input type="checkbox" checked={settings.hapticsEnabled} onChange={(event) => setSettings({ ...settings, hapticsEnabled: event.target.checked })} /><i aria-hidden="true" /></label></section>}
+          {isNeonConfigured() && <section className="content-card settings-section compact-section"><div className="settings-title"><span><LockKeyhole size={21} aria-hidden="true" /></span><div><h2>Accès</h2><p>Retire l’accès de cet appareil.</p></div></div><button className="button button-secondary button-wide" type="button" onClick={() => void lockDevice()} disabled={locking}>{locking ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : <LockKeyhole size={17} aria-hidden="true" />}{locking ? "Verrouillage…" : "Verrouiller cet iPhone"}</button></section>}
         </div>
       </div>
       {(feedback || dirty || pending || saved) && <div className="settings-actions">

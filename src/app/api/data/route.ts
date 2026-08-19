@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { hasValidSameOrigin, requireApiAccess } from "@/lib/auth/server";
 import { getDatabase } from "@/lib/neon/server";
-import type { BreathSession, SoundSettings } from "@/lib/types";
+import { normalizeMusicTrack, type BreathSession } from "@/lib/types";
+import { isUuid, isValidSession, isValidSettings } from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +12,7 @@ interface ProfileRow {
 }
 
 interface SettingsRow {
-  music_track: SoundSettings["musicTrack"];
+  music_track: "pluie" | "ocean" | "foret";
   music_volume: number;
   breath_volume: number;
   haptics_enabled: boolean;
@@ -39,14 +41,39 @@ function invalid() {
   return NextResponse.json({ error: "Données invalides" }, { status: 400 });
 }
 
-export async function GET() {
+async function handleApiRequest(operation: "read" | "write" | "delete", handler: () => Promise<NextResponse>) {
+  try {
+    return await handler();
+  } catch (error) {
+    const requestId = crypto.randomUUID();
+    console.error("[eole-api]", { requestId, operation, errorName: error instanceof Error ? error.name : "UnknownError" });
+    return NextResponse.json(
+      { error: "Erreur interne", requestId },
+      { status: 500, headers: { "X-Eole-Request-Id": requestId } },
+    );
+  }
+}
+
+export function GET(request: NextRequest) {
+  return handleApiRequest("read", () => readData(request));
+}
+
+async function readData(request: NextRequest) {
+  const denied = requireApiAccess(request);
+  if (denied) return denied;
   const sql = getDatabase();
   if (!sql) return unavailable();
 
+  const view = request.nextUrl.searchParams.get("view");
+  if (view && !["dashboard", "profile", "sessions", "settings"].includes(view)) return invalid();
+  const includeProfile = !view || view === "dashboard" || view === "profile";
+  const includeSessions = !view || view === "dashboard" || view === "sessions";
+  const includeSettings = !view || view === "settings";
+
   const [profiles, settingsRows, sessions] = await Promise.all([
-    sql`select first_name, username from public.personal_profile where id = 1`,
-    sql`select music_track, music_volume, breath_volume, haptics_enabled from public.personal_settings where id = 1`,
-    sql`
+    includeProfile ? sql`select first_name, username from public.personal_profile where id = 1` : Promise.resolve([]),
+    includeSettings ? sql`select music_track, music_volume, breath_volume, haptics_enabled from public.personal_settings where id = 1` : Promise.resolve([]),
+    includeSessions ? sql`
       select
         s.id,
         s.status,
@@ -70,22 +97,27 @@ export async function GET() {
       group by s.id
       order by s.completed_at desc
       limit 500
-    `,
+    ` : Promise.resolve([]),
   ]);
 
   const profile = profiles[0] as ProfileRow | undefined;
   const settings = settingsRows[0] as SettingsRow | undefined;
-  if (!profile || !settings) return NextResponse.json({ error: "Espace personnel non initialisé" }, { status: 500 });
+  if ((includeProfile && !profile) || (includeSettings && !settings)) {
+    return NextResponse.json({ error: "Espace personnel non initialisé" }, { status: 500 });
+  }
 
-  return NextResponse.json({
-    profile: { firstName: profile.first_name, username: profile.username },
-    settings: {
-      musicTrack: settings.music_track,
+  const payload: Record<string, unknown> = {};
+  if (profile) payload.profile = { firstName: profile.first_name, username: profile.username };
+  if (settings) {
+    payload.settings = {
+      musicTrack: normalizeMusicTrack(settings.music_track),
       musicVolume: settings.music_volume,
       breathVolume: settings.breath_volume,
       hapticsEnabled: settings.haptics_enabled,
-    },
-    sessions: (sessions as SessionRow[]).map((session) => ({
+    };
+  }
+  if (includeSessions) {
+    payload.sessions = (sessions as SessionRow[]).map((session) => ({
       id: session.id,
       status: session.status,
       plannedRounds: session.planned_rounds,
@@ -94,11 +126,20 @@ export async function GET() {
       startedAt: session.started_at,
       completedAt: session.completed_at,
       rounds: session.rounds,
-    })),
-  }, { headers: { "Cache-Control": "no-store" } });
+    }));
+  }
+
+  return NextResponse.json(payload, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function POST(request: NextRequest) {
+export function POST(request: NextRequest) {
+  return handleApiRequest("write", () => writeData(request));
+}
+
+async function writeData(request: NextRequest) {
+  const denied = requireApiAccess(request);
+  if (denied) return denied;
+  if (!hasValidSameOrigin(request)) return NextResponse.json({ error: "Origine invalide" }, { status: 403 });
   const sql = getDatabase();
   if (!sql) return unavailable();
   const body = (await request.json().catch(() => null)) as { type?: unknown; session?: unknown; settings?: unknown } | null;
@@ -122,9 +163,14 @@ export async function POST(request: NextRequest) {
 
   if (body?.type === "settings" && isValidSettings(body.settings)) {
     const settings = body.settings;
+    const storedTrack = {
+      bambou: "pluie",
+      meditation: "ocean",
+      serenite: "foret",
+    }[settings.musicTrack];
     await sql`
       update public.personal_settings
-      set music_track = ${settings.musicTrack}::public.music_track,
+      set music_track = ${storedTrack}::public.music_track,
           music_volume = ${settings.musicVolume},
           breath_volume = ${settings.breathVolume},
           haptics_enabled = ${settings.hapticsEnabled},
@@ -137,49 +183,18 @@ export async function POST(request: NextRequest) {
   return invalid();
 }
 
-export async function DELETE(request: NextRequest) {
+export function DELETE(request: NextRequest) {
+  return handleApiRequest("delete", () => deleteData(request));
+}
+
+async function deleteData(request: NextRequest) {
+  const denied = requireApiAccess(request);
+  if (denied) return denied;
+  if (!hasValidSameOrigin(request)) return NextResponse.json({ error: "Origine invalide" }, { status: 403 });
   const sql = getDatabase();
   if (!sql) return unavailable();
   const body = (await request.json().catch(() => null)) as { sessionId?: unknown } | null;
   if (typeof body?.sessionId !== "string" || !isUuid(body.sessionId)) return invalid();
   await sql`delete from public.personal_sessions where id = ${body.sessionId}::uuid`;
   return NextResponse.json({ ok: true });
-}
-
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function isIntegerBetween(value: unknown, min: number, max: number) {
-  return Number.isInteger(value) && Number(value) >= min && Number(value) <= max;
-}
-
-function isValidSession(value: unknown): value is BreathSession {
-  if (!value || typeof value !== "object") return false;
-  const session = value as Partial<BreathSession>;
-  if (typeof session.id !== "string" || !isUuid(session.id)) return false;
-  if (session.status !== "completed" && session.status !== "stopped") return false;
-  if (session.pace !== "slow" && session.pace !== "normal" && session.pace !== "fast") return false;
-  if (!isIntegerBetween(session.plannedRounds, 1, 8) || !isIntegerBetween(session.breathsPerRound, 10, 60)) return false;
-  if (typeof session.startedAt !== "string" || typeof session.completedAt !== "string") return false;
-  const startedAt = Date.parse(session.startedAt);
-  const completedAt = Date.parse(session.completedAt);
-  if (!Number.isFinite(startedAt) || !Number.isFinite(completedAt) || completedAt < startedAt) return false;
-  if (!Array.isArray(session.rounds) || session.rounds.length > 8) return false;
-  return session.rounds.every((round) =>
-    isIntegerBetween(round.roundIndex, 1, 8) &&
-    isIntegerBetween(round.breathsCompleted, 10, 60) &&
-    isIntegerBetween(round.retentionSeconds, 1, 3600),
-  );
-}
-
-function isValidSettings(value: unknown): value is SoundSettings {
-  if (!value || typeof value !== "object") return false;
-  const settings = value as Partial<SoundSettings>;
-  return (
-    (settings.musicTrack === "pluie" || settings.musicTrack === "ocean" || settings.musicTrack === "foret") &&
-    isIntegerBetween(settings.musicVolume, 0, 100) &&
-    isIntegerBetween(settings.breathVolume, 0, 100) &&
-    typeof settings.hapticsEnabled === "boolean"
-  );
 }

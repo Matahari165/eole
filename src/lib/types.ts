@@ -1,5 +1,6 @@
 export type Pace = "slow" | "normal" | "fast";
 export type SessionStatus = "completed" | "stopped";
+export type MusicTrack = "bambou" | "meditation" | "serenite";
 
 export interface SessionConfig {
   rounds: number;
@@ -30,7 +31,7 @@ export interface UserProfile {
 }
 
 export interface SoundSettings {
-  musicTrack: "pluie" | "ocean" | "foret";
+  musicTrack: MusicTrack;
   musicVolume: number;
   breathVolume: number;
   hapticsEnabled: boolean;
@@ -43,11 +44,18 @@ export const DEFAULT_SESSION_CONFIG: SessionConfig = {
 };
 
 export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
-  musicTrack: "pluie",
+  musicTrack: "bambou",
   musicVolume: 32,
   breathVolume: 72,
   hapticsEnabled: false,
 };
+
+export function normalizeMusicTrack(value: unknown): MusicTrack {
+  if (value === "bambou" || value === "pluie") return "bambou";
+  if (value === "meditation" || value === "ocean") return "meditation";
+  if (value === "serenite" || value === "foret") return "serenite";
+  return DEFAULT_SOUND_SETTINGS.musicTrack;
+}
 
 export const PACE_TIMINGS: Record<Pace, { inhale: number; exhale: number }> = {
   slow: { inhale: 3000, exhale: 3000 },

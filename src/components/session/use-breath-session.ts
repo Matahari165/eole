@@ -18,6 +18,8 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const [results, setResults] = useState<RoundResult[]>([]);
   const [savedSession, setSavedSession] = useState<BreathSession | null>(null);
   const [tapHint, setTapHint] = useState(false);
+  const [audioNotice, setAudioNotice] = useState<string | null>(null);
+  const [syncPending, setSyncPending] = useState(false);
   
   const audioRef = useRef<AudioEngine | null>(null);
   const audioStartCancelledRef = useRef(false);
@@ -34,6 +36,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   useEffect(() => {
     audioRef.current = new AudioEngine(initialSettingsRef.current);
     return () => {
+      audioStartCancelledRef.current = true;
       audioRef.current?.destroy();
       void wakeLockRef.current?.release();
     };
@@ -58,13 +61,16 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     setPhase("starting");
     const audio = audioRef.current;
     if (audio) {
-      void audio.unlock()
-        .then(() => {
-          if (!audioStartCancelledRef.current) audio.startAmbient();
-        })
-        .catch(() => {
-          // La séance reste utilisable sans son si Web Audio est indisponible.
-        });
+      const paceDuration = PACE_TIMINGS[config.pace].inhale;
+      try {
+        const readiness = await audio.unlock(paceDuration === 2000 ? [2000] : [paceDuration, 2000]);
+        if (audioStartCancelledRef.current) return;
+        if (readiness.music) audio.startAmbient();
+        if (!readiness.breathGuides) setAudioNotice("Les respirations enregistrées n’ont pas pu être chargées. Le guide de secours reste actif.");
+        else if (!readiness.music) setAudioNotice("La musique n’a pas pu être chargée. Les respirations restent actives.");
+      } catch {
+        setAudioNotice("Le son n’est pas disponible. La séance peut continuer sans audio.");
+      }
     }
     startedAtRef.current = new Date().toISOString();
     if ("wakeLock" in navigator) {
@@ -72,7 +78,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     }
     setCountdownSeconds(3);
     setPhase("countdown");
-  }, []);
+  }, [config.pace]);
 
   const sessionInProgress = !["ready", "complete", "error"].includes(phase);
   useEffect(() => {
@@ -156,7 +162,10 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
 
   const endRetention = useCallback(() => {
     if (phase !== "retention") return;
-    pendingRetentionRef.current = Math.floor((performance.now() - retentionStartedRef.current) / 1000);
+    pendingRetentionRef.current = Math.max(
+      1,
+      Math.floor((performance.now() - retentionStartedRef.current) / 1000),
+    );
     cue(620);
     setPhase("recovery-inhale");
   }, [cue, phase]);
@@ -208,7 +217,8 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     }
     setPhase("saving");
     try {
-      await saveSession(session);
+      const result = await saveSession(session);
+      setSyncPending(result.sync === "pending");
       setPhase("complete");
     } catch {
       setPhase("error");
@@ -224,7 +234,8 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     persistingRef.current = true;
     setPhase("saving");
     try {
-      await saveSession(savedSession);
+      const result = await saveSession(savedSession);
+      setSyncPending(result.sync === "pending");
       setPhase("complete");
     } catch {
       setPhase("error");
@@ -254,5 +265,5 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     void persist("stopped", results);
   }, [persist, results]);
 
-  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, start, stop, endRetention, retrySave, setTapHint };
+  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, audioNotice, syncPending, start, stop, endRetention, retrySave, setTapHint };
 }

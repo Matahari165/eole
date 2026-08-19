@@ -36,10 +36,6 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   }, []);
 
   useEffect(() => {
-    if (sessionPhase === "ready") void startSession();
-  }, [sessionPhase, startSession]);
-
-  useEffect(() => {
     if (confirmStop) {
       dialogRef.current?.showModal();
       continueRef.current?.focus();
@@ -75,16 +71,18 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   }, [sessionInProgress]);
 
   if (session.phase === "ready" || session.phase === "starting" || session.phase === "countdown") {
+    const ready = session.phase === "ready";
     const countdown = session.phase === "countdown";
     return (
-      <main className={`session-screen session-ready${countdown ? " session-countdown" : ""}`} aria-busy={!countdown}>
+      <main className={`session-screen session-ready${countdown ? " session-countdown" : ""}`} aria-busy={!ready && !countdown}>
         <div className="ready-wave" aria-hidden="true"><span /><span /><span /></div>
         <div className="session-ready-content">
-          <p className="eyebrow">{countdown ? `Round 1 sur ${config.rounds}` : "Préparation"}</p>
-          <div className="countdown-orb" aria-live="polite" aria-atomic="true">{countdown ? <strong>{session.countdownSeconds}</strong> : <LoaderCircle className="spin" size={34} aria-hidden="true" />}</div>
-          <h1>{countdown ? "Installe-toi." : "Préparation…"}</h1>
-          <p>{countdown ? "Le premier souffle arrive." : "Le son se prépare en douceur."}</p>
-          {countdown && settingsFallback ? <p className="session-audio-note">Les réglages audio par défaut sont utilisés.</p> : null}
+          <p className="eyebrow">{countdown ? `Round 1 sur ${config.rounds}` : ready ? "Séance prête" : "Préparation"}</p>
+          <div className="countdown-orb" aria-live="polite" aria-atomic="true">{countdown ? <strong>{session.countdownSeconds}</strong> : ready ? <Check size={34} aria-hidden="true" /> : <LoaderCircle className="spin" size={34} aria-hidden="true" />}</div>
+          <h1>{countdown ? "Installe-toi." : ready ? "Tout est prêt." : "Préparation…"}</h1>
+          <p>{countdown ? "Le premier souffle arrive." : ready ? "Active le son puis laisse-toi guider." : "Les respirations et la musique se chargent."}</p>
+          {ready ? <button className="button button-primary button-large" type="button" onClick={() => void startSession()}>Démarrer la séance</button> : null}
+          {countdown && (settingsFallback || session.audioNotice) ? <p className="session-audio-note">{session.audioNotice ?? "Les réglages audio par défaut sont utilisés."}</p> : null}
         </div>
       </main>
     );
@@ -100,7 +98,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
     const roundsCount = saved?.rounds.length ?? 0;
     const stopped = saved?.status === "stopped";
     const failed = session.phase === "error";
-    const outcome = getSessionOutcome({ failed, stopped, roundsCount });
+    const outcome = getSessionOutcome({ failed, stopped, roundsCount, syncPending: session.syncPending });
     return (
       <main className="session-screen session-complete">
         <div className={`complete-mark${stopped || failed ? " complete-mark-neutral" : ""}`}>{stopped || failed ? <CircleStop size={34} aria-hidden="true" /> : <Check size={34} aria-hidden="true" />}</div>
@@ -142,7 +140,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   return (
     <main className={`session-screen session-running phase-${session.phase}`} onPointerUp={handleSessionPointerUp}>
       <SessionMotionField />
-      
+
       <div className="session-bg" aria-hidden="true">
         <div className="session-bg-layer session-bg-inhale" data-active={session.phase === "inhale"} />
         <div className="session-bg-layer session-bg-exhale" data-active={session.phase === "exhale"} />
@@ -150,17 +148,19 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
         <div className="session-bg-layer session-bg-recovery" data-active={["recovery-inhale", "recovery-hold", "recovery-exhale"].includes(session.phase)} />
       </div>
 
-      <header className="session-topbar"><span>Round {session.round} / {config.rounds}</span><button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} /></button></header>
-      
-      <div className="session-center">
-        <div className="visual-layer" data-visible={!!breathingPhase}>
-          <BreathingVisual phase={breathingPhase ?? "inhale"} breath={session.breath} total={config.breathsPerRound} durationMs={animationDuration} />
+      <header className="session-topbar">
+        <div className="session-position">
+          <span>Round {session.round} / {config.rounds}</span>
+          <small>{breathingPhase ? `Souffle ${session.breath} sur ${config.breathsPerRound}` : isRetention ? "Rétention libre" : "Récupération"}</small>
         </div>
-        <div className="visual-layer" data-visible={isRetention}>
-          <RetentionVisual seconds={session.retentionSeconds} />
-        </div>
-        <div className="visual-layer" data-visible={!!recoveryPhase}>
-          <RecoveryVisual phase={recoveryPhase ?? "recovery-inhale"} seconds={session.recoverySeconds} />
+        <button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} aria-hidden="true" /></button>
+      </header>
+
+      <div className="session-center" data-phase={session.phase}>
+        <div className="visual-layer" key={breathingPhase ? "breathing" : isRetention ? "retention" : "recovery"}>
+          {breathingPhase ? <BreathingVisual phase={breathingPhase} breath={session.breath} total={config.breathsPerRound} durationMs={animationDuration} /> : null}
+          {isRetention ? <RetentionVisual seconds={session.retentionSeconds} /> : null}
+          {recoveryPhase ? <RecoveryVisual phase={recoveryPhase} seconds={session.recoverySeconds} /> : null}
         </div>
         {isRetention && session.tapHint && <p className="retention-tap-hint" aria-live="polite">Double-tape pour terminer</p>}
       </div>
@@ -173,7 +173,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   );
 }
 
-function getSessionOutcome({ failed, stopped, roundsCount }: { failed: boolean; stopped: boolean; roundsCount: number }) {
+function getSessionOutcome({ failed, stopped, roundsCount, syncPending }: { failed: boolean; stopped: boolean; roundsCount: number; syncPending: boolean }) {
   if (failed) {
     return {
       eyebrow: "Enregistrement interrompu",
@@ -186,6 +186,13 @@ function getSessionOutcome({ failed, stopped, roundsCount }: { failed: boolean; 
       eyebrow: "Séance arrêtée",
       title: "À bientôt.",
       summary: "Aucun round terminé. Rien n’a été enregistré.",
+    };
+  }
+  if (syncPending) {
+    return {
+      eyebrow: "Sauvegardée sur cet iPhone",
+      title: "Ta séance est en sécurité.",
+      summary: "Elle sera synchronisée automatiquement dès que la connexion reviendra.",
     };
   }
   const plural = roundsCount > 1;

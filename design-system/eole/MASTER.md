@@ -8,8 +8,10 @@
 
 **Project:** Eole
 **Generated:** 2026-08-07 22:46:44
-**Category:** Yoga & Stretching Guide
-**Design Dials:** Variance 5/10 (Balanced / Modern) | Motion 7/10 (Standard) | Density 4/10 (Standard)
+**Updated:** 2026-08-17
+**Category:** Guided breathwork and meditation
+**Direction:** Clarte aquatique - quiet, precise, reassuring
+**Design Dials:** Variance 4/10 | Motion 3/10 | Density 4/10
 
 ---
 
@@ -23,16 +25,16 @@
 | On Primary | `#FFFFFF` | `--color-on-primary` |
 | Secondary | `#35B7CA` | `--color-secondary` |
 | Accent/CTA | `#7FD4DC` | `--color-accent` |
-| Background | `#F2F9FC` | `--color-background` |
+| Background | `#EEF7F9` | `--color-background` |
 | Surface | `#FFFFFF` | `--color-surface` |
-| Surface soft | `#EAF6F9` | `--color-surface-soft` |
+| Surface soft | `#E6F3F6` | `--color-surface-soft` |
 | Foreground | `#102F3B` | `--color-foreground` |
 | Muted text | `#59737D` | `--color-muted` |
-| Border | `#D9E9EE` | `--color-border` |
+| Border | `#D7E8EC` | `--color-border` |
 | Destructive | `#B64343` | `--color-danger` |
 | Ring | `#087D9D` | `--color-ring` |
 
-**Color Notes:** Refreshing blue + water cyan
+**Color Notes:** Water blue and soft cyan. White surfaces stay translucent only when they improve hierarchy; they never exist as decorative glass alone.
 
 ### Typography
 
@@ -55,14 +57,15 @@
 | `--space-2xl` | `48px` / `3rem` | Section margins |
 | `--space-3xl` | `64px` / `4rem` | Hero padding |
 
-### Shadow Depths
+### Shape and depth
 
-| Level | Value | Usage |
+| Token | Value | Usage |
 |-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+| `--radius-sm` | `12px` | Controls and navigation |
+| `--radius-md` | `20px` | Cards and grouped controls |
+| `--radius-lg` | `28px` | Hero and large sections |
+| `--shadow-soft` | `0 10px 32px rgba(31,78,91,.055)` | Quiet separation |
+| `--shadow-float` | `0 18px 52px rgba(18,79,94,.09)` | Hero or important overlay only |
 
 ---
 
@@ -76,26 +79,25 @@
   background: #087D9D;
   color: white;
   padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
+  border-radius: 999px;
+  font-weight: 650;
+  transition: transform 120ms cubic-bezier(0, 0, .2, 1), background-color 200ms cubic-bezier(0, 0, .2, 1);
   cursor: pointer;
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
   transform: translateY(-1px);
 }
 
 /* Secondary Button */
 .btn-secondary {
-  background: #EAF6F9;
+  background: #E6F3F6;
   color: #075E77;
-  border: 1px solid #D9E9EE;
+  border: 1px solid #D7E8EC;
   padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
+  border-radius: 999px;
+  font-weight: 650;
+  transition: background-color 200ms cubic-bezier(0, 0, .2, 1);
   cursor: pointer;
 }
 ```
@@ -105,17 +107,16 @@
 ```css
 .card {
   background: #FFFFFF;
-  border: 1px solid #D9E9EE;
-  border-radius: 12px;
+  border: 1px solid #D7E8EC;
+  border-radius: 20px;
   padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform 120ms cubic-bezier(0, 0, .2, 1), box-shadow 200ms cubic-bezier(0, 0, .2, 1);
 }
 
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+.card[href]:hover,
+button.card:hover {
+  transform: translateY(-1px);
 }
 ```
 
@@ -124,8 +125,8 @@
 ```css
 .input {
   padding: 12px 16px;
-  border: 1px solid #D9E9EE;
-  border-radius: 8px;
+  border: 1px solid #D7E8EC;
+  border-radius: 12px;
   font-size: 16px;
   transition: border-color 200ms ease;
 }
@@ -147,9 +148,9 @@
 
 .modal {
   background: white;
-  border-radius: 16px;
+  border-radius: 28px;
   padding: 32px;
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-float);
   max-width: 500px;
   width: 90%;
 }
@@ -159,37 +160,49 @@
 
 ## Style Guidelines
 
-**Style:** Soft UI Evolution
+**Style:** Quiet aquatic clarity
 
-**Keywords:** Evolved soft UI, better contrast, modern aesthetics, subtle depth, accessibility-focused, improved shadows, hybrid
+**Keywords:** calm, restrained, spacious, legible, tactile, natural, accessible
 
 **Best For:** Modern enterprise apps, SaaS platforms, health/wellness, modern business tools, professional, hybrid
 
-**Key Effects:** Improved shadows (softer than flat, clearer than neumorphism), modern (200-300ms), focus visible, WCAG AA/AAA
+**Key Effects:** gentle tonal hierarchy, very soft depth, short state transitions, visible focus, WCAG AA
 
 ### Page Pattern
 
-**Pattern Name:** Immersive/Interactive Experience
+**Pattern Name:** Immediate guided practice
 
-- **Conversion Strategy:** 40% higher engagement. Performance trade-off. Provide skip option. Mobile fallback essential.
-- **CTA Placement:** After interaction complete + Skip option for impatient users
-- **Section Order:** 1. Full-screen interactive element, 2. Guided product tour, 3. Key benefits revealed, 4. CTA after completion
+- **Primary path:** one-tap start from the home screen with a safe default protocol.
+- **Secondary path:** adjust the protocol without competing with the start action.
+- **During practice:** one dominant visual, one instruction, progress kept secondary.
+- **After practice:** factual result and a quiet next action; no gamification pressure.
+
+### Premium experience rules
+
+- Only the current practice phase is mounted and animated. Hidden phases never consume rendering work or remain exposed to assistive technologies.
+- The breathing guide owns the continuous motion. Other screens use short transitions for feedback and continuity only.
+- Ambient sound fades in over several seconds and automatically steps back under breath cues and bells.
+- Mobile translucent surfaces become near-solid to protect readability and reduce costly backdrop compositing.
+- Greeting and loading copy remain stable between server render and hydration to avoid visual shifts.
 
 ---
 
 ## Motion
 
-**Stagger List** (Standard) — Trigger: load or scroll | Duration: 300-450ms | Easing: `back.out(1.4)`
+- Page entry: opacity only, `320ms`, standard ease-out.
+- Interaction feedback: `120-200ms`; never animate layout dimensions.
+- Session phase transitions: background crossfade `520ms`; phase content enter `360ms`.
+- Continuous motion is reserved for the active breathing guide and explicit loading states.
+- `prefers-reduced-motion` removes every decorative and page-entry animation.
 
-```js
-gsap.from('.grid-item', { opacity: 0, scale: 0.92, y: 16, duration: 0.4, stagger: { each: 0.06, from: 'start', grid: 'auto' }, ease: 'back.out(1.4)' });
-```
+### Audio
 
-**Framework notes:** grid: 'auto' lets GSAP infer rows/columns from a CSS grid layout for a natural wave stagger
-
-- ✅ Combine with from: 'center' for a bento-grid layout to draw the eye inward first
-- ❌ Don't use back.out on dense data tables; the overshoot reads as sloppy on informational UI
-- ⚡ Group DOM writes; avoid interleaving layout reads (getBoundingClientRect) between staggered tweens
+- Breath cues target about `-34 LUFS` so they guide without startling.
+- Ambient loops target about `-30 LUFS`, then are attenuated by the user-controlled gain.
+- True peaks stay below `-3 dBTP` and every loop uses soft fades.
+- Startup loads only the two breath cues and the selected ambience; other ambiences load on demand.
+- Ambience fade-in: `2.4s`; fade-out: `850ms`; track crossfade: `1.8s`.
+- Breath cues and bells duck ambience temporarily instead of competing for attention.
 
 ---
 

@@ -57,16 +57,16 @@ L’écran reste allumé durant la séance lorsque le navigateur autorise cette 
 - Aucun guidage vocal.
 - Sons humains d’inspiration par le nez et d’expiration, issus d'une source CC0
   documentée dans `public/audio/SOURCES.md`.
-- Trois ambiances musicales initiales : Glacier, Lagon et Aurore.
+- Trois paysages sonores locaux : Pluie douce, Océan calme et Forêt paisible.
 - Volume de la musique et volume respiratoire réglables séparément de 0 à 100 %.
 - Mettre un volume à 0 désactive la catégorie correspondante.
 - Vibrations disponibles mais désactivées par défaut.
 - Animation synchronisée avec la vitesse choisie.
 - Les animations non essentielles sont fortement réduites si l’appareil demande moins de mouvement.
 
-Les sons respiratoires sont servis comme fichiers audio locaux et joués avec Web
-Audio. L’ambiance musicale reste générée dans le navigateur afin de rester légère
-et réglable.
+Les sons respiratoires et les trois ambiances sont servis comme fichiers audio
+locaux et joués avec Web Audio. Les niveaux sont normalisés, les transitions ont
+des fondus doux et l’ambiance recule automatiquement sous les sons-guides.
 
 Sur iOS 17 et les navigateurs qui exposent `navigator.audioSession`, Eole demande
 le mode `playback` pour éviter que le mode silencieux matériel coupe le son. Les
@@ -179,8 +179,7 @@ Une sauvegarde échouée ne doit jamais être présentée comme réussie.
 
 Inclus :
 
-- Authentification complète.
-- Profils privés.
+- Espace personnel unique sans authentification.
 - Configuration d’une séance.
 - Moteur respiratoire et récupération de 15 secondes.
 - Sons, musiques, volumes et vibrations facultatives.
