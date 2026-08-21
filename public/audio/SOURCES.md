@@ -1,23 +1,25 @@
 # Sources audio
 
 Les six sons respiratoires synchronisés utilisés par Eole proviennent du fichier
-**Long single breath through nose (male) 01.wav** publié sur Freesound par
-`thomasXkiteXforXlife` (son `#410864`) :
+**inhale-exhale** publié sur Pixabay par `Amber2023` :
 
-- Page source : <https://freesound.org/s/410864/>
-- Aperçu haute qualité utilisé :
-  <https://cdn.freesound.org/previews/410/410864_3102860-hq.mp3>
-- Licence : Creative Commons Zero (`CC0`), avec copie, modification,
-  redistribution et usage commercial autorisés sans demande préalable.
-- Enregistrement original : respiration humaine réelle par le nez, captée avec un
-  Rode NTG-2 et un Tascam DR-40 en 96 kHz / 24 bits. L'aperçu public utilisé par
-  l'application est fourni en MP3 mono 48 kHz par Freesound.
+- Page source :
+  <https://pixabay.com/sound-effects/people-inhale-exhale-230173/>
+- Fichier public utilisé :
+  <https://cdn.pixabay.com/audio/2024/08/05/audio_5b806d63e5.mp3>
+- Licence : Pixabay Content License. Elle autorise l'utilisation gratuite,
+  l'adaptation et l'usage sans attribution, sous réserve de ses usages interdits,
+  notamment la redistribution du contenu original sans travail créatif.
+- Source reçue : MP3 stéréo 44,1 kHz de `3,631 s`, contenant une inspiration puis
+  une expiration humaines.
 
-Chaque rythme utilise une prise distincte de l'enregistrement et un fichier à la
-durée exacte de l'animation : `1,25 s` pour le rythme rapide, `2 s` pour le rythme
-normal et `3 s` pour le rythme lent. Les prises ont été isolées, ajustées dans le
-temps sans changer la hauteur, filtrées légèrement, puis munies de fondus courts.
-Les six fichiers sont nommés `eole-{inhale,exhale}-{fast,normal,slow}.mp3`.
+L'inspiration (`0,12–0,88 s`) et l'expiration (`1,68–2,70 s`) ont été isolées puis
+ajustées hors ligne à hauteur constante pour correspondre exactement aux trois
+durées de l'animation : `1,25 s`, `2 s` et `3 s`. Les traitements restent légers :
+filtrage passe-haut à 80 Hz, passe-bas à 14 kHz, homogénéisation de la dynamique,
+fondus courts et normalisation autour de `-34,5 LUFS`. Les fichiers finaux sont en
+MP3 mono 44,1 kHz à 96 kb/s et sont nommés
+`eole-{inhale,exhale}-{fast,normal,slow}.mp3`.
 
 ## Musiques de fond
 
