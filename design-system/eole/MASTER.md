@@ -8,10 +8,10 @@
 
 **Project:** Eole
 **Generated:** 2026-08-07 22:46:44
-**Updated:** 2026-08-17
+**Updated:** 2026-08-21
 **Category:** Guided breathwork and meditation
-**Direction:** Clarte aquatique - quiet, precise, reassuring
-**Design Dials:** Variance 4/10 | Motion 3/10 | Density 4/10
+**Direction:** Souffle ouvert - natural, minimal, quietly alive
+**Design Dials:** Variance 3/10 | Motion 3/10 | Density 4/10
 
 ---
 
@@ -21,26 +21,26 @@
 
 | Role | Hex | CSS Variable |
 |------|-----|--------------|
-| Primary | `#087D9D` | `--color-primary` |
+| Primary | `#176F65` | `--color-primary` |
 | On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#35B7CA` | `--color-secondary` |
-| Accent/CTA | `#7FD4DC` | `--color-accent` |
-| Background | `#EEF7F9` | `--color-background` |
+| Secondary | `#84B8A8` | `--color-secondary` |
+| Accent/CTA | `#BAD7CC` | `--color-accent` |
+| Background | `#EFF4F1` | `--color-background` |
 | Surface | `#FFFFFF` | `--color-surface` |
-| Surface soft | `#E6F3F6` | `--color-surface-soft` |
-| Foreground | `#102F3B` | `--color-foreground` |
-| Muted text | `#59737D` | `--color-muted` |
-| Border | `#D7E8EC` | `--color-border` |
+| Surface soft | `#E5EEEA` | `--color-surface-soft` |
+| Foreground | `#17332E` | `--color-foreground` |
+| Muted text | `#5F726C` | `--color-muted` |
+| Border | `#D6E1DC` | `--color-border` |
 | Destructive | `#B64343` | `--color-danger` |
-| Ring | `#087D9D` | `--color-ring` |
+| Ring | `#176F65` | `--color-ring` |
 
-**Color Notes:** Water blue and soft cyan. White surfaces stay translucent only when they improve hierarchy; they never exist as decorative glass alone.
+**Color Notes:** Mineral green and quiet plant neutrals. The accent stays functional; translucent white surfaces create hierarchy without becoming decorative glass objects.
 
 ### Typography
 
-- **Heading Font:** Iowan Old Style, puis Palatino/Georgia
+- **Heading Font:** Avenir Next, puis Avenir/Segoe UI
 - **Body Font:** Avenir Next, puis Avenir/Segoe UI
-- **Mood:** calm, wellness, health, relaxing, natural, organic
+- **Mood:** calm, breathing, natural, minimal, tactile
 - **Chargement:** polices système uniquement, pour un affichage immédiat et sans dépendance réseau.
 
 ### Spacing Variables
@@ -61,11 +61,11 @@
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--radius-sm` | `12px` | Controls and navigation |
-| `--radius-md` | `20px` | Cards and grouped controls |
-| `--radius-lg` | `28px` | Hero and large sections |
-| `--shadow-soft` | `0 10px 32px rgba(31,78,91,.055)` | Quiet separation |
-| `--shadow-float` | `0 18px 52px rgba(18,79,94,.09)` | Hero or important overlay only |
+| `--radius-sm` | `10px` | Controls and navigation |
+| `--radius-md` | `16px` | Cards and grouped controls |
+| `--radius-lg` | `22px` | Hero and large sections |
+| `--shadow-soft` | `0 12px 36px rgba(38,73,64,.055)` | Quiet separation |
+| `--shadow-float` | `0 22px 64px rgba(29,69,60,.1)` | Hero or important overlay only |
 
 ---
 
@@ -76,10 +76,10 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #087D9D;
+  background: #176F65;
   color: white;
   padding: 12px 24px;
-  border-radius: 999px;
+  border-radius: 13px;
   font-weight: 650;
   transition: transform 120ms cubic-bezier(0, 0, .2, 1), background-color 200ms cubic-bezier(0, 0, .2, 1);
   cursor: pointer;
@@ -91,11 +91,11 @@
 
 /* Secondary Button */
 .btn-secondary {
-  background: #E6F3F6;
-  color: #075E77;
-  border: 1px solid #D7E8EC;
+  background: #E5EEEA;
+  color: #0C514B;
+  border: 1px solid #D6E1DC;
   padding: 12px 24px;
-  border-radius: 999px;
+  border-radius: 13px;
   font-weight: 650;
   transition: background-color 200ms cubic-bezier(0, 0, .2, 1);
   cursor: pointer;
@@ -107,8 +107,8 @@
 ```css
 .card {
   background: #FFFFFF;
-  border: 1px solid #D7E8EC;
-  border-radius: 20px;
+  border: 1px solid #D6E1DC;
+  border-radius: 16px;
   padding: 24px;
   box-shadow: var(--shadow-soft);
   transition: transform 120ms cubic-bezier(0, 0, .2, 1), box-shadow 200ms cubic-bezier(0, 0, .2, 1);
@@ -125,16 +125,16 @@ button.card:hover {
 ```css
 .input {
   padding: 12px 16px;
-  border: 1px solid #D7E8EC;
-  border-radius: 12px;
+  border: 1px solid #D6E1DC;
+  border-radius: 10px;
   font-size: 16px;
   transition: border-color 200ms ease;
 }
 
 .input:focus {
-  border-color: #087D9D;
+  border-color: #176F65;
   outline: none;
-  box-shadow: 0 0 0 3px #087D9D33;
+  box-shadow: 0 0 0 3px #176F6533;
 }
 ```
 
@@ -148,7 +148,7 @@ button.card:hover {
 
 .modal {
   background: white;
-  border-radius: 28px;
+  border-radius: 22px;
   padding: 32px;
   box-shadow: var(--shadow-float);
   max-width: 500px;
@@ -160,13 +160,13 @@ button.card:hover {
 
 ## Style Guidelines
 
-**Style:** Quiet aquatic clarity
+**Style:** Open breath
 
-**Keywords:** calm, restrained, spacious, legible, tactile, natural, accessible
+**Keywords:** calm, restrained, breathable, legible, tactile, natural, accessible
 
 **Best For:** Modern enterprise apps, SaaS platforms, health/wellness, modern business tools, professional, hybrid
 
-**Key Effects:** gentle tonal hierarchy, very soft depth, short state transitions, visible focus, WCAG AA
+**Key Effects:** open two-stroke breath mark, mineral glass, very soft depth, short state transitions, visible focus, WCAG AA
 
 ### Page Pattern
 
@@ -219,6 +219,8 @@ button.card:hover {
 - ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
 - ❌ **Instant state changes** — Always use transitions (150-300ms)
 - ❌ **Invisible focus states** — Focus states must be visible for a11y
+- ❌ **Leaf, lotus, wave, or generic wellness symbols as branding** — Use the open breath mark
+- ❌ **Baked-in icon background, frame, shadow, or gradient** — Keep every logo asset transparent
 
 ---
 

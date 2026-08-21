@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowRight, CalendarDays, SlidersHorizontal, Trophy, Waves, Wind } from "lucide-react";
+import { ArrowRight, CalendarDays, SlidersHorizontal, Trophy, Wind } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { EoleMark } from "@/components/layout/brand";
 import { SummaryCards } from "@/components/stats/summary-cards";
 import { calculateStats, formatDuration } from "@/lib/analytics";
 import { getDashboardData } from "@/lib/repository";
@@ -38,7 +39,7 @@ export function DashboardOverview() {
 
       <section className="breath-hero" aria-labelledby="daily-practice-title">
         <div className="hero-copy">
-          <p className="hero-kicker"><Waves size={16} strokeWidth={1.8} aria-hidden="true" /> Séance guidée</p>
+          <p className="hero-kicker"><Wind size={16} strokeWidth={1.8} aria-hidden="true" /> Séance guidée</p>
           <h2 id="daily-practice-title">Inspire. Relâche.<br />Reste présent.</h2>
           <p>3 rounds · 35 respirations · rythme normal</p>
           <div className="hero-actions">
@@ -46,9 +47,9 @@ export function DashboardOverview() {
             <Link className="hero-adjust" href="/app/session/nouvelle"><SlidersHorizontal size={17} aria-hidden="true" /> Ajuster</Link>
           </div>
         </div>
-        <div className="hero-orb" aria-hidden="true">
-          <span className="hero-orb-ring" />
-          <span className="hero-orb-core"><Wind size={40} strokeWidth={1.2} /></span>
+        <div className="hero-breath" aria-hidden="true">
+          <span className="hero-breath-ring" />
+          <EoleMark size={190} className="hero-breath-mark" />
         </div>
       </section>
 

@@ -1,5 +1,5 @@
-import { Waves } from "lucide-react";
 import type { CSSProperties } from "react";
+import { EoleMark } from "@/components/layout/brand";
 import type { SessionPhase } from "@/components/session/use-breath-session";
 
 type BreathingPhase = Extract<SessionPhase, "inhale" | "exhale">;
@@ -43,7 +43,7 @@ export function RetentionVisual({ seconds }: { seconds: number }) {
 
   return (
     <>
-      <p className="phase-label" aria-live="polite"><Waves size={18} strokeWidth={1.8} aria-hidden="true" />Rétention</p>
+      <p className="phase-label" aria-live="polite"><EoleMark size={20} className="phase-mark" />Rétention</p>
       <div className="retention-stage" style={style} role="timer" aria-label={`Rétention, ${seconds} seconde${seconds > 1 ? "s" : ""}`}>
         <div className="retention-rings" aria-hidden="true"><span /><span /><span /></div>
         <div className="retention-core">
