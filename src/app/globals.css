@@ -477,6 +477,8 @@ h2 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.14; }
   .settings-actions .button { width: 100%; }
   .auth-card { padding: 1.4rem; }
   .form-grid-two { grid-template-columns: 1fr; }
+  .session-stop-dialog > div { grid-template-columns: 1fr; }
+  .session-stop-dialog > div .button-primary { grid-column: auto; }
   .complete-actions { width: min(430px, 100%); flex-direction: column; }
   .complete-actions .button { width: 100%; }
   .session-stop-dialog > div { grid-template-columns: 1fr; }
