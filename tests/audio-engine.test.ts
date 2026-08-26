@@ -31,32 +31,30 @@ describe("AudioEngine", () => {
     expect(getBreathAssetPath("exhale", 2200)).toBe("/audio/eole-exhale-normal.mp3");
   });
 
-  it("charge l’ambiance choisie à la demande, même après l’initialisation", async () => {
-    let resolveMeditation: ((response: { ok: boolean; arrayBuffer: () => Promise<ArrayBuffer> }) => void) | undefined;
+  it("diffuse l’ambiance en streaming sans la décoder dans Web Audio", async () => {
     const fetchMock = vi.fn((path: string) => {
-      if (path.endsWith("eole-meditation.mp3")) {
-        return new Promise<{ ok: boolean; arrayBuffer: () => Promise<ArrayBuffer> }>((resolve) => {
-          resolveMeditation = resolve;
-        });
-      }
+      void path;
       return Promise.resolve({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) });
     });
-
-    let startedSources = 0;
-    let currentTime = 0;
-    const gainParams: ReturnType<typeof audioParam>[] = [];
+    const playedTracks: string[] = [];
     const sourcePlaybackRates: ReturnType<typeof audioParam>[] = [];
     const sourceStops: ReturnType<typeof vi.fn>[] = [];
+    class FakeAudio {
+      loop = false;
+      preload = "";
+      volume = 1;
+      constructor(public src: string) {}
+      play = vi.fn(async () => { playedTracks.push(this.src); });
+      pause = vi.fn();
+      removeAttribute = vi.fn();
+      load = vi.fn();
+    }
     class FakeAudioContext {
-      get currentTime() { return currentTime; }
+      currentTime = 3;
       destination = audioNode();
       sampleRate = 4;
       state = "running";
-      createGain = () => {
-        const gain = audioParam();
-        gainParams.push(gain);
-        return audioNode({ gain });
-      };
+      createGain = () => audioNode({ gain: audioParam() });
       createDynamicsCompressor = () => audioNode({ threshold: audioParam(), knee: audioParam(), ratio: audioParam(), attack: audioParam(), release: audioParam() });
       createConvolver = () => audioNode({ buffer: null });
       createBuffer = (channels: number, length: number) => ({ duration: 2, getChannelData: () => new Float32Array(length), numberOfChannels: channels });
@@ -65,7 +63,7 @@ describe("AudioEngine", () => {
         const stop = vi.fn();
         sourcePlaybackRates.push(playbackRate);
         sourceStops.push(stop);
-        return audioNode({ addEventListener: vi.fn(), buffer: null, loop: false, playbackRate, start: vi.fn(() => { startedSources += 1; }), stop });
+        return audioNode({ addEventListener: vi.fn(), buffer: null, loop: false, playbackRate, start: vi.fn(), stop });
       };
       decodeAudioData = async () => ({ duration: 2 });
       resume = vi.fn();
@@ -73,6 +71,7 @@ describe("AudioEngine", () => {
     }
 
     vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("Audio", FakeAudio);
     vi.stubGlobal("AudioContext", FakeAudioContext);
 
     const engine = new AudioEngine(DEFAULT_SOUND_SETTINGS);
@@ -81,18 +80,12 @@ describe("AudioEngine", () => {
     engine.updateSettings({ ...DEFAULT_SOUND_SETTINGS, musicTrack: "meditation" });
     engine.startAmbient();
 
-    expect(fetchMock.mock.calls.filter(([path]) => String(path).endsWith("eole-meditation.mp3"))).toHaveLength(1);
-    expect(startedSources).toBe(0);
-
-    resolveMeditation?.({ ok: true, arrayBuffer: async () => new ArrayBuffer(1) });
-    await vi.waitFor(() => expect(startedSources).toBe(1));
+    expect(fetchMock.mock.calls.filter(([path]) => String(path).endsWith("eole-meditation.mp3"))).toHaveLength(0);
+    await vi.waitFor(() => expect(playedTracks).toEqual(["/audio/eole-meditation.mp3"]));
     engine.startAmbient();
-    expect(startedSources).toBe(1);
+    expect(playedTracks).toHaveLength(1);
 
-    currentTime = 3;
     engine.playBreath("inhale", 1250);
-    expect(gainParams[2].cancelScheduledValues).toHaveBeenCalledOnce();
-    expect(gainParams[2].exponentialRampToValueAtTime).toHaveBeenCalledWith(expect.any(Number), 3.12);
     expect(sourcePlaybackRates.at(-1)?.setValueAtTime).not.toHaveBeenCalled();
     expect(sourceStops.at(-1)).toHaveBeenCalledWith(4.25);
     engine.destroy();

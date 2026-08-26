@@ -74,6 +74,12 @@ async function readData(request: NextRequest) {
     includeProfile ? sql`select first_name, username from public.personal_profile where id = 1` : Promise.resolve([]),
     includeSettings ? sql`select music_track, music_volume, breath_volume, haptics_enabled from public.personal_settings where id = 1` : Promise.resolve([]),
     includeSessions ? sql`
+      with recent_sessions as (
+        select *
+        from public.personal_sessions
+        order by completed_at desc
+        limit 500
+      )
       select
         s.id,
         s.status,
@@ -92,11 +98,10 @@ async function readData(request: NextRequest) {
           ) filter (where r.id is not null),
           '[]'::jsonb
         ) as rounds
-      from public.personal_sessions s
+      from recent_sessions s
       left join public.personal_rounds r on r.session_id = s.id
       group by s.id
       order by s.completed_at desc
-      limit 500
     ` : Promise.resolve([]),
   ]);
 

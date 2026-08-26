@@ -46,10 +46,6 @@ export function getBreathAssetPath(direction: BreathDirection, durationMs: numbe
   return BREATH_AUDIO_PATHS[direction][variant];
 }
 
-const AMBIENT_FADE_IN_SECONDS = 2.4;
-const AMBIENT_FADE_OUT_SECONDS = 0.85;
-const AMBIENT_CROSSFADE_SECONDS = 1.8;
-
 export class AudioEngine {
   private context: AudioContext | null = null;
   private masterGain: GainNode | null = null;
@@ -57,12 +53,8 @@ export class AudioEngine {
   private reverb: ConvolverNode | null = null;
   private reverbGain: GainNode | null = null;
 
-  private ambientSource: AudioBufferSourceNode | null = null;
-  private ambientGain: GainNode | null = null;
-  private ambientFadeInUntil = 0;
-  private fadingAmbients: { source: AudioBufferSourceNode, gain: GainNode }[] = [];
-  
-  private ambientBuffers = new Map<string, AudioBuffer>();
+  private ambientAudio: HTMLAudioElement | null = null;
+  private ambientRestoreTimer: ReturnType<typeof setTimeout> | null = null;
   private noiseBuffers = new Map<number, AudioBuffer[]>();
   private breathBuffers = new Map<string, AudioBuffer>();
   private assetLoadPromises = new Map<string, Promise<AudioBuffer | null>>();
@@ -110,100 +102,36 @@ export class AudioEngine {
   updateSettings(settings: SoundSettings) {
     const trackChanged = this.settings.musicTrack !== settings.musicTrack;
     this.settings = settings;
-    if (trackChanged && this.context) {
-      const requestedTrack = settings.musicTrack;
-      void this.ensureAmbientBuffer(requestedTrack).then((buffer) => {
-        if (buffer && this.settings.musicTrack === requestedTrack && this.ambientSource) this.crossfadeAmbient();
-      });
-    }
-    if (!trackChanged && this.ambientGain) {
-      const level = (settings.musicVolume / 100) * 0.5;
-      this.ambientGain.gain.setTargetAtTime(level, this.context?.currentTime ?? 0, 0.2);
-    }
+    if (trackChanged && this.ambientAudio) this.crossfadeAmbient();
+    if (!trackChanged && this.ambientAudio) this.ambientAudio.volume = this.getAmbientLevel();
   }
 
-  startAmbient(isCrossfade = false) {
-    if (!this.context || this.settings.musicVolume === 0 || !this.masterGain || this.ambientSource) return;
-    const buffer = this.ambientBuffers.get(this.settings.musicTrack);
-    if (!buffer) {
-      const requestedTrack = this.settings.musicTrack;
-      void this.ensureAmbientBuffer(requestedTrack).then((loadedBuffer) => {
-        if (loadedBuffer && this.settings.musicTrack === requestedTrack && !this.ambientSource) this.startAmbient(isCrossfade);
-      });
-      return;
-    }
-
-    const now = this.context.currentTime;
-    const source = this.context.createBufferSource();
-    const gain = this.context.createGain();
-
-    source.buffer = buffer;
-    source.loop = true;
-
-    const targetLevel = (this.settings.musicVolume / 100) * 0.5;
-    gain.gain.setValueAtTime(0.001, now);
-
-    if (isCrossfade) {
-      gain.gain.exponentialRampToValueAtTime(targetLevel, now + AMBIENT_CROSSFADE_SECONDS);
-      this.ambientFadeInUntil = now + AMBIENT_CROSSFADE_SECONDS;
-    } else {
-      gain.gain.exponentialRampToValueAtTime(targetLevel, now + AMBIENT_FADE_IN_SECONDS);
-      this.ambientFadeInUntil = now + AMBIENT_FADE_IN_SECONDS;
-    }
-
-    source.connect(gain).connect(this.masterGain);
-    source.start(now);
-
-    this.ambientSource = source;
-    this.ambientGain = gain;
+  startAmbient() {
+    if (this.settings.musicVolume === 0 || this.ambientAudio || typeof Audio === "undefined") return;
+    const audio = new Audio(AMBIENT_PATHS[this.settings.musicTrack]);
+    audio.loop = true;
+    audio.preload = "metadata";
+    audio.volume = this.getAmbientLevel();
+    this.ambientAudio = audio;
+    void audio.play().catch(() => {
+      if (this.ambientAudio === audio) this.ambientAudio = null;
+    });
   }
 
   stopAmbient() {
-    if (!this.context || !this.ambientSource || !this.ambientGain) return;
-    const now = this.context.currentTime;
-    const currentSource = this.ambientSource;
-    const currentGain = this.ambientGain;
-    
-    this.ambientSource = null;
-    this.ambientGain = null;
-    this.ambientFadeInUntil = 0;
-
-    currentGain.gain.cancelScheduledValues(now);
-    currentGain.gain.setValueAtTime(Math.max(0.001, currentGain.gain.value), now);
-    currentGain.gain.exponentialRampToValueAtTime(0.001, now + AMBIENT_FADE_OUT_SECONDS);
-
-    currentSource.stop(now + AMBIENT_FADE_OUT_SECONDS + 0.05);
-
-    setTimeout(() => {
-      try { currentSource.disconnect(); } catch {}
-      try { currentGain.disconnect(); } catch {}
-    }, (AMBIENT_FADE_OUT_SECONDS + 0.1) * 1000);
+    const audio = this.ambientAudio;
+    if (!audio) return;
+    this.ambientAudio = null;
+    if (this.ambientRestoreTimer) clearTimeout(this.ambientRestoreTimer);
+    this.ambientRestoreTimer = null;
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
   }
 
   private crossfadeAmbient() {
-    if (!this.context || !this.ambientSource || !this.ambientGain || !this.masterGain) return;
-    const now = this.context.currentTime;
-    const oldSource = this.ambientSource;
-    const oldGain = this.ambientGain;
-    
-    this.fadingAmbients.push({ source: oldSource, gain: oldGain });
-
-    oldGain.gain.cancelScheduledValues(now);
-    const startVal = Math.max(0.001, oldGain.gain.value);
-    oldGain.gain.setValueAtTime(startVal, now);
-    oldGain.gain.exponentialRampToValueAtTime(0.001, now + AMBIENT_CROSSFADE_SECONDS);
-
-    oldSource.stop(now + AMBIENT_CROSSFADE_SECONDS + 0.05);
-
-    setTimeout(() => {
-      try { oldSource.disconnect(); } catch {}
-      try { oldGain.disconnect(); } catch {}
-      this.fadingAmbients = this.fadingAmbients.filter(a => a.source !== oldSource);
-    }, (AMBIENT_CROSSFADE_SECONDS + 0.1) * 1000);
-
-    this.ambientSource = null;
-    this.ambientGain = null;
-    this.startAmbient(true);
+    this.stopAmbient();
+    this.startAmbient();
   }
 
   playBreath(direction: BreathDirection, durationMs: number) {
@@ -329,11 +257,6 @@ export class AudioEngine {
 
   destroy() {
     this.stopAmbient();
-    this.fadingAmbients.forEach(a => {
-      try { a.source.disconnect(); } catch {}
-      try { a.gain.disconnect(); } catch {}
-    });
-    this.fadingAmbients = [];
 
     if (this.masterGain) this.masterGain.disconnect();
     if (this.compressor) this.compressor.disconnect();
@@ -347,7 +270,6 @@ export class AudioEngine {
     this.reverb = null;
     this.reverbGain = null;
 
-    this.ambientBuffers.clear();
     this.noiseBuffers.clear();
     this.breathBuffers.clear();
     this.assetLoadPromises.clear();
@@ -370,17 +292,13 @@ export class AudioEngine {
   }
 
   private duckAmbient(durationSeconds: number, depth: number) {
-    if (!this.context || !this.ambientGain || this.settings.musicVolume === 0 || this.context.currentTime < this.ambientFadeInUntil) return;
-    const now = this.context.currentTime;
-    const target = Math.max(0.001, (this.settings.musicVolume / 100) * 0.5);
-    const ducked = Math.max(0.001, target * depth);
-    const releaseAt = now + Math.max(0.3, durationSeconds - 0.16);
-
-    this.ambientGain.gain.cancelScheduledValues(now);
-    this.ambientGain.gain.setValueAtTime(Math.max(0.001, this.ambientGain.gain.value), now);
-    this.ambientGain.gain.exponentialRampToValueAtTime(ducked, now + 0.12);
-    this.ambientGain.gain.setValueAtTime(ducked, releaseAt);
-    this.ambientGain.gain.exponentialRampToValueAtTime(target, releaseAt + 0.34);
+    if (!this.ambientAudio || this.settings.musicVolume === 0) return;
+    this.ambientAudio.volume = Math.max(0, this.getAmbientLevel() * depth);
+    if (this.ambientRestoreTimer) clearTimeout(this.ambientRestoreTimer);
+    this.ambientRestoreTimer = setTimeout(() => {
+      if (this.ambientAudio) this.ambientAudio.volume = this.getAmbientLevel();
+      this.ambientRestoreTimer = null;
+    }, Math.max(300, durationSeconds * 1000));
   }
 
   private async loadAssets(breathDurationsMs: readonly number[]): Promise<AudioReadiness> {
@@ -392,13 +310,10 @@ export class AudioEngine {
       ]),
     );
     const paths = Array.from(breathPaths);
-    const [breathBuffers, ambientBuffer] = await Promise.all([
-      Promise.all(paths.map((path) => this.ensureBreathBuffer(path))),
-      this.ensureAmbientBuffer(this.settings.musicTrack),
-    ]);
+    const breathBuffers = await Promise.all(paths.map((path) => this.ensureBreathBuffer(path)));
     return {
       breathGuides: breathBuffers.every(Boolean),
-      music: Boolean(ambientBuffer),
+      music: typeof Audio !== "undefined",
     };
   }
 
@@ -410,12 +325,8 @@ export class AudioEngine {
     return buffer;
   }
 
-  private async ensureAmbientBuffer(track: SoundSettings["musicTrack"]) {
-    const existing = this.ambientBuffers.get(track);
-    if (existing) return existing;
-    const buffer = await this.loadBuffer(AMBIENT_PATHS[track]);
-    if (buffer) this.ambientBuffers.set(track, buffer);
-    return buffer;
+  private getAmbientLevel() {
+    return Math.min(1, Math.max(0, (this.settings.musicVolume / 100) * 0.5));
   }
 
   private loadBuffer(path: string) {

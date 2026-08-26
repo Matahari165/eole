@@ -439,6 +439,10 @@ h2 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.14; }
 }
 
 @media (max-width: 1000px) {
+  .session-running::before, .session-motion-field, .orb-light { display: none; }
+  .breath-circles span:nth-child(n+2):nth-child(-n+6) { display: none; }
+  .breath-circles span, .breath-core { box-shadow: none; }
+  .retention-rings span:nth-child(n+2) { display: none; }
   .sidebar { display: none; }
   .app-main { margin-left: 0; padding: 0 max(1rem, env(safe-area-inset-right)) calc(7.1rem + env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left)); }
   .demo-banner { margin: 0 -1rem 1rem; padding: .5rem 1rem; font-size: .75rem; }

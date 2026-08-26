@@ -156,7 +156,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
         lastRenderedSecondRef.current = elapsedSeconds;
         setRetentionSeconds(elapsedSeconds);
       }
-    }, 100);
+    }, 1000);
     return () => window.clearInterval(interval);
   }, [ding, phase]);
 
