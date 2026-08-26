@@ -100,7 +100,14 @@ async function readData(request: NextRequest) {
         ) as rounds
       from recent_sessions s
       left join public.personal_rounds r on r.session_id = s.id
-      group by s.id
+      group by
+        s.id,
+        s.status,
+        s.planned_rounds,
+        s.breaths_per_round,
+        s.pace,
+        s.started_at,
+        s.completed_at
       order by s.completed_at desc
     ` : Promise.resolve([]),
   ]);
