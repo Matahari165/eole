@@ -8,10 +8,10 @@
 
 **Project:** Eole
 **Generated:** 2026-08-07 22:46:44
-**Updated:** 2026-08-21
+**Updated:** 2026-08-26
 **Category:** Guided breathwork and meditation
-**Direction:** Souffle ouvert - natural, minimal, quietly alive
-**Design Dials:** Variance 3/10 | Motion 3/10 | Density 4/10
+**Direction:** Topographie du souffle - natural, minimal, quietly alive
+**Design Dials:** Variance 5/10 | Motion 3/10 | Density 4/10
 
 ---
 
@@ -35,6 +35,15 @@
 | Ring | `#176F65` | `--color-ring` |
 
 **Color Notes:** Mineral green and quiet plant neutrals. The accent stays functional; translucent white surfaces create hierarchy without becoming decorative glass objects.
+
+### Signature visual language
+
+- Eole uses irregular nested contour lines derived from the open breath mark.
+- Contours expand on inhale, contract on exhale, and become nearly still during retention.
+- Perfect concentric circles are reserved for functional controls only, never as the main identity.
+- The home practice area is a continuous ink-green field, not a generic rounded card.
+- Progress on the home screen forms a compact ruled band; avoid repeated equal-weight cards.
+- Blue-air highlights belong only to breath motion and remain rare.
 
 ### Typography
 
@@ -181,6 +190,7 @@ button.card:hover {
 
 - Only the current practice phase is mounted and animated. Hidden phases never consume rendering work or remain exposed to assistive technologies.
 - The breathing guide owns the continuous motion. Other screens use short transitions for feedback and continuity only.
+- The breathing guide is a topographic field around the Eole mark. Its irregularity must remain visible at rest and in motion.
 - Ambient sound fades in over several seconds and automatically steps back under breath cues and bells.
 - Mobile translucent surfaces become near-solid to protect readability and reduce costly backdrop compositing.
 - Greeting and loading copy remain stable between server render and hydration to avoid visual shifts.
@@ -191,8 +201,11 @@ button.card:hover {
 
 - Page entry: opacity only, `320ms`, standard ease-out.
 - Interaction feedback: `120-200ms`; never animate layout dimensions.
-- Session phase transitions: background crossfade `520ms`; phase content enter `360ms`.
+- Session phase transitions: background crossfade `680ms`; phase content enter `420ms`.
 - Continuous motion is reserved for the active breathing guide and explicit loading states.
+- Home topography drifts over `16-18s`; the movement must remain barely perceptible and never move text or controls.
+- Home content enters once with `6-10px` vertical travel and a short stagger; progress values never loop.
+- Desktop ambient light may drift over `24-34s`; disable this large-field motion on mobile.
 - `prefers-reduced-motion` removes every decorative and page-entry animation.
 
 ### Audio
@@ -220,6 +233,8 @@ button.card:hover {
 - ❌ **Instant state changes** — Always use transitions (150-300ms)
 - ❌ **Invisible focus states** — Focus states must be visible for a11y
 - ❌ **Leaf, lotus, wave, or generic wellness symbols as branding** — Use the open breath mark
+- ❌ **Perfect concentric circles as the primary visual** — Use the irregular Eole contour field
+- ❌ **Four-card home statistics grid** — Use the compact ruled summary band
 - ❌ **Baked-in icon background, frame, shadow, or gradient** — Keep every logo asset transparent
 
 ---
