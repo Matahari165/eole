@@ -1,5 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="eole-title">
   <title id="eole-title">Eole</title>
-  <path d="M27 67C39 43 57 31 77 33C90 35 100 45 104 57" fill="none" stroke="#176F65" stroke-width="9" stroke-linecap="round" />
-  <path d="M101 76C90 94 71 103 52 99C39 96 30 89 25 80" fill="none" stroke="#176F65" stroke-opacity=".52" stroke-width="9" stroke-linecap="round" />
+  <path d="M54 108C53 88 40 77 42 60C44 42 63 29 94 20C83 36 84 49 101 60" fill="none" stroke="#176F65" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
