@@ -257,6 +257,8 @@ h2 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.14; }
 .confirm-dialog h2 { font-size: 1.35rem; }
 .confirm-dialog p { margin: .6rem 0 1.3rem; color: var(--color-muted); }
 .confirm-dialog > div { display: flex; gap: .6rem; }
+.session-stop-dialog > div { display: grid; grid-template-columns: 1fr 1fr; }
+.session-stop-dialog > div .button-primary { grid-column: 1 / -1; }
 .dialog-close { float: right; width: 44px; height: 44px; margin: -.65rem -.65rem 0 0; border: 0; border-radius: 50%; display: grid; place-items: center; cursor: pointer; background: var(--color-surface-soft); }
 .session-complete { padding: max(2rem, env(safe-area-inset-top)) 1.2rem max(2rem, env(safe-area-inset-bottom)); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .8rem; text-align: center; background: radial-gradient(circle at 50% 30%, #e3eee8, #f7faf8 62%); }
 .complete-mark { width: 68px; height: 68px; margin-bottom: .65rem; border-radius: 50%; display: grid; place-items: center; color: #fff; background: var(--color-primary); box-shadow: 0 15px 42px rgba(23,111,101,.18); }
@@ -499,6 +501,8 @@ h2 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.14; }
   .settings-actions .button { width: 100%; }
   .auth-card { padding: 1.4rem; }
   .form-grid-two { grid-template-columns: 1fr; }
+  .session-stop-dialog > div { grid-template-columns: 1fr; }
+  .session-stop-dialog > div .button-primary { grid-column: auto; }
   .complete-actions { width: min(430px, 100%); flex-direction: column; }
   .complete-actions .button { width: 100%; }
 }

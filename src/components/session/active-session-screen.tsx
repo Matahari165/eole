@@ -98,10 +98,10 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
     const roundsCount = saved?.rounds.length ?? 0;
     const stopped = saved?.status === "stopped";
     const failed = session.phase === "error";
-    const outcome = getSessionOutcome({ failed, stopped, roundsCount, syncPending: session.syncPending });
+    const outcome = getSessionOutcome({ discarded: session.discarded, failed, stopped, roundsCount, syncPending: session.syncPending });
     return (
       <main className="session-screen session-complete">
-        <div className={`complete-mark${stopped || failed ? " complete-mark-neutral" : ""}`}>{stopped || failed ? <CircleStop size={34} aria-hidden="true" /> : <Check size={34} aria-hidden="true" />}</div>
+        <div className={`complete-mark${stopped || failed || session.discarded ? " complete-mark-neutral" : ""}`}>{stopped || failed || session.discarded ? <CircleStop size={34} aria-hidden="true" /> : <Check size={34} aria-hidden="true" />}</div>
         <p className="eyebrow">{outcome.eyebrow}</p>
         <h1>{outcome.title}</h1>
         <p>{outcome.summary}</p>
@@ -168,17 +168,24 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
       {isRetention && <button className="sr-only session-end-accessible" type="button" onClick={session.endRetention}>Arrêter la rétention</button>}
       
       <div className="round-dots" role="progressbar" aria-label="Progression des rounds" aria-valuemin={1} aria-valuemax={config.rounds} aria-valuenow={session.round}>{Array.from({ length: config.rounds }).map((_, index) => <span data-active={index + 1 <= session.round} key={index} />)}</div>
-      <dialog className="confirm-dialog" ref={dialogRef} aria-labelledby="stop-dialog-title" onCancel={() => setConfirmStop(false)}><button className="dialog-close" type="button" onClick={() => setConfirmStop(false)} aria-label="Fermer"><X size={20} /></button><h2 id="stop-dialog-title">Arrêter la séance ?</h2><p>{session.results.length ? `${session.results.length} round${session.results.length > 1 ? "s" : ""} terminé${session.results.length > 1 ? "s" : ""} ${session.results.length > 1 ? "seront conservés" : "sera conservé"}.` : "Aucun round n’est encore terminé."}</p><div><button className="button button-primary" type="button" onClick={() => setConfirmStop(false)} ref={continueRef}>Continuer la séance</button><button className="button button-quiet-danger" type="button" onClick={session.stop}>Arrêter</button></div></dialog>
+      <dialog className="confirm-dialog session-stop-dialog" ref={dialogRef} aria-labelledby="stop-dialog-title" onCancel={() => setConfirmStop(false)}><button className="dialog-close" type="button" onClick={() => setConfirmStop(false)} aria-label="Fermer"><X size={20} /></button><h2 id="stop-dialog-title">Arrêter la séance ?</h2><p>{session.results.length ? `${session.results.length} round${session.results.length > 1 ? "s" : ""} terminé${session.results.length > 1 ? "s" : ""}. Tu peux les enregistrer ou les supprimer.` : "Aucun round n’est encore terminé."}</p><div><button className="button button-primary" type="button" onClick={() => setConfirmStop(false)} ref={continueRef}>Continuer la séance</button><button className="button button-quiet-danger" type="button" onClick={session.stop}>Arrêter</button><button className="button button-danger" type="button" onClick={session.discard}>Arrêter sans enregistrer</button></div></dialog>
     </main>
   );
 }
 
-function getSessionOutcome({ failed, stopped, roundsCount, syncPending }: { failed: boolean; stopped: boolean; roundsCount: number; syncPending: boolean }) {
+function getSessionOutcome({ discarded, failed, stopped, roundsCount, syncPending }: { discarded: boolean; failed: boolean; stopped: boolean; roundsCount: number; syncPending: boolean }) {
   if (failed) {
     return {
       eyebrow: "Enregistrement interrompu",
       title: "Tes résultats sont ici.",
       summary: "Tes résultats sont encore sur cet écran. Vérifie ta connexion puis réessaie.",
+    };
+  }
+  if (discarded) {
+    return {
+      eyebrow: "Séance non enregistrée",
+      title: "À bientôt.",
+      summary: "La séance a été arrêtée sans être ajoutée à ton historique.",
     };
   }
   if (stopped && roundsCount === 0) {
