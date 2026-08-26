@@ -7,9 +7,13 @@ import { getNewRetentionMinute } from "@/lib/retention-timing";
 import { PACE_TIMINGS, type BreathSession, type RoundResult, type SessionConfig, type SoundSettings } from "@/lib/types";
 
 export type SessionPhase = "ready" | "starting" | "countdown" | "inhale" | "exhale" | "retention" | "recovery-inhale" | "recovery-hold" | "recovery-exhale" | "saving" | "complete" | "error";
+type InternalSessionPhase = "inter-round-pause";
+
+const INTER_ROUND_PAUSE_MS = 1000;
 
 export function useBreathSession(config: SessionConfig, settings: SoundSettings) {
   const [phase, setPhase] = useState<SessionPhase>("ready");
+  const [internalPhase, setInternalPhase] = useState<InternalSessionPhase | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(3);
   const [round, setRound] = useState(1);
   const [breath, setBreath] = useState(1);
@@ -157,7 +161,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
         lastRenderedSecondRef.current = elapsedSeconds;
         setRetentionSeconds(elapsedSeconds);
       }
-    }, 100);
+    }, 1000);
     return () => window.clearInterval(interval);
   }, [ding, phase]);
 
@@ -246,7 +250,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   }, [savedSession]);
 
   useEffect(() => {
-    if (phase !== "recovery-exhale") return;
+    if (phase !== "recovery-exhale" || internalPhase !== null) return;
     audioRef.current?.playBreath("exhale", 2000);
     const timeout = window.setTimeout(() => {
       const completed = [...results, { roundIndex: round, breathsCompleted: config.breathsPerRound, retentionSeconds: pendingRetentionRef.current }];
@@ -254,13 +258,22 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
       if (round >= config.rounds) {
         void persist("completed", completed);
       } else {
-        setRound((value) => value + 1);
-        setBreath(1);
-        setPhase("inhale");
+        setInternalPhase("inter-round-pause");
       }
     }, 2000);
     return () => window.clearTimeout(timeout);
-  }, [config.breathsPerRound, config.rounds, persist, phase, results, round]);
+  }, [config.breathsPerRound, config.rounds, internalPhase, persist, phase, results, round]);
+
+  useEffect(() => {
+    if (phase !== "recovery-exhale" || internalPhase !== "inter-round-pause") return;
+    const timeout = window.setTimeout(() => {
+      setInternalPhase(null);
+      setRound((value) => value + 1);
+      setBreath(1);
+      setPhase("inhale");
+    }, INTER_ROUND_PAUSE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [internalPhase, phase]);
 
   const stop = useCallback(() => {
     void persist("stopped", results);
@@ -279,5 +292,5 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     persistingRef.current = false;
   }, []);
 
-  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, audioNotice, syncPending, discarded, start, stop, discard, endRetention, retrySave, setTapHint };
+  return { phase, interRoundPause: internalPhase === "inter-round-pause", countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, audioNotice, syncPending, discarded, start, stop, discard, endRetention, retrySave, setTapHint };
 }

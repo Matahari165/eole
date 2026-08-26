@@ -48,7 +48,9 @@ export function DashboardOverview() {
           </div>
         </div>
         <div className="hero-breath" aria-hidden="true">
-          <span className="hero-breath-ring" />
+          <div className="hero-contours">
+            {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
+          </div>
           <EoleMark size={190} className="hero-breath-mark" />
         </div>
       </section>
@@ -70,7 +72,7 @@ export function DashboardOverview() {
         </section>
         <section className="content-card milestone-card">
           <span className="milestone-icon"><TrophyMark /></span>
-          <div><p className="eyebrow">Prochain repère</p><h2>{formatDuration(nextMilestone)}</h2><p>Tu es à {formatDuration(stats.maxRetention)}. Chaque souffle compte.</p></div>
+          <div><p className="eyebrow">Prochain repère</p><h2>{formatDuration(nextMilestone)}</h2><p>Tu es à {formatDuration(stats.maxRetention)}.</p></div>
         </section>
       </div>}
     </div>
