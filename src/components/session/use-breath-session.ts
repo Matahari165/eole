@@ -20,6 +20,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   const [tapHint, setTapHint] = useState(false);
   const [audioNotice, setAudioNotice] = useState<string | null>(null);
   const [syncPending, setSyncPending] = useState(false);
+  const [discarded, setDiscarded] = useState(false);
   
   const audioRef = useRef<AudioEngine | null>(null);
   const audioStartCancelledRef = useRef(false);
@@ -265,5 +266,18 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     void persist("stopped", results);
   }, [persist, results]);
 
-  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, audioNotice, syncPending, start, stop, endRetention, retrySave, setTapHint };
+  const discard = useCallback(() => {
+    if (persistingRef.current || !startedAtRef.current) return;
+    persistingRef.current = true;
+    audioStartCancelledRef.current = true;
+    audioRef.current?.stopAmbient();
+    void wakeLockRef.current?.release();
+    setDiscarded(true);
+    setSavedSession(null);
+    setSyncPending(false);
+    setPhase("complete");
+    persistingRef.current = false;
+  }, []);
+
+  return { phase, countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, audioNotice, syncPending, discarded, start, stop, discard, endRetention, retrySave, setTapHint };
 }
