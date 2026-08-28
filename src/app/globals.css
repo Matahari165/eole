@@ -82,7 +82,7 @@ h2 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.14; }
 
 .brand { min-height: 44px; display: inline-flex; align-items: center; gap: 0.65rem; width: max-content; }
 .brand-mark { width: 35px; height: 35px; color: var(--color-primary); overflow: visible; transition: transform 300ms var(--ease-out); }
-.brand:hover .brand-mark { transform: rotate(3deg) scale(1.025); }
+.brand:hover .brand-mark { transform: scale(1.025); }
 .brand-name { font-family: var(--font-display); font-size: 1.42rem; font-weight: 550; letter-spacing: -0.045em; }
 
 .app-frame { min-height: 100svh; }

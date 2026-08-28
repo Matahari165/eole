@@ -10,7 +10,7 @@ export function EoleMark({ size = 35, className = "" }: { size?: number; classNa
       height={size}
       aria-hidden="true"
     >
-      <path d="M54 108C53 88 40 77 42 60C44 42 63 29 94 20C83 36 84 49 101 60" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="64" cy="64" r="44" fill="none" stroke="currentColor" strokeWidth="8" />
     </svg>
   );
 }

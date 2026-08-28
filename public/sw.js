@@ -1,4 +1,4 @@
-const STATIC_CACHE = "eole-static-v1";
+const STATIC_CACHE = "eole-static-v2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
