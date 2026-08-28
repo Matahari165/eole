@@ -59,7 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <main className="app-main" id="main-content" ref={mainRef} tabIndex={-1}>
         {!isNeonConfigured() && (
           <div className="demo-banner" role="status">
-            Mode aperçu — connecte Neon pour activer la sauvegarde permanente.
+            Mode test — données fictives et séances enregistrées uniquement dans ce navigateur. Aucun impact sur le cloud.
           </div>
         )}
         {children}

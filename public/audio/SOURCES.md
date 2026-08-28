@@ -1,6 +1,15 @@
 # Sources audio
 
-Les six sons respiratoires synchronisés utilisés par Eole proviennent du fichier
+Les deux fichiers au rythme normal (`eole-inhale-normal.mp3` et
+`eole-exhale-normal.mp3`) proviennent d'un enregistrement personnel fourni pour
+Eole. Une prise naturelle de `2 s` a été sélectionnée pour chaque phase, sans
+étirement temporel : inspiration `20,260–22,260 s`, expiration
+`7,580–9,580 s`. Seuls un filtrage léger, des fondus courts et une normalisation
+autour de `-34 LUFS` ont été appliqués.
+
+## Rythmes lent et rapide
+
+Les quatre sons respiratoires lent et rapide utilisés par Eole proviennent du fichier
 **inhale-exhale** publié sur Pixabay par `Amber2023` :
 
 - Page source :
@@ -14,8 +23,8 @@ Les six sons respiratoires synchronisés utilisés par Eole proviennent du fichi
   une expiration humaines.
 
 L'inspiration (`0,12–0,88 s`) et l'expiration (`1,68–2,70 s`) ont été isolées puis
-ajustées hors ligne à hauteur constante pour correspondre exactement aux trois
-durées de l'animation : `1,25 s`, `2 s` et `3 s`. Les traitements restent légers :
+ajustées hors ligne à hauteur constante pour correspondre aux durées de `1,25 s`
+et `3 s`. Les traitements restent légers :
 filtrage passe-haut à 80 Hz, passe-bas à 14 kHz, homogénéisation de la dynamique,
 fondus courts et normalisation autour de `-34,5 LUFS`. Les fichiers finaux sont en
 MP3 mono 44,1 kHz à 96 kb/s et sont nommés

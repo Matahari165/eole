@@ -1,5 +1,4 @@
-import type { CSSProperties } from "react";
-import { EoleMark } from "@/components/layout/brand";
+import { useEffect, useState, type CSSProperties } from "react";
 import type { SessionPhase } from "@/components/session/use-breath-session";
 
 type BreathingPhase = Extract<SessionPhase, "inhale" | "exhale">;
@@ -12,26 +11,21 @@ export function SessionMotionField() {
 export function BreathingVisual({ phase, breath, total, durationMs }: { phase: BreathingPhase; breath: number; total: number; durationMs: number }) {
   const inhale = phase === "inhale";
   const label = inhale ? "Inspiration" : "Expiration";
+  const motionPhase = useMotionPhase(phase);
   const style = {
     "--breath-duration": `${durationMs / 1000}s`,
   } as CSSProperties;
 
-  return <div className="breath-stage" style={style} role="img" aria-label={`${label}, respiration ${breath} sur ${total}`}>
+  return <div className="breath-stage" style={style} data-motion-phase={motionPhase} role="img" aria-label={`${label}, respiration ${breath} sur ${total}`}>
     <div className="breath-contours" aria-hidden="true">
       {Array.from({ length: 8 }, (_, index) => <span key={index} />)}
     </div>
-    <EoleMark size={74} className="breath-center-mark" aria-hidden="true" />
+    <span className="breath-origin" aria-hidden="true" />
   </div>;
 }
 
 export function RetentionVisual({ seconds }: { seconds: number }) {
-  const progress = (seconds % 60) * 6;
-  const style = { "--minute-progress": `${progress}deg` } as CSSProperties;
-
-  return <div className="retention-stage" style={style} role="timer" aria-label={`Rétention, ${seconds} seconde${seconds > 1 ? "s" : ""}`}>
-    <div className="retention-contours" aria-hidden="true">
-      {Array.from({ length: 6 }, (_, index) => <span key={index} />)}
-    </div>
+  return <div className="retention-stage" role="timer" aria-label={`Rétention, ${seconds} seconde${seconds > 1 ? "s" : ""}`}>
     <strong className="retention-timer">{formatClock(seconds)}</strong>
   </div>;
 }
@@ -40,15 +34,25 @@ export function RecoveryVisual({ phase, seconds }: { phase: RecoveryPhase; secon
   const holding = phase === "recovery-hold";
   const inhale = phase === "recovery-inhale";
   const phaseLabel = inhale ? "Inspiration de récupération" : holding ? "Rétention de récupération" : "Expiration de récupération";
+  const motionPhase = useMotionPhase(phase);
   const style = { "--breath-duration": "2s" } as CSSProperties;
 
-  return <div className="recovery-stage" style={style} role="img" aria-label={`${phaseLabel}, ${seconds} seconde${seconds > 1 ? "s" : ""}`}>
+  return <div className="recovery-stage" style={style} data-motion-phase={motionPhase} role="img" aria-label={`${phaseLabel}, ${seconds} seconde${seconds > 1 ? "s" : ""}`}>
     <div className="breath-contours" aria-hidden="true">
       {Array.from({ length: 8 }, (_, index) => <span key={index} />)}
     </div>
-    {!holding ? <EoleMark size={74} className="breath-center-mark" aria-hidden="true" /> : null}
+    {!holding ? <span className="breath-origin" aria-hidden="true" /> : null}
     {holding ? <strong className="recovery-count">{seconds}</strong> : null}
   </div>;
+}
+
+function useMotionPhase<T extends string>(phase: T) {
+  const [motionPhase, setMotionPhase] = useState<T | "rest">("rest");
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setMotionPhase(phase));
+    return () => window.cancelAnimationFrame(frame);
+  }, [phase]);
+  return motionPhase;
 }
 
 function formatClock(seconds: number) {

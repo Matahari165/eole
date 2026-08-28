@@ -50,6 +50,7 @@ describe("calculateStats", () => {
     expect(stats.averageRetention).toBe(86.25);
     expect(stats.currentStreak).toBe(2);
     expect(stats.totalPracticeSeconds).toBe(1200);
+    expect(stats.averageSessionSeconds).toBe(600);
   });
 });
 

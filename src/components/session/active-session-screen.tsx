@@ -2,24 +2,34 @@
 
 import { Check, CircleStop, LoaderCircle, RotateCcw, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { formatDuration } from "@/lib/analytics";
 import { getSoundSettings } from "@/lib/repository";
 import { DEFAULT_SOUND_SETTINGS, PACE_TIMINGS, type SessionConfig, type SoundSettings } from "@/lib/types";
 import { useBreathSession } from "@/components/session/use-breath-session";
 import { BreathingVisual, RecoveryVisual, RetentionVisual, SessionMotionField } from "@/components/session/session-visuals";
 
-export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
+export function ActiveSessionScreen({ config, initialStartedAt }: { config: SessionConfig; initialStartedAt?: string }) {
   const [settings, setSettings] = useState<SoundSettings>(DEFAULT_SOUND_SETTINGS);
   const [settingsFallback, setSettingsFallback] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
   const lastSessionTapRef = useRef(0);
-  const session = useBreathSession(config, settings);
+  const session = useBreathSession(config, settings, initialStartedAt);
   const sessionPhase = session.phase;
-  const startSession = session.start;
   const setTapHint = session.setTapHint;
+
+  const openStopDialog = () => {
+    setConfirmStop(true);
+    if (!dialogRef.current?.open) dialogRef.current?.showModal();
+    continueRef.current?.focus();
+  };
+
+  const closeStopDialog = () => {
+    setConfirmStop(false);
+    dialogRef.current?.close();
+  };
 
   useEffect(() => {
     let active = true;
@@ -37,7 +47,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
 
   useEffect(() => {
     if (confirmStop) {
-      dialogRef.current?.showModal();
+      if (!dialogRef.current?.open) dialogRef.current?.showModal();
       continueRef.current?.focus();
     }
     else dialogRef.current?.close();
@@ -61,7 +71,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
       }
       restoring = true;
       window.history.forward();
-      setConfirmStop(true);
+      openStopDialog();
     };
     window.addEventListener("popstate", guardBackGesture);
     return () => {
@@ -70,17 +80,15 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
     };
   }, [sessionInProgress]);
 
-  if (session.phase === "ready" || session.phase === "starting" || session.phase === "countdown") {
-    const ready = session.phase === "ready";
+  if (session.phase === "starting" || session.phase === "countdown") {
     const countdown = session.phase === "countdown";
     return (
-      <main className={`session-screen session-ready${countdown ? " session-countdown" : ""}`} aria-busy={!ready && !countdown}>
+      <main className={`session-screen session-ready${countdown ? " session-countdown" : ""}`} aria-busy={!countdown} onPointerDown={session.resumeAudio}>
         <div className="ready-wave" aria-hidden="true"><span /><span /><span /></div>
         <div className="session-ready-content">
-          <p className="eyebrow">{countdown ? `Round 1 sur ${config.rounds}` : ready ? "Séance prête" : "Préparation"}</p>
-          <div className="countdown-orb" aria-live="polite" aria-atomic="true">{countdown ? <strong>{session.countdownSeconds}</strong> : ready ? <Check size={34} aria-hidden="true" /> : <LoaderCircle className="spin" size={34} aria-hidden="true" />}</div>
-          <h1>{countdown ? "Installe-toi." : ready ? "Tout est prêt." : "Préparation…"}</h1>
-          {ready ? <button className="button button-primary button-large" type="button" onClick={() => void startSession()}>Démarrer la séance</button> : null}
+          <p className="eyebrow">{countdown ? `Round 1 sur ${config.rounds}` : "Préparation"}</p>
+          <div className="countdown-orb" aria-live="polite" aria-atomic="true">{countdown ? <strong>{session.countdownSeconds}</strong> : <LoaderCircle className="spin" size={34} aria-hidden="true" />}</div>
+          <h1>{countdown ? "Installe-toi." : "Préparation…"}</h1>
           {countdown && (settingsFallback || session.audioNotice) ? <p className="session-audio-note">{session.audioNotice ?? "Les réglages audio par défaut sont utilisés."}</p> : null}
         </div>
       </main>
@@ -95,6 +103,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
     const saved = session.savedSession;
     const best = saved?.rounds.length ? Math.max(...saved.rounds.map((round) => round.retentionSeconds)) : 0;
     const roundsCount = saved?.rounds.length ?? 0;
+    const duration = saved ? Math.max(0, (new Date(saved.completedAt).getTime() - new Date(saved.startedAt).getTime()) / 1000) : 0;
     const stopped = saved?.status === "stopped";
     const failed = session.phase === "error";
     const outcome = getSessionOutcome({ discarded: session.discarded, failed, stopped, roundsCount, syncPending: session.syncPending });
@@ -104,7 +113,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
         <p className="eyebrow">{outcome.eyebrow}</p>
         <h1>{outcome.title}</h1>
         <p>{outcome.summary}</p>
-        {roundsCount ? <div className="complete-stats"><div><span>Meilleure rétention</span><strong>{formatDuration(best)}</strong></div><div><span>Rounds terminés</span><strong>{roundsCount}</strong></div></div> : null}
+        {roundsCount ? <div className="complete-stats"><div><span>Durée de la séance</span><strong>{formatDuration(duration)}</strong></div><div><span>Meilleure rétention</span><strong>{formatDuration(best)}</strong></div><div><span>Rounds terminés</span><strong>{roundsCount}</strong></div></div> : null}
         <div className="complete-actions">{failed ? <button className="button button-primary" type="button" onClick={session.retrySave}>Réessayer l’enregistrement</button> : <Link className="button button-primary" href={roundsCount ? "/app/statistiques" : "/app"} replace>{roundsCount ? "Voir mes progrès" : "Retour à l’accueil"}</Link>}<Link className="button button-secondary" href="/app/session/nouvelle" replace><RotateCcw size={17} aria-hidden="true" /> Recommencer</Link></div>
       </main>
     );
@@ -136,9 +145,10 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
   const animationDuration = session.phase === "inhale" || session.phase === "exhale"
     ? PACE_TIMINGS[config.pace][session.phase]
     : 2000;
+  const sessionStyle = { "--phase-duration": `${animationDuration / 1000}s` } as CSSProperties;
 
   return (
-    <main className={`session-screen session-running phase-${session.phase}`} onPointerUp={handleSessionPointerUp}>
+    <main className={`session-screen session-running phase-${session.phase}`} style={sessionStyle} onPointerDown={session.resumeAudio} onPointerUp={handleSessionPointerUp}>
       <SessionMotionField />
 
       <div className="session-bg" aria-hidden="true">
@@ -151,8 +161,9 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
       <header className="session-topbar">
         <div className="session-position">
           <span>Round {session.round} / {config.rounds}</span>
+          {breathingPhase ? <small className="breath-position" key={session.breath}>Respiration {session.breath} / {config.breathsPerRound}</small> : null}
         </div>
-        <button type="button" onClick={() => setConfirmStop(true)} aria-label="Arrêter la séance"><X size={22} aria-hidden="true" /></button>
+        <button type="button" onClick={openStopDialog} aria-label="Arrêter la séance"><X size={22} aria-hidden="true" /></button>
       </header>
 
       <div className="session-center" data-phase={session.phase}>
@@ -167,7 +178,7 @@ export function ActiveSessionScreen({ config }: { config: SessionConfig }) {
       
       {isRetention && <button className="sr-only session-end-accessible" type="button" onClick={session.endRetention}>Arrêter la rétention</button>}
       
-      <dialog className="confirm-dialog session-stop-dialog" ref={dialogRef} aria-labelledby="stop-dialog-title" onCancel={() => setConfirmStop(false)}><button className="dialog-close" type="button" onClick={() => setConfirmStop(false)} aria-label="Fermer"><X size={20} /></button><h2 id="stop-dialog-title">Arrêter la séance ?</h2><p>{session.results.length ? `${session.results.length} round${session.results.length > 1 ? "s" : ""} terminé${session.results.length > 1 ? "s" : ""}. Tu peux les enregistrer ou les supprimer.` : "Aucun round n’est encore terminé."}</p><div><button className="button button-primary" type="button" onClick={() => setConfirmStop(false)} ref={continueRef}>Continuer la séance</button><button className="button button-quiet-danger" type="button" onClick={session.stop}>Arrêter</button><button className="button button-danger" type="button" onClick={session.discard}>Arrêter sans enregistrer</button></div></dialog>
+      <dialog className="confirm-dialog session-stop-dialog" ref={dialogRef} aria-labelledby="stop-dialog-title" onCancel={closeStopDialog}><button className="dialog-close" type="button" onClick={closeStopDialog} aria-label="Fermer"><X size={20} /></button><h2 id="stop-dialog-title">Arrêter la séance ?</h2><p>{session.results.length ? `${session.results.length} round${session.results.length > 1 ? "s" : ""} terminé${session.results.length > 1 ? "s" : ""}. Tu peux les enregistrer ou les supprimer.` : "Aucun round n’est encore terminé."}</p><div><button className="button button-danger session-stop-primary" type="button" onClick={session.stop}>Arrêter</button><button className="button button-secondary" type="button" onClick={closeStopDialog} ref={continueRef}>Continuer la séance</button><button className="button button-quiet-danger" type="button" onClick={session.discard}>Arrêter sans enregistrer</button></div></dialog>
     </main>
   );
 }

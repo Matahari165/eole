@@ -1,20 +1,22 @@
 "use client";
 
-import { ArrowRight, CalendarDays, SlidersHorizontal, Trophy, Wind } from "lucide-react";
+import { ArrowRight, CalendarDays, SlidersHorizontal, Trophy } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { EoleMark } from "@/components/layout/brand";
 import { SummaryCards } from "@/components/stats/summary-cards";
 import { calculateStats, formatDuration } from "@/lib/analytics";
 import { getDashboardData } from "@/lib/repository";
-import type { BreathSession, UserProfile } from "@/lib/types";
+import { getSessionDefaults } from "@/lib/session-defaults";
+import { DEFAULT_SESSION_CONFIG, type BreathSession, type UserProfile } from "@/lib/types";
 
 export function DashboardOverview() {
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [sessions, setSessions] = useState<BreathSession[] | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [sessionDefaults, setSessionDefaults] = useState(DEFAULT_SESSION_CONFIG);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    Promise.resolve().then(() => setSessionDefaults(getSessionDefaults()));
     getDashboardData()
       .then(({ profile: nextProfile, sessions: nextSessions }) => {
         setProfile(nextProfile);
@@ -26,32 +28,25 @@ export function DashboardOverview() {
   const stats = sessions ? calculateStats(sessions) : null;
   const last = sessions?.find((session) => session.rounds.length > 0);
   const nextMilestone = stats ? Math.ceil((stats.maxRetention + 1) / 15) * 15 : 0;
+  const paceSummary = sessionDefaults.pace === "slow" ? "lent" : sessionDefaults.pace === "fast" ? "rapide" : "normal";
+  const sessionHref = `/app/session/active?rounds=${sessionDefaults.rounds}&breaths=${sessionDefaults.breathsPerRound}&pace=${sessionDefaults.pace}`;
 
   return (
     <div className="page-stack dashboard-page">
       <header className="page-header dashboard-header">
         <div>
-          <p className="eyebrow">{profile ? `Bonjour ${profile.firstName}` : "Ton espace Eole"}</p>
-          <h1>Prends un instant pour respirer.</h1>
+          <h1>{profile ? `Bonjour ${profile.firstName}` : "Bonjour"}</h1>
         </div>
         <span className="date-pill"><CalendarDays size={16} aria-hidden="true" />{new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span>
       </header>
 
       <section className="breath-hero" aria-labelledby="daily-practice-title">
         <div className="hero-copy">
-          <p className="hero-kicker"><Wind size={16} strokeWidth={1.8} aria-hidden="true" /> Séance guidée</p>
-          <h2 id="daily-practice-title">Inspire. Relâche.<br />Reste présent.</h2>
-          <p>3 rounds · 35 respirations · rythme normal</p>
+          <h2 id="daily-practice-title">Prends un instant pour respirer.</h2>
+          <div className="hero-meta"><p>{sessionDefaults.rounds} rounds · {sessionDefaults.breathsPerRound} respirations · rythme {paceSummary}</p><Link className="hero-adjust" href="/app/session/nouvelle"><SlidersHorizontal size={15} aria-hidden="true" /> Ajuster</Link></div>
           <div className="hero-actions">
-            <Link className="button button-light" href="/app/session/active?rounds=3&breaths=35&pace=normal">Commencer <ArrowRight size={18} aria-hidden="true" /></Link>
-            <Link className="hero-adjust" href="/app/session/nouvelle"><SlidersHorizontal size={17} aria-hidden="true" /> Ajuster</Link>
+            <Link className="button button-light" href={sessionHref}>Commencer <ArrowRight size={18} aria-hidden="true" /></Link>
           </div>
-        </div>
-        <div className="hero-breath" aria-hidden="true">
-          <div className="hero-contours">
-            {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
-          </div>
-          <EoleMark size={190} className="hero-breath-mark" />
         </div>
       </section>
 

@@ -7,6 +7,7 @@ export interface SessionStats {
   maxRetention: number;
   averageRetention: number;
   totalPracticeSeconds: number;
+  averageSessionSeconds: number;
   currentStreak: number;
 }
 
@@ -41,6 +42,7 @@ export function calculateStats(sessions: BreathSession[], today = new Date()): S
       ? retentions.reduce((sum, value) => sum + value, 0) / retentions.length
       : 0,
     totalPracticeSeconds,
+    averageSessionSeconds: validSessions.length ? totalPracticeSeconds / validSessions.length : 0,
     currentStreak,
   };
 }

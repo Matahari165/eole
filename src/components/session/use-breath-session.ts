@@ -10,9 +10,10 @@ export type SessionPhase = "ready" | "starting" | "countdown" | "inhale" | "exha
 type InternalSessionPhase = "inter-round-pause";
 
 const INTER_ROUND_PAUSE_MS = 1000;
+const AUDIO_PREPARATION_TIMEOUT_MS = 1500;
 
-export function useBreathSession(config: SessionConfig, settings: SoundSettings) {
-  const [phase, setPhase] = useState<SessionPhase>("ready");
+export function useBreathSession(config: SessionConfig, settings: SoundSettings, initialStartedAt?: string) {
+  const [phase, setPhase] = useState<SessionPhase>("countdown");
   const [internalPhase, setInternalPhase] = useState<InternalSessionPhase | null>(null);
   const [countdownSeconds, setCountdownSeconds] = useState(3);
   const [round, setRound] = useState(1);
@@ -28,24 +29,47 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
   
   const audioRef = useRef<AudioEngine | null>(null);
   const audioStartCancelledRef = useRef(false);
-  const startedAtRef = useRef<string | null>(null);
-  const startingRef = useRef(false);
+  const startedAtRef = useRef(initialStartedAt ?? new Date().toISOString());
   const retentionStartedRef = useRef(0);
   const lastRetentionDingMinuteRef = useRef(0);
   const lastRenderedSecondRef = useRef(0);
+  const lastRecoveryDingSecondRef = useRef(0);
   const pendingRetentionRef = useRef(0);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const persistingRef = useRef(false);
   const initialSettingsRef = useRef(settings);
 
   useEffect(() => {
-    audioRef.current = new AudioEngine(initialSettingsRef.current);
+    let active = true;
+    const audio = new AudioEngine(initialSettingsRef.current);
+    audioRef.current = audio;
+    const paceDuration = PACE_TIMINGS[config.pace].inhale;
+    void Promise.race([
+      audio.unlock(paceDuration === 2000 ? [2000] : [paceDuration, 2000]),
+      new Promise<{ breathGuides: boolean; music: boolean }>((resolve) => {
+        setTimeout(() => resolve({ breathGuides: false, music: false }), AUDIO_PREPARATION_TIMEOUT_MS);
+      }),
+    ]).then((readiness) => {
+      if (!active || audioStartCancelledRef.current) return;
+      if (readiness.music) audio.startAmbient();
+      if (!readiness.breathGuides) setAudioNotice("Les respirations enregistrées n’ont pas pu être chargées. Le guide de secours reste actif.");
+      else if (!readiness.music) setAudioNotice("La musique n’a pas pu être chargée. Les respirations restent actives.");
+    }).catch(() => {
+      if (active && !audioStartCancelledRef.current) setAudioNotice("Le son n’est pas disponible. La séance peut continuer sans audio.");
+    });
+    if ("wakeLock" in navigator) {
+      void navigator.wakeLock.request("screen").then((lock) => {
+        if (active) wakeLockRef.current = lock;
+        else void lock.release();
+      }).catch(() => undefined);
+    }
     return () => {
+      active = false;
       audioStartCancelledRef.current = true;
-      audioRef.current?.destroy();
+      audio.destroy();
       void wakeLockRef.current?.release();
     };
-  }, []); // Audio engine lifetime matches the session screen.
+  }, [config.pace]);
 
   useEffect(() => audioRef.current?.updateSettings(settings), [settings]);
 
@@ -59,31 +83,13 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     if (settings.hapticsEnabled && "vibrate" in navigator) navigator.vibrate([24, 35, 24]);
   }, [settings.hapticsEnabled]);
 
-  const start = useCallback(async () => {
-    if (startedAtRef.current || startingRef.current) return;
-    startingRef.current = true;
-    audioStartCancelledRef.current = false;
-    setPhase("starting");
-    const audio = audioRef.current;
-    if (audio) {
-      const paceDuration = PACE_TIMINGS[config.pace].inhale;
-      try {
-        const readiness = await audio.unlock(paceDuration === 2000 ? [2000] : [paceDuration, 2000]);
-        if (audioStartCancelledRef.current) return;
-        if (readiness.music) audio.startAmbient();
-        if (!readiness.breathGuides) setAudioNotice("Les respirations enregistrées n’ont pas pu être chargées. Le guide de secours reste actif.");
-        else if (!readiness.music) setAudioNotice("La musique n’a pas pu être chargée. Les respirations restent actives.");
-      } catch {
-        setAudioNotice("Le son n’est pas disponible. La séance peut continuer sans audio.");
-      }
-    }
-    startedAtRef.current = new Date().toISOString();
-    if ("wakeLock" in navigator) {
-      try { wakeLockRef.current = await navigator.wakeLock.request("screen"); } catch { /* Not supported or denied. */ }
-    }
-    setCountdownSeconds(3);
-    setPhase("countdown");
-  }, [config.pace]);
+  const softDing = useCallback(() => {
+    audioRef.current?.playSoftDing();
+  }, []);
+
+  const resumeAudio = useCallback(() => {
+    audioRef.current?.resume();
+  }, []);
 
   const sessionInProgress = !["ready", "complete", "error"].includes(phase);
   useEffect(() => {
@@ -177,6 +183,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
 
   useEffect(() => {
     if (phase !== "recovery-inhale") return;
+    lastRecoveryDingSecondRef.current = 0;
     audioRef.current?.playBreath("inhale", 2000);
     const timeout = window.setTimeout(() => {
       setRecoverySeconds(15);
@@ -187,6 +194,10 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
 
   useEffect(() => {
     if (phase !== "recovery-hold") return;
+    if (round < config.rounds && recoverySeconds <= 3 && lastRecoveryDingSecondRef.current !== recoverySeconds) {
+      lastRecoveryDingSecondRef.current = recoverySeconds;
+      softDing();
+    }
     const timeout = window.setTimeout(() => {
       if (recoverySeconds <= 1) {
         cue(540);
@@ -196,7 +207,7 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
       }
     }, 1000);
     return () => window.clearTimeout(timeout);
-  }, [cue, phase, recoverySeconds]);
+  }, [config.rounds, cue, phase, recoverySeconds, round, softDing]);
 
   const persist = useCallback(async (status: BreathSession["status"], completedResults: RoundResult[]) => {
     if (persistingRef.current || !startedAtRef.current) return;
@@ -292,5 +303,5 @@ export function useBreathSession(config: SessionConfig, settings: SoundSettings)
     persistingRef.current = false;
   }, []);
 
-  return { phase, interRoundPause: internalPhase === "inter-round-pause", countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, audioNotice, syncPending, discarded, start, stop, discard, endRetention, retrySave, setTapHint };
+  return { phase, interRoundPause: internalPhase === "inter-round-pause", countdownSeconds, round, breath, retentionSeconds, recoverySeconds, results, savedSession, tapHint, audioNotice, syncPending, discarded, stop, discard, endRetention, retrySave, resumeAudio, setTapHint };
 }

@@ -33,6 +33,8 @@ const BREATH_VARIANT_DURATIONS: Record<BreathVariant, number> = {
   slow: 3000,
 };
 
+const AUDIO_RESUME_TIMEOUT_MS = 800;
+
 export function getBreathAssetPath(direction: BreathDirection, durationMs: number) {
   const variants = Object.keys(BREATH_VARIANT_DURATIONS) as BreathVariant[];
   const variant = variants.reduce(
@@ -95,8 +97,17 @@ export class AudioEngine {
       this.reverb.connect(this.compressor);
     }
 
-    if (this.context.state === "suspended") await this.context.resume();
+    if (this.context.state === "suspended") {
+      await Promise.race([
+        this.context.resume().catch(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, AUDIO_RESUME_TIMEOUT_MS)),
+      ]);
+    }
     return this.loadAssets(breathDurationsMs);
+  }
+
+  resume() {
+    if (this.context?.state === "suspended") void this.context.resume().catch(() => undefined);
   }
 
   updateSettings(settings: SoundSettings) {
@@ -206,6 +217,29 @@ export class AudioEngine {
 
     playPartial(frequency, 0.085);
     playPartial(frequency * 2, 0.018);
+  }
+
+  playSoftDing() {
+    if (!this.context || this.settings.breathVolume === 0 || !this.masterGain) return;
+    const now = this.context.currentTime;
+    const oscillator = this.context.createOscillator();
+    const gain = this.context.createGain();
+    const volume = Math.max(0.001, (this.settings.breathVolume / 100) * 0.055);
+
+    this.duckAmbient(0.4, 0.78);
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(432, now);
+    oscillator.frequency.exponentialRampToValueAtTime(426, now + 0.32);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(volume, now + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+    oscillator.connect(gain).connect(this.masterGain);
+    oscillator.start(now);
+    oscillator.stop(now + 0.38);
+    oscillator.addEventListener("ended", () => {
+      oscillator.disconnect();
+      gain.disconnect();
+    }, { once: true });
   }
 
   playDing() {

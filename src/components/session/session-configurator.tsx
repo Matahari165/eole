@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowRight, Gauge, Minus, Plus, RotateCcw, Wind } from "lucide-react";
+import { ArrowRight, Check, Gauge, Minus, Plus, Save, RotateCcw, Wind } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getSessionDefaults, saveSessionDefaults } from "@/lib/session-defaults";
 import { DEFAULT_SESSION_CONFIG, type Pace } from "@/lib/types";
 
 const paceOptions: { value: Pace; label: string; detail: string }[] = [
@@ -16,12 +17,39 @@ export function SessionConfigurator() {
   const [rounds, setRounds] = useState(DEFAULT_SESSION_CONFIG.rounds);
   const [breaths, setBreaths] = useState(DEFAULT_SESSION_CONFIG.breathsPerRound);
   const [pace, setPace] = useState<Pace>(DEFAULT_SESSION_CONFIG.pace);
+  const [savedDefaults, setSavedDefaults] = useState(DEFAULT_SESSION_CONFIG);
+  const [savedNotice, setSavedNotice] = useState(false);
   const paceSummary = pace === "slow" ? "lent" : pace === "fast" ? "rapide" : "normal";
-  const customized = rounds !== DEFAULT_SESSION_CONFIG.rounds || breaths !== DEFAULT_SESSION_CONFIG.breathsPerRound || pace !== DEFAULT_SESSION_CONFIG.pace;
+  const customized = rounds !== savedDefaults.rounds || breaths !== savedDefaults.breathsPerRound || pace !== savedDefaults.pace;
+
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (!active) return;
+      const defaults = getSessionDefaults();
+      setSavedDefaults(defaults);
+      setRounds(defaults.rounds);
+      setBreaths(defaults.breathsPerRound);
+      setPace(defaults.pace);
+    });
+    return () => { active = false; };
+  }, []);
 
   function start() {
-    const params = new URLSearchParams({ rounds: String(rounds), breaths: String(breaths), pace });
+    const params = new URLSearchParams({
+      rounds: String(rounds),
+      breaths: String(breaths),
+      pace,
+      startedAt: new Date().toISOString(),
+    });
     router.push(`/app/session/active?${params.toString()}`);
+  }
+
+  function saveAsDefault() {
+    const defaults = { rounds, breathsPerRound: breaths, pace };
+    saveSessionDefaults(defaults);
+    setSavedDefaults(defaults);
+    setSavedNotice(true);
   }
 
   return (
@@ -43,7 +71,7 @@ export function SessionConfigurator() {
       <section className="setup-controls" aria-labelledby="setup-details-title">
         <div className="setup-details-heading">
           <div><h2 id="setup-details-title">Personnaliser la séance</h2></div>
-          {customized && <button className="reset-settings" type="button" onClick={() => { setRounds(DEFAULT_SESSION_CONFIG.rounds); setBreaths(DEFAULT_SESSION_CONFIG.breathsPerRound); setPace(DEFAULT_SESSION_CONFIG.pace); }}><RotateCcw size={16} aria-hidden="true" /> Réinitialiser</button>}
+          {customized && <button className="reset-settings" type="button" onClick={() => { setRounds(savedDefaults.rounds); setBreaths(savedDefaults.breathsPerRound); setPace(savedDefaults.pace); setSavedNotice(false); }}><RotateCcw size={16} aria-hidden="true" /> Réinitialiser</button>}
         </div>
         <div className="setup-control-grid">
           <Stepper icon={<RotateCcw size={20} />} label="Nombre de rounds" value={rounds} min={1} max={8} onChange={setRounds} />
@@ -56,6 +84,14 @@ export function SessionConfigurator() {
             </div>
           </fieldset>
         </div>
+        <div className="setup-default-actions">
+          <div><strong>Réglages par défaut</strong><p>Utiliser cette configuration pour les prochaines séances.</p></div>
+          <button className="button button-secondary" type="button" onClick={saveAsDefault} disabled={!customized}>
+            {savedNotice && !customized ? <Check size={17} aria-hidden="true" /> : <Save size={17} aria-hidden="true" />}
+            {savedNotice && !customized ? "Réglages enregistrés" : "Définir par défaut"}
+          </button>
+        </div>
+        {savedNotice && <p className="sr-only" role="status">Ces réglages seront utilisés par défaut pour les prochaines séances.</p>}
       </section>
     </div>
   );

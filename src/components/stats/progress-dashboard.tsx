@@ -114,7 +114,7 @@ export function ProgressDashboard() {
   return (
     <div className="page-stack stats-page">
       {deleteNotice && <p className="sr-only" role="status">{deleteNotice}</p>}
-      <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1></div><div className="stats-header-actions"><button className="button button-secondary stats-export" type="button" onClick={exportHistory}><Download size={17} aria-hidden="true" /> Exporter</button><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></div></header>
+      <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1></div><div className="stats-header-actions"><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></div></header>
       <SummaryCards stats={stats} />
 
       <section className="content-card chart-card">
@@ -127,7 +127,7 @@ export function ProgressDashboard() {
 
       <div className="stats-secondary">
         <section className="content-card chart-card compact-chart"><div className="section-heading"><div><p className="eyebrow">Régularité</p><h2>Sessions par jour</h2></div><CalendarRange size={20} aria-hidden="true" /></div><p className="sr-only">{`${periodSessionCount} session${periodSessionCount > 1 ? "s" : ""} sur les ${period} derniers jours. ${sessionDataSummary}`}</p><div className="chart-wrap small" aria-hidden="true"><div className="chart-inner"><ResponsiveContainer width="100%" height="100%"><BarChart accessibilityLayer={false} data={series} margin={{ top: 8, right: 0, left: -32, bottom: 0 }}><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#5f726c", fontSize: 12 }} /><YAxis allowDecimals={false} axisLine={false} tickLine={false} tick={{ fill: "#5f726c", fontSize: 12 }} /><Tooltip content={<SessionTooltip />} /><Bar dataKey="sessions" fill="#84b8a8" radius={[5, 5, 2, 2]} maxBarSize={24} /></BarChart></ResponsiveContainer></div></div></section>
-        <section className="content-card practice-card"><div><span className="practice-icon"><Clock3 size={20} /></span><p>Temps de pratique</p><strong>{formatDuration(stats.totalPracticeSeconds)}</strong></div><div><span className="practice-icon"><Layers3 size={20} /></span><p>Rounds moyens</p><strong>{stats.averageRounds.toFixed(1).replace(".0", "")}</strong></div></section>
+        <section className="content-card practice-card"><div><span className="practice-icon"><Clock3 size={20} /></span><p>Temps moyen par séance</p><strong>{formatDuration(stats.averageSessionSeconds)}</strong></div><div><span className="practice-icon"><Layers3 size={20} /></span><p>Temps de pratique total</p><strong>{formatDuration(stats.totalPracticeSeconds)}</strong></div></section>
       </div>
 
       <section className="content-card history-card">
@@ -135,9 +135,11 @@ export function ProgressDashboard() {
         {recent.length ? <div className="history-list" role="list">{recent.map((session) => {
           const dateLabel = formatSessionDate(session.completedAt);
           const isDeleting = deletingId === session.id;
-          return <article key={session.id} role="listitem"><div className="history-main"><strong>{dateLabel}</strong><span>{session.rounds.length} / {session.plannedRounds} round{session.plannedRounds > 1 ? "s" : ""} · {session.status === "stopped" ? "arrêtée" : "terminée"}</span></div><div className="retention-chips">{session.rounds.map((round) => <span key={round.roundIndex}>R{round.roundIndex} <strong>{formatDuration(round.retentionSeconds)}</strong></span>)}</div><button className="history-delete" type="button" disabled={Boolean(deletingId)} onClick={(event) => requestDelete(session, event)} aria-label={`Supprimer la séance du ${dateLabel}`} title="Supprimer cette séance">{isDeleting ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Trash2 size={18} aria-hidden="true" />}</button></article>;
+          const duration = Math.max(0, (new Date(session.completedAt).getTime() - new Date(session.startedAt).getTime()) / 1000);
+          return <article key={session.id} role="listitem"><div className="history-main"><strong>{dateLabel}</strong><span>{session.rounds.length} / {session.plannedRounds} round{session.plannedRounds > 1 ? "s" : ""} · {formatDuration(duration)} · {session.status === "stopped" ? "arrêtée" : "terminée"}</span></div><div className="retention-chips">{session.rounds.map((round) => <span key={round.roundIndex}>R{round.roundIndex} <strong>{formatDuration(round.retentionSeconds)}</strong></span>)}</div><button className="history-delete" type="button" disabled={Boolean(deletingId)} onClick={(event) => requestDelete(session, event)} aria-label={`Supprimer la séance du ${dateLabel}`} title="Supprimer cette séance">{isDeleting ? <LoaderCircle className="spin" size={18} aria-hidden="true" /> : <Trash2 size={18} aria-hidden="true" />}</button></article>;
         })}</div> : <p className="empty-copy">Termine un round pour commencer ton historique.</p>}
       </section>
+      <div className="stats-footer-actions"><button className="button button-secondary stats-export" type="button" onClick={exportHistory}><Download size={17} aria-hidden="true" /> Exporter</button></div>
       <dialog className="confirm-dialog history-delete-dialog" ref={deleteDialogRef} aria-labelledby="delete-session-title" onCancel={(event) => { if (deletingId) event.preventDefault(); else cancelDelete(); }}>
         <button className="dialog-close" type="button" onClick={cancelDelete} aria-label="Fermer" disabled={Boolean(deletingId)}><X size={20} aria-hidden="true" /></button>
         <p className="eyebrow">Historique</p>

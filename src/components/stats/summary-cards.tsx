@@ -8,9 +8,10 @@ export function SummaryCards({ stats, compact = false }: { stats: SessionStats; 
     { label: "Rétention moyenne", value: formatDuration(stats.averageRetention), icon: Timer },
     { label: "Série actuelle", value: `${stats.currentStreak} jour${stats.currentStreak > 1 ? "s" : ""}`, icon: Flame },
   ];
+  const visibleCards = compact ? [cards[2], cards[1], cards[0], cards[3]] : cards;
   return (
     <div className={compact ? "summary-grid summary-grid-compact" : "summary-grid"}>
-      {cards.map(({ label, value, icon: Icon }) => (
+      {visibleCards.map(({ label, value, icon: Icon }) => (
         <article className="summary-card" key={label}>
           <span className="summary-icon"><Icon size={19} strokeWidth={1.8} aria-hidden="true" /></span>
           <div><p>{label}</p><strong>{value}</strong></div>
