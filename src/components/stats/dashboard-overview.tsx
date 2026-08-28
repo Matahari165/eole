@@ -50,6 +50,11 @@ export function DashboardOverview() {
         </div>
       </section>
 
+      {stats && stats.sessionCount > 0 && <section className="content-card milestone-card dashboard-milestone">
+        <span className="milestone-icon"><TrophyMark /></span>
+        <div><p className="eyebrow">Prochain repère</p><h2>{formatDuration(nextMilestone)}</h2><p>Tu es à {formatDuration(stats.maxRetention)}.</p></div>
+      </section>}
+
       {error && <section className="dashboard-inline-error" role="alert"><div><strong>Impossible de charger tes données.</strong><span>Tu peux toujours lancer une séance. Réessaie pour retrouver tes progrès.</span></div><button className="button button-secondary" type="button" onClick={() => window.location.reload()}>Réessayer</button></section>}
 
       {!error && !stats && <DashboardStatsSkeleton />}
@@ -64,10 +69,6 @@ export function DashboardOverview() {
               {last.rounds.map((round) => <div key={round.roundIndex}><span>Round {round.roundIndex}</span><strong>{formatDuration(round.retentionSeconds)}</strong></div>)}
             </div>
           ) : null}
-        </section>
-        <section className="content-card milestone-card">
-          <span className="milestone-icon"><TrophyMark /></span>
-          <div><p className="eyebrow">Prochain repère</p><h2>{formatDuration(nextMilestone)}</h2><p>Tu es à {formatDuration(stats.maxRetention)}.</p></div>
         </section>
       </div>}
     </div>

@@ -100,7 +100,7 @@ export function ProgressDashboard() {
     return (
       <div className="page-stack stats-page">
         {deleteNotice && <p className="sr-only" role="status">{deleteNotice}</p>}
-        <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1><p>Tes tendances apparaîtront après ton premier round terminé.</p></div></header>
+        <header className="page-header"><div><h1>Ton souffle, dans le temps.</h1><p>Tes tendances apparaîtront après ton premier round terminé.</p></div></header>
         <section className="content-card stats-empty-card">
           <span className="empty-state-icon"><Wind size={28} strokeWidth={1.7} aria-hidden="true" /></span>
           <h2>Commence par une séance.</h2>
@@ -114,7 +114,7 @@ export function ProgressDashboard() {
   return (
     <div className="page-stack stats-page">
       {deleteNotice && <p className="sr-only" role="status">{deleteNotice}</p>}
-      <header className="page-header"><div><p className="eyebrow">Progression</p><h1>Ton souffle, dans le temps.</h1></div><div className="stats-header-actions"><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></div></header>
+      <header className="page-header"><div><h1>Ton souffle, dans le temps.</h1></div><div className="stats-header-actions"><div className="period-control" aria-label="Période du graphique">{([7, 30] as const).map((value) => <button type="button" aria-pressed={period === value} data-active={period === value} onClick={() => setPeriod(value)} key={value}>{value === 7 ? "Semaine" : "Mois"}</button>)}</div></div></header>
       <SummaryCards stats={stats} />
 
       <section className="content-card chart-card">

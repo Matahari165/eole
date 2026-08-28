@@ -133,7 +133,7 @@ h2 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.14; }
 .summary-icon { flex: 0 0 auto; width: 38px; height: 38px; display: grid; place-items: center; color: var(--color-primary); border-radius: var(--radius-sm); background: var(--color-surface-soft); }
 .summary-card p { color: var(--color-muted); font-size: 0.75rem; margin-bottom: 0.3rem; }
 .summary-card strong { display: block; font-size: clamp(1.05rem, 2vw, 1.35rem); line-height: 1.2; }
-.dashboard-lower { display: grid; grid-template-columns: 1.45fr 1fr; gap: 1rem; }
+.dashboard-lower { display: grid; grid-template-columns: 1fr; gap: 1rem; }
 .content-card { border: 1px solid var(--glass-border); border-radius: var(--radius-lg); background: var(--glass); backdrop-filter: blur(22px) saturate(112%); -webkit-backdrop-filter: blur(22px) saturate(112%); box-shadow: var(--shadow-card-raised); }
 .dashboard-inline-error { min-height: 74px; padding: .9rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: rgba(255,255,255,.7); }
 .dashboard-inline-error > div { display: grid; gap: .12rem; }
@@ -148,6 +148,7 @@ h2 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.14; }
 .recent-rounds span { display: block; color: var(--color-muted); font-size: .75rem; }
 .recent-rounds strong { display: block; margin-top: .15rem; font-size: 1rem; }
 .milestone-card { display: flex; align-items: center; gap: 1rem; }
+.dashboard-milestone { min-height: 112px; }
 .milestone-icon { flex: 0 0 auto; width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; color: var(--color-primary); background: #deebe5; }
 .milestone-card > div { display: grid; gap: .25rem; }
 .milestone-card h2 { font-family: var(--font-display); font-size: 1.9rem; }
