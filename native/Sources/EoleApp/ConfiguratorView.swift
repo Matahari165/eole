@@ -3,9 +3,10 @@ import EoleCore
 #endif
 import SwiftUI
 
-/// Réglage court et tactile de la séance. Les contrôles sont en Liquid Glass ;
-/// les valeurs restent sur le fond afin de garder la hiérarchie légère.
+/// Préparation d'une séance avec des contrôles iOS natifs et un démarrage
+/// toujours accessible depuis le bas de l'écran.
 public struct ConfiguratorView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var rounds: Int
     @State private var breaths: Int
     @State private var pace: Pace
@@ -22,145 +23,167 @@ public struct ConfiguratorView: View {
 
     public var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                VStack(alignment: .leading, spacing: 7) {
-                    EoleEyebrow("Nouvelle séance")
-                    Text("Prépare ton rythme.")
-                        .font(.eoleDisplay)
-                        .tracking(-1.1)
-                        .foregroundStyle(Color.eoleForeground)
-                    Text("Choisis une cadence, puis laisse le souffle faire le reste.")
-                        .font(.eoleBody)
-                        .foregroundStyle(Color.eoleMuted)
-                }
-
-                parameterSection
-                paceSection
-
-                EoleGlassContainer(spacing: 10) {
+            VStack(alignment: .leading, spacing: 20) {
+                introduction
+                configurationPanel
+                pacePanel
+                defaultsAction
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            // L'inset inférieur contient le CTA fixe ; ce padding évite qu'il
+            // masque les dernières informations lorsque le contenu défile.
+            .padding(.bottom, 112)
+        }
+        .scrollIndicators(.hidden)
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle("Nouvelle séance")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Annuler") { dismiss() }
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VStack(spacing: 0) {
+                Divider()
+                EoleGlassContainer(spacing: 8) {
                     Button {
                         onStart(SessionConfig(rounds: rounds, breathsPerRound: breaths, pace: pace))
                     } label: {
-                        Label("Lancer la séance", systemImage: "play.fill")
+                        Label("Démarrer", systemImage: "play.fill")
                     }
                     .buttonStyle(EolePrimaryButton())
                 }
-
-                Button {
-                    AppDefaults.shared.sessionDefaults = SessionConfig(
-                        rounds: rounds, breathsPerRound: breaths, pace: pace
-                    )
-                    withAnimation(.easeOut(duration: 0.18)) { defaultsSaved = true }
-                } label: {
-                    Label(
-                        defaultsSaved ? "Réglages enregistrés" : "Définir comme réglages par défaut",
-                        systemImage: defaultsSaved ? "checkmark" : "bookmark"
-                    )
-                }
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.eolePrimary)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 9)
-            .padding(.bottom, 28)
+            .background(.bar)
         }
-        .scrollIndicators(.hidden)
-        .background(EoleAmbientBackground())
-        .navigationTitle("Nouvelle séance")
-        .navigationBarTitleDisplayMode(.inline)
         .onChange(of: rounds) { _, _ in defaultsSaved = false }
         .onChange(of: breaths) { _, _ in defaultsSaved = false }
         .onChange(of: pace) { _, _ in defaultsSaved = false }
     }
 
-    private var parameterSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            parameterRow(
-                title: "Rounds", hint: "De 1 à 8", value: rounds,
-                decrement: { rounds = max(1, rounds - 1) },
-                increment: { rounds = min(8, rounds + 1) },
-                decrementDisabled: rounds == 1, incrementDisabled: rounds == 8
-            )
-            Divider().padding(.vertical, 18)
-            parameterRow(
-                title: "Respirations", hint: "De 10 à 60, par 5", value: breaths,
-                decrement: { breaths = max(10, breaths - 5) },
-                increment: { breaths = min(60, breaths + 5) },
-                decrementDisabled: breaths == 10, incrementDisabled: breaths == 60
-            )
+    private var introduction: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Prépare ton rythme")
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(Color.eoleForeground)
+            Text("Une cadence simple, puis toute ton attention sur le souffle.")
+                .font(.body)
+                .foregroundStyle(Color.eoleMuted)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func parameterRow(
-        title: String, hint: String, value: Int,
-        decrement: @escaping () -> Void, increment: @escaping () -> Void,
-        decrementDisabled: Bool, incrementDisabled: Bool
+    private var configurationPanel: some View {
+        nativePanel {
+            VStack(alignment: .leading, spacing: 0) {
+                parameterRow(
+                    title: "Rounds",
+                    hint: "De 1 à 8",
+                    value: rounds,
+                    stepper: Stepper(value: $rounds, in: 1...8, step: 1) { EmptyView() }
+                )
+                Divider().padding(.vertical, 16)
+                parameterRow(
+                    title: "Respirations",
+                    hint: "De 10 à 60, par 5",
+                    value: breaths,
+                    stepper: Stepper(value: $breaths, in: 10...60, step: 5) { EmptyView() }
+                )
+            }
+        }
+    }
+
+    private func parameterRow<S: View>(
+        title: String,
+        hint: String,
+        value: Int,
+        stepper: S
     ) -> some View {
-        HStack(alignment: .center, spacing: 14) {
+        HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(.headline.weight(.semibold)).foregroundStyle(Color.eoleForeground)
-                Text(hint).font(.caption).foregroundStyle(Color.eoleMuted)
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.eoleForeground)
+                Text(hint)
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
             }
             Spacer(minLength: 8)
-            EoleGlassContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    Button(action: decrement) { Image(systemName: "minus") }
-                        .buttonStyle(EoleGlassIconButtonStyle())
-                        .disabled(decrementDisabled)
-                        .opacity(decrementDisabled ? 0.38 : 1)
-                        .accessibilityLabel("Diminuer \(title.lowercased())")
-                    Text("\(value)")
-                        .font(.title3.weight(.medium))
-                        .monospacedDigit()
-                        .frame(minWidth: 38)
+            Text("\(value)")
+                .font(.body.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(Color.eoleForeground)
+                .accessibilityHidden(true)
+            stepper
+                .labelsHidden()
+                .tint(Color.eolePrimary)
+                .accessibilityLabel(title)
+                .accessibilityValue("\(value)")
+        }
+    }
+
+    private var pacePanel: some View {
+        nativePanel {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Cadence")
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(Color.eoleForeground)
-                        .accessibilityLabel("\(title) : \(value)")
-                    Button(action: increment) { Image(systemName: "plus") }
-                        .buttonStyle(EoleGlassIconButtonStyle())
-                        .disabled(incrementDisabled)
-                        .opacity(incrementDisabled ? 0.38 : 1)
-                        .accessibilityLabel("Augmenter \(title.lowercased())")
+                    Spacer()
+                    Text(paceLabel(pace))
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(Color.eolePrimary)
                 }
+
+                Picker("Cadence", selection: $pace) {
+                    Text("Lente").tag(Pace.slow)
+                    Text("Normale").tag(Pace.normal)
+                    Text("Rapide").tag(Pace.fast)
+                }
+                .pickerStyle(.segmented)
+                .tint(Color.eolePrimary)
+
+                Text(paceDescription(pace))
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
             }
         }
     }
 
-    private var paceSection: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Vitesse").font(.headline.weight(.semibold)).foregroundStyle(Color.eoleForeground)
-                Spacer()
-                Text(paceLabel(pace)).font(.caption).foregroundStyle(Color.eoleMuted)
-            }
-            EoleGlassContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    paceOption(.slow, title: "Lente", detail: "6 s")
-                    paceOption(.normal, title: "Normale", detail: "4 s")
-                    paceOption(.fast, title: "Rapide", detail: "2,5 s")
-                }
-            }
-        }
-    }
-
-    private func paceOption(_ value: Pace, title: String, detail: String) -> some View {
-        Button { pace = value } label: {
-            VStack(spacing: 3) {
-                Image(systemName: value == pace ? "circle.inset.filled" : "circle")
-                    .font(.caption)
-                Text(title).font(.caption.weight(.semibold))
-                Text(detail).font(.caption2).foregroundStyle(Color.eoleMuted)
-            }
-            .frame(maxWidth: .infinity, minHeight: 70)
-            .foregroundStyle(value == pace ? Color.eolePrimary : Color.eoleForeground)
-            .glassEffect(
-                value == pace ? .regular.tint(Color.eoleAccent.opacity(0.7)).interactive() : .regular.interactive(),
-                in: RoundedRectangle(cornerRadius: EoleRadius.sm)
+    private var defaultsAction: some View {
+        Button {
+            AppDefaults.shared.sessionDefaults = SessionConfig(
+                rounds: rounds,
+                breathsPerRound: breaths,
+                pace: pace
             )
+            withAnimation(.easeOut(duration: 0.18)) { defaultsSaved = true }
+        } label: {
+            Label(
+                defaultsSaved ? "Réglages par défaut enregistrés" : "Enregistrer comme réglages par défaut",
+                systemImage: defaultsSaved ? "checkmark.circle.fill" : "bookmark"
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .accessibilityLabel("\(title), \(detail)")
-        .accessibilityAddTraits(value == pace ? .isSelected : [])
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(Color.eolePrimary)
+        .contentShape(Rectangle())
+        .accessibilityHint("Utilisera ces valeurs au prochain démarrage")
+    }
+
+    private func nativePanel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                Color(.secondarySystemGroupedBackground),
+                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+            )
     }
 
     private func paceLabel(_ pace: Pace) -> String {
@@ -168,6 +191,14 @@ public struct ConfiguratorView: View {
         case .slow: return "Lente"
         case .normal: return "Normale"
         case .fast: return "Rapide"
+        }
+    }
+
+    private func paceDescription(_ pace: Pace) -> String {
+        switch pace {
+        case .slow: return "Inspire et expire en 3 secondes."
+        case .normal: return "Inspire et expire en 2 secondes."
+        case .fast: return "Inspire et expire en 1,25 seconde."
         }
     }
 }

@@ -5,8 +5,8 @@ import EoleCore
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Progrès : lecture de la pratique avec une hiérarchie éditoriale et des
-/// graphiques sans effets décoratifs qui nuiraient aux valeurs.
+/// Lecture native de la pratique : une mesure principale, ses repères, puis les
+/// détails temporels. Les données restent issues exclusivement de SessionStore.
 public struct StatsView: View {
     @ObservedObject var store: SessionStore
     @State private var days = 7
@@ -31,12 +31,13 @@ public struct StatsView: View {
         let series = buildDailySeries(store.sessions, days: days)
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 27) {
+            VStack(alignment: .leading, spacing: 24) {
                 header
                 if stats.sessionCount == 0 {
                     emptyState
                 } else {
-                    summary(stats)
+                    primaryMetric(stats)
+                    secondaryMetrics(stats)
                     retentionChart(series)
                     consistencyChart(series)
                     history
@@ -44,8 +45,8 @@ public struct StatsView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 9)
-            .padding(.bottom, 28)
+            .padding(.top, 10)
+            .padding(.bottom, 32)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
@@ -57,7 +58,9 @@ public struct StatsView: View {
         )) {
             Button("Annuler", role: .cancel) {}
             Button("Supprimer", role: .destructive) {
-                if let sessionToDelete { store.deleteSession(id: sessionToDelete.id) }
+                if let sessionToDelete {
+                    store.deleteSession(id: sessionToDelete.id)
+                }
             }
         } message: {
             Text("Elle sera retirée des statistiques.")
@@ -65,207 +68,270 @@ public struct StatsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            EoleEyebrow("Suivi")
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("Ton souffle,\ndans le temps.")
-                    .font(.eoleDisplay)
-                    .tracking(-1)
-                    .foregroundStyle(Color.eoleForeground)
-                Spacer(minLength: 0)
-                periodControl
-            }
+        VStack(alignment: .leading, spacing: 16) {
+            EoleSectionHeader("Ta progression", subtitle: "Une lecture simple de ta pratique.")
+            Text("Période des graphiques")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.eoleMuted)
+            periodControl
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var periodControl: some View {
-        EoleGlassContainer(spacing: 4) {
-            HStack(spacing: 4) {
-                periodButton(7, title: "7 j")
-                periodButton(30, title: "30 j")
+        EoleGlassContainer(spacing: 6) {
+            HStack(spacing: 6) {
+                periodButton(7, title: "7 jours")
+                periodButton(30, title: "30 jours")
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Période des graphiques")
+        .accessibilityValue(days == 7 ? "7 jours" : "30 jours")
     }
 
     private func periodButton(_ value: Int, title: String) -> some View {
         Button(title) { days = value }
-            .font(.caption.weight(.semibold))
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(days == value ? Color.eolePrimaryStrong : Color.eoleMuted)
-            .frame(minWidth: 44, minHeight: 44)
+            .frame(minWidth: 92, minHeight: 44)
             .glassEffect(
-                days == value ? .regular.tint(Color.eoleAccent.opacity(0.72)).interactive() : .regular.interactive(),
+                days == value
+                    ? .regular.tint(Color.eoleAccent.opacity(0.72)).interactive()
+                    : .regular.interactive(),
                 in: Capsule()
             )
             .accessibilityAddTraits(days == value ? .isSelected : [])
     }
 
+    private func primaryMetric(_ stats: SessionStats) -> some View {
+        EolePanel {
+            VStack(alignment: .leading, spacing: 14) {
+                EoleSectionHeader("Rétention moyenne", subtitle: "Le temps moyen tenu par round")
+                HStack(alignment: .lastTextBaseline, spacing: 8) {
+                    Text(formatDuration(stats.averageRetention))
+                        .font(.system(.largeTitle, design: .rounded).weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.eoleForeground)
+                        .minimumScaleFactor(0.72)
+                        .accessibilityLabel("Rétention moyenne")
+                        .accessibilityValue(formatDuration(stats.averageRetention))
+                    Text("/ round")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.eoleMuted)
+                }
+                Text("Meilleur repère : \(formatDuration(Double(stats.maxRetention)))")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.eoleMuted)
+            }
+        }
+    }
+
+    private func secondaryMetrics(_ stats: SessionStats) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            EoleSectionHeader("En un coup d’œil")
+            HStack(alignment: .top, spacing: 12) {
+                EoleMetricTile(
+                    label: "Séances",
+                    value: "\(stats.sessionCount)",
+                    detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : nil
+                )
+                EoleMetricTile(
+                    label: "Temps total",
+                    value: formatDuration(stats.totalPracticeSeconds),
+                    detail: "de pratique"
+                )
+            }
+        }
+    }
+
     private var emptyState: some View {
-        VStack(spacing: 13) {
-            Image(systemName: "wind")
-                .font(.title2)
-                .foregroundStyle(Color.eolePrimary)
-                .frame(width: 58, height: 58)
-                .background(Color.eoleSurfaceSoft, in: Circle())
-            Text("Aucune séance pour l'instant.")
-                .font(.headline.weight(.semibold))
-            Text("Lance ta première séance : elle apparaîtra ici.")
-                .font(.caption)
-                .foregroundStyle(Color.eoleMuted)
-                .multilineTextAlignment(.center)
-            Button("Préparer une séance", action: onPrepare)
-                .buttonStyle(EolePrimaryButton())
-                .padding(.top, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 70)
-        .accessibilityElement(children: .combine)
-    }
-
-    private func summary(_ stats: SessionStats) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 0) {
-                metric(title: "Sessions", value: "\(stats.sessionCount)")
-                Divider().frame(height: 42)
-                metric(title: "Meilleure rétention", value: formatDuration(Double(stats.maxRetention)))
-            }
-            Divider().padding(.horizontal, 14)
-            HStack(spacing: 0) {
-                metric(title: "Rétention moyenne", value: formatDuration(stats.averageRetention))
-                Divider().frame(height: 42)
-                metric(title: "Pratique totale", value: formatDuration(stats.totalPracticeSeconds))
+        EolePanel {
+            VStack(alignment: .leading, spacing: 14) {
+                Image(systemName: "wind")
+                    .font(.title2)
+                    .foregroundStyle(Color.eolePrimary)
+                    .frame(width: 52, height: 52)
+                    .background(Color.eoleSurfaceSoft, in: Circle())
+                    .accessibilityHidden(true)
+                EoleSectionHeader("Ta première séance t’attend", subtitle: "Lance une pratique pour voir apparaître tes repères ici.")
+                Button("Préparer une séance", action: onPrepare)
+                    .buttonStyle(EolePrimaryButton())
+                    .padding(.top, 2)
             }
         }
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.45), in: RoundedRectangle(cornerRadius: EoleRadius.md))
-    }
-
-    private func metric(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.caption).foregroundStyle(Color.eoleMuted)
-            Text(value).font(.headline.weight(.semibold)).monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .foregroundStyle(Color.eoleForeground)
     }
 
     private func retentionChart(_ series: [DailyPoint]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            chartTitle("Rétention moyenne", subtitle: "Secondes par jour")
-            Chart(series, id: \.key) { point in
-                if let retention = point.averageRetention {
-                    AreaMark(
-                        x: .value("Jour", point.label),
-                        y: .value("Rétention", retention)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(colors: [Color.eoleSecondary.opacity(0.34), .clear], startPoint: .top, endPoint: .bottom)
-                    )
-                    .interpolationMethod(.catmullRom)
-                    LineMark(
-                        x: .value("Jour", point.label),
-                        y: .value("Rétention", retention)
-                    )
-                    .foregroundStyle(Color.eolePrimary)
-                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                    .interpolationMethod(.catmullRom)
+        let maximum = max(60, (series.compactMap(\.averageRetention).max() ?? 0) + 15)
+
+        return EolePanel {
+            VStack(alignment: .leading, spacing: 14) {
+                EoleSectionHeader("Rétention par jour", subtitle: "Moyenne en secondes · les jours sans séance restent vides")
+                Chart {
+                    ForEach(Array(retentionRuns(series).enumerated()), id: \.offset) { _, run in
+                        ForEach(run, id: \.key) { point in
+                            if let retention = point.averageRetention {
+                                LineMark(
+                                    x: .value("Jour", point.label),
+                                    y: .value("Secondes", retention),
+                                    series: .value("Série", run.first?.key ?? point.key)
+                                )
+                                .foregroundStyle(Color.eolePrimary)
+                                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                                .interpolationMethod(.linear)
+                                PointMark(
+                                    x: .value("Jour", point.label),
+                                    y: .value("Secondes", retention)
+                                )
+                                .foregroundStyle(Color.eolePrimary)
+                                .symbolSize(32)
+                            }
+                        }
+                    }
                 }
-            }
-            .chartYAxis(.hidden)
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: days == 7 ? 4 : 5)) { value in
-                    AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.35))
-                    AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
+                .chartYScale(domain: 0...maximum)
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                        AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.55))
+                        AxisValueLabel {
+                            if let seconds = value.as(Int.self) {
+                                Text("\(seconds) s")
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(Color.eoleMuted)
+                    }
                 }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 4 : 5)) { _ in
+                        AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
+                    }
+                }
+                .frame(height: 190)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Rétention moyenne par jour")
+                .accessibilityValue(Text(retentionAccessibility(series)))
             }
-            .frame(height: 172)
-            .accessibilityLabel("Évolution de la rétention moyenne")
-            .accessibilityValue(Text(retentionAccessibility(series)))
         }
-        .padding(18)
-        .background(Color.white.opacity(0.50), in: RoundedRectangle(cornerRadius: EoleRadius.lg))
     }
 
     private func consistencyChart(_ series: [DailyPoint]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            chartTitle("Régularité", subtitle: "Sessions par jour")
-            Chart(series, id: \.key) { point in
-                BarMark(
-                    x: .value("Jour", point.label),
-                    y: .value("Séances", point.sessions)
-                )
-                .foregroundStyle(Color.eoleSecondary)
-                .cornerRadius(5)
-            }
-            .chartYAxis(.hidden)
-            .chartXAxis {
-                AxisMarks(values: .automatic(desiredCount: days == 7 ? 4 : 5)) { value in
-                    AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
-                }
-            }
-            .frame(height: 126)
-            .accessibilityLabel("Évolution du nombre de séances")
-            .accessibilityValue(Text(consistencyAccessibility(series)))
-        }
-        .padding(18)
-        .background(Color.white.opacity(0.50), in: RoundedRectangle(cornerRadius: EoleRadius.lg))
-    }
+        let maximum = max(1, series.map(\.sessions).max() ?? 0)
 
-    private func chartTitle(_ title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title).font(.headline.weight(.semibold)).foregroundStyle(Color.eoleForeground)
-            Text(subtitle).font(.caption).foregroundStyle(Color.eoleMuted)
+        return EolePanel {
+            VStack(alignment: .leading, spacing: 14) {
+                EoleSectionHeader("Régularité", subtitle: "Nombre de séances par jour")
+                Chart(series, id: \.key) { point in
+                    BarMark(
+                        x: .value("Jour", point.label),
+                        y: .value("Séances", point.sessions)
+                    )
+                    .foregroundStyle(Color.eoleSecondary)
+                    .cornerRadius(5)
+                }
+                .chartYScale(domain: 0...maximum)
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: min(4, maximum + 1))) { _ in
+                        AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.55))
+                        AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 4 : 5)) { _ in
+                        AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
+                    }
+                }
+                .frame(height: 150)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Nombre de séances par jour")
+                .accessibilityValue(Text(consistencyAccessibility(series)))
+            }
         }
     }
 
     private var history: some View {
         let recentSessions = Array(store.sessions.filter { !$0.rounds.isEmpty }.prefix(8))
+
         return VStack(alignment: .leading, spacing: 12) {
-            Text("Dernières séances").font(.headline.weight(.semibold))
-            ForEach(recentSessions, id: \.id) { session in
-                historyRow(session)
-                if session.id != recentSessions.last?.id { Divider().padding(.leading, 2) }
+            EoleSectionHeader("Dernières séances", subtitle: "Les huit plus récentes")
+            EolePanel {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(recentSessions, id: \.id) { session in
+                        historyRow(session)
+                        if session.id != recentSessions.last?.id {
+                            Divider().padding(.vertical, 12)
+                        }
+                    }
+                }
             }
         }
     }
 
     private func historyRow(_ session: BreathSession) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(formatSessionDate(session.completedAt))
                     .font(.subheadline.weight(.semibold))
-                Text("\(session.rounds.count) / \(session.plannedRounds) round\(session.plannedRounds > 1 ? "s" : "") · \(formatSessionDuration(session)) · \(sessionStatusLabel(session.status)) · \(paceLabel(session.pace))")
-                    .font(.caption).foregroundStyle(Color.eoleMuted)
+                    .foregroundStyle(Color.eoleForeground)
+                Text("\(session.rounds.count) / \(session.plannedRounds) rounds · \(formatSessionDuration(session))")
+                    .font(.caption)
+                    .foregroundStyle(Color.eoleMuted)
+                Text("Rétentions : \(retentionSummary(session))")
+                    .font(.caption)
+                    .foregroundStyle(Color.eoleMuted)
+                    .lineLimit(2)
             }
-            Spacer(minLength: 8)
-            Button { sessionToDelete = session } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(EoleGlassIconButtonStyle())
-            .foregroundStyle(Color.eoleDanger)
-            .accessibilityLabel("Supprimer la séance du \(formatSessionDate(session.completedAt))")
-            }
-            if !session.rounds.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(session.rounds, id: \.roundIndex) { round in
-                            Text("R\(round.roundIndex) · \(formatDuration(Double(round.retentionSeconds)))")
-                                .font(.caption.weight(.semibold))
-                                .monospacedDigit()
-                                .foregroundStyle(Color.eolePrimaryStrong)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .background(Color.eoleSurfaceSoft, in: Capsule())
-                        }
-                    }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Menu {
+                Button("Supprimer", systemImage: "trash", role: .destructive) {
+                    sessionToDelete = session
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel("Rétentions par round")
+            } label: {
+                Image(systemName: "ellipsis")
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .foregroundStyle(Color.eoleMuted)
+            .accessibilityLabel("Actions pour la séance du \(formatSessionDate(session.completedAt))")
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var exportAction: some View {
+        ShareLink(
+            item: SessionsCSVExport(csv: buildSessionsCsv(store.sessions)),
+            preview: SharePreview("Historique Eole")
+        ) {
+            Label("Exporter l’historique CSV", systemImage: "square.and.arrow.up")
+                .frame(maxWidth: .infinity, minHeight: 44)
+        }
+        .font(.subheadline.weight(.semibold))
+        .foregroundStyle(Color.eolePrimary)
+        .accessibilityHint("Ouvre les options de partage de l’historique")
+    }
+
+    private func retentionRuns(_ series: [DailyPoint]) -> [[DailyPoint]] {
+        var runs: [[DailyPoint]] = []
+        var current: [DailyPoint] = []
+
+        for point in series {
+            if point.averageRetention == nil {
+                if !current.isEmpty {
+                    runs.append(current)
+                    current.removeAll(keepingCapacity: true)
+                }
+            } else {
+                current.append(point)
             }
         }
-        .padding(.vertical, 4)
-        .foregroundStyle(Color.eoleForeground)
+        if !current.isEmpty { runs.append(current) }
+        return runs
+    }
+
+    private func retentionSummary(_ session: BreathSession) -> String {
+        session.rounds.map { "R\($0.roundIndex) \(formatDuration(Double($0.retentionSeconds)))" }
+            .joined(separator: ", ")
     }
 
     private func formatSessionDate(_ value: String) -> String {
@@ -274,20 +340,10 @@ public struct StatsView: View {
     }
 
     private func formatSessionDuration(_ session: BreathSession) -> String {
-        guard let start = parseDate(session.startedAt), let end = parseDate(session.completedAt) else { return "durée inconnue" }
-        return formatDuration(max(0, end.timeIntervalSince(start)))
-    }
-
-    private func sessionStatusLabel(_ status: SessionStatus) -> String {
-        status == .stopped ? "arrêtée" : "terminée"
-    }
-
-    private func paceLabel(_ pace: Pace) -> String {
-        switch pace {
-        case .slow: return "lente"
-        case .normal: return "normale"
-        case .fast: return "rapide"
+        guard let start = parseDate(session.startedAt), let end = parseDate(session.completedAt) else {
+            return "durée inconnue"
         }
+        return formatDuration(max(0, end.timeIntervalSince(start)))
     }
 
     private func retentionAccessibility(_ series: [DailyPoint]) -> String {
@@ -304,20 +360,6 @@ public struct StatsView: View {
             "\(point.label) : \(point.sessions) séance\(point.sessions == 1 ? "" : "s")"
         }.joined(separator: "; ")
     }
-
-    private var exportAction: some View {
-        ShareLink(
-            item: SessionsCSVExport(csv: buildSessionsCsv(store.sessions)),
-            preview: SharePreview("Historique Eole")
-        ) {
-            Label("Exporter l'historique CSV", systemImage: "square.and.arrow.up")
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(Color.eolePrimary)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
-        .contentShape(Rectangle())
-    }
-
 }
 
 private struct SessionsCSVExport: Transferable {

@@ -66,6 +66,8 @@ public struct EoleRootView: View {
                     showConfigurator = false
                 })
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .fullScreenCover(isPresented: $showActiveSession, onDismiss: {
             sessionConfig = nil

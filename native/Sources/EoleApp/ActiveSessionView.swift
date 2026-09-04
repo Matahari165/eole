@@ -4,7 +4,7 @@ import EoleCore
 import SwiftUI
 
 /// Écran de séance immersif plein écran : compte à rebours, contours
-/// synchronisés, rétention au double-tap,
+/// synchronisés, commande explicite de fin de rétention,
 /// récupération 15 s, confirmation d'arrêt, écran final.
 public struct ActiveSessionView: View {
     @StateObject private var engine: SessionEngine
@@ -41,12 +41,6 @@ public struct ActiveSessionView: View {
                 Spacer()
                 centerStage
                 Spacer()
-                if engine.phase == .retention {
-                    Text("Double-tape pour terminer")
-                        .font(.subheadline).fontWeight(.semibold)
-                        .foregroundStyle(.white.opacity(0.72))
-                        .padding(.bottom, 60)
-                }
             }
         }
         .foregroundStyle(.white)
@@ -169,18 +163,22 @@ public struct ActiveSessionView: View {
             }
             .transition(reduceMotion ? .identity : .opacity.combined(with: .scale(scale: 0.98)))
         case .retention:
-            VStack(spacing: 12) {
+            VStack(spacing: 28) {
+                Text("Rétention")
+                    .font(.headline)
+                    .foregroundStyle(.white.opacity(0.72))
                 Text(retentionLabel)
                     .font(.system(size: retentionFontSize, weight: .regular))
                     .monospacedDigit()
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 2) { engine.endRetention() }
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityLabel("Terminer la rétention")
-                Button("Terminer la rétention") { engine.endRetention() }
-                    .buttonStyle(.glass)
-                    .tint(.white.opacity(0.78))
-                    .font(.footnote.weight(.semibold))
+                    .accessibilityLabel("Rétention : \(retentionLabel)")
+                Button { engine.endRetention() } label: {
+                    Label("Terminer la rétention", systemImage: "stop.fill")
+                        .frame(minWidth: 210)
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.white.opacity(0.92))
+                .foregroundStyle(Color.eolePrimaryStrong)
+                .controlSize(.extraLarge)
             }
         case .recoveryInhale, .recoveryHold, .recoveryExhale:
             VStack(spacing: 12) {
@@ -198,51 +196,59 @@ public struct ActiveSessionView: View {
             ProgressView().tint(.white)
         case .saving:
             VStack(spacing: 8) {
-                ProgressView().tint(Color.eolePrimary)
-                Text("Enregistrement…").foregroundStyle(Color.eoleMuted)
+                ProgressView().tint(.white)
+                Text("Enregistrement…").foregroundStyle(.white.opacity(0.72))
             }
             .padding(32)
-            .glassEffect(.regular.tint(.white.opacity(0.88)), in: RoundedRectangle(cornerRadius: EoleRadius.lg))
+            .background(.regularMaterial, in: .rect(cornerRadius: EoleRadius.lg))
         case .complete:
             ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 10) {
-                Image(systemName: "checkmark")
-                    .font(.title).foregroundStyle(.white)
-                    .frame(width: 68, height: 68)
-                    .background(Color.eolePrimary, in: Circle())
-                Text("Bien joué.").font(.system(size: 48, weight: .medium))
+            VStack(spacing: 20) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(.largeTitle, design: .rounded, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+                Text("Séance terminée")
+                    .font(.largeTitle.weight(.semibold))
+                    .multilineTextAlignment(.center)
                 if let message = engine.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(Color.eoleDanger)
+                    Text(message).font(.footnote).foregroundStyle(.red.opacity(0.9))
                     Button("Réessayer") { engine.retryPersist() }
-                        .buttonStyle(EolePrimaryButton())
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.extraLarge)
                 } else {
-                    Text("C'est enregistré.").foregroundStyle(Color.eoleMuted)
+                    Text("Tes progrès sont enregistrés sur cet iPhone.")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.72))
+                        .multilineTextAlignment(.center)
                 }
                 ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(engine.results.enumerated()), id: \.offset) { _, round in
-                        VStack {
-                            Text("R\(round.roundIndex)").font(.caption)
-                                .foregroundStyle(Color.eoleMuted)
-                            Text(formatDuration(Double(round.retentionSeconds)))
-                                .font(.headline)
+                    HStack(spacing: 0) {
+                        ForEach(Array(engine.results.enumerated()), id: \.offset) { _, round in
+                            VStack(spacing: 5) {
+                                Text("R\(round.roundIndex)").font(.caption2.weight(.semibold))
+                                    .foregroundStyle(.white.opacity(0.62))
+                                Text(formatDuration(Double(round.retentionSeconds)))
+                                    .font(.headline.weight(.semibold))
+                                    .monospacedDigit()
+                            }
+                            .frame(minWidth: 92)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(10)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 10))
                     }
                 }
-                .frame(minWidth: 260)
-                }
-                .foregroundStyle(Color.eoleForeground)
+                .padding(.vertical, 18)
+                .padding(.horizontal, 12)
+                .background(.white.opacity(0.08), in: .rect(cornerRadius: EoleRadius.md))
                 if engine.errorMessage == nil {
-                    Button("À bientôt") {
+                    Button("Terminer") {
                         onClose()
                     }
-                    .buttonStyle(EolePrimaryButton())
+                    .buttonStyle(.glassProminent)
+                    .tint(.white.opacity(0.92))
+                    .foregroundStyle(Color.eolePrimaryStrong)
+                    .controlSize(.extraLarge)
                 }
             }
-            .padding(24)
+            .padding(28)
             }
             .frame(maxHeight: .infinity)
         }

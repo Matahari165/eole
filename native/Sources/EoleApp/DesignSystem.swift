@@ -1,19 +1,23 @@
 import SwiftUI
 import Foundation
+import UIKit
 
 // Système visuel natif d'Eole.
+// Les surfaces de contenu restent adaptatives et lisibles ; le verre est réservé
+// aux contrôles et aux éléments flottants.
 public extension Color {
-    static let eolePrimary = Color(hex: 0x176F65)
-    static let eolePrimaryStrong = Color(hex: 0x0C514B)
-    static let eoleSecondary = Color(hex: 0x84B8A8)
-    static let eoleAccent = Color(hex: 0xBAD7CC)
-    static let eoleBackground = Color(hex: 0xEFF4F1)
-    static let eoleSurfaceSoft = Color(hex: 0xE5EEEA)
-    static let eoleForeground = Color(hex: 0x17332E)
-    static let eoleMuted = Color(hex: 0x5F726C)
-    static let eoleBorder = Color(hex: 0xD6E1DC)
-    static let eoleDanger = Color(hex: 0xB64343)
-    static let eoleSessionDeep = Color(hex: 0x123F3B)
+    static let eolePrimary = Color.eoleAdaptive(light: 0x0F766E, dark: 0x5DD6C7)
+    static let eolePrimaryStrong = Color.eoleAdaptive(light: 0x0A5C56, dark: 0x83E7DC)
+    static let eoleSecondary = Color.eoleAdaptive(light: 0x4C9786, dark: 0x80D8C8)
+    static let eoleAccent = Color.eoleAdaptive(light: 0xCFEAE2, dark: 0x214A44)
+    static let eoleBackground = Color(uiColor: .systemGroupedBackground)
+    static let eoleSurface = Color(uiColor: .secondarySystemGroupedBackground)
+    static let eoleSurfaceSoft = Color(uiColor: .tertiarySystemGroupedBackground)
+    static let eoleForeground = Color(uiColor: .label)
+    static let eoleMuted = Color(uiColor: .secondaryLabel)
+    static let eoleBorder = Color(uiColor: .separator)
+    static let eoleDanger = Color(uiColor: .systemRed)
+    static let eoleSessionDeep = Color.eoleAdaptive(light: 0x123F3B, dark: 0x071D1B)
 
     init(hex: UInt32, opacity: Double = 1) {
         self.init(
@@ -24,21 +28,47 @@ public extension Color {
             opacity: opacity
         )
     }
+
+    private static func eoleAdaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(uiColor: UIColor { traits in
+            let value = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: CGFloat((value >> 16) & 0xFF) / 255,
+                green: CGFloat((value >> 8) & 0xFF) / 255,
+                blue: CGFloat(value & 0xFF) / 255,
+                alpha: 1
+            )
+        })
+    }
 }
 
 public enum EoleRadius {
-    public static let sm: CGFloat = 12
-    public static let md: CGFloat = 18
-    public static let lg: CGFloat = 26
+    /// Compatible aliases used by existing screens.
+    public static let sm: CGFloat = 14
+    public static let md: CGFloat = 20
+    public static let lg: CGFloat = 28
+
+    /// Semantic names for new native surfaces.
+    public static let control: CGFloat = sm
+    public static let panel: CGFloat = md
+    public static let prominentPanel: CGFloat = lg
+}
+
+public enum EoleSpacing {
+    public static let xs: CGFloat = 4
+    public static let sm: CGFloat = 8
+    public static let md: CGFloat = 12
+    public static let lg: CGFloat = 16
+    public static let xl: CGFloat = 24
+    public static let xxl: CGFloat = 32
 }
 
 public extension Font {
-    // `relativeTo` keeps the Eole voice while allowing Dynamic Type to enlarge
-    // text for people who need it.
-    static let eoleDisplay = Font.custom("Avenir Next", size: 32, relativeTo: .largeTitle).weight(.medium)
-    static let eoleTitle = Font.custom("Avenir Next", size: 24, relativeTo: .title2).weight(.medium)
-    static let eoleBody = Font.custom("Avenir Next", size: 16, relativeTo: .body)
-    static let eoleCaption = Font.custom("Avenir Next", size: 13, relativeTo: .caption)
+    // SF Pro sémantique : le système fournit métrique, poids et Dynamic Type.
+    static let eoleDisplay = Font.system(.largeTitle, design: .rounded, weight: .medium)
+    static let eoleTitle = Font.system(.title2, design: .rounded, weight: .medium)
+    static let eoleBody = Font.system(.body, design: .default, weight: .regular)
+    static let eoleCaption = Font.system(.caption, design: .default, weight: .regular)
 }
 
 public extension Animation {
@@ -47,18 +77,121 @@ public extension Animation {
     }
 }
 
+/// Panneau de contenu natif : surface groupée adaptative, sans verre décoratif.
+public struct EolePanel<Content: View>: View {
+    private let padding: CGFloat
+    private let content: Content
+
+    public init(padding: CGFloat = EoleSpacing.xl, @ViewBuilder content: () -> Content) {
+        self.padding = padding
+        self.content = content()
+    }
+
+    public var body: some View {
+        content
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(padding)
+            .background(Color.eoleSurface, in: RoundedRectangle(cornerRadius: EoleRadius.panel, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: EoleRadius.panel, style: .continuous)
+                    .stroke(Color.eoleBorder.opacity(0.65), lineWidth: 0.5)
+            }
+    }
+}
+
+/// Tuile de métrique : une valeur dominante, un libellé stable et un contexte optionnel.
+public struct EoleMetricTile: View {
+    private let label: String
+    private let value: String
+    private let detail: String?
+
+    public init(label: String, value: String, detail: String? = nil) {
+        self.label = label
+        self.value = value
+        self.detail = detail
+    }
+
+    public var body: some View {
+        VStack(alignment: .leading, spacing: EoleSpacing.sm) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(Color.eoleMuted)
+                .lineLimit(2)
+            Text(value)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(Color.eoleForeground)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+            if let detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(Color.eoleMuted)
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .padding(EoleSpacing.lg)
+        .background(Color.eoleSurfaceSoft, in: RoundedRectangle(cornerRadius: EoleRadius.control, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: EoleRadius.control, style: .continuous)
+                .stroke(Color.eoleBorder.opacity(0.55), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// En-tête de section compact, cohérent entre Accueil, Progrès et Réglages.
+public struct EoleSectionHeader: View {
+    private let title: String
+    private let subtitle: String?
+    private let systemImage: String?
+
+    public init(_ title: String, subtitle: String? = nil, systemImage: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+    }
+
+    public var body: some View {
+        HStack(alignment: .top, spacing: EoleSpacing.sm) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.eolePrimary)
+                    .frame(width: 22, height: 22)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(Color.eoleForeground)
+                    .accessibilityAddTraits(.isHeader)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.eoleMuted)
+                }
+            }
+        }
+    }
+}
+
 /// Action principale utilisant le style Liquid Glass système.
 public struct EolePrimaryButton: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     public init() {}
+
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.custom("Avenir Next", size: 16, relativeTo: .body).weight(.semibold))
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .font(.body.weight(.semibold))
+            .frame(maxWidth: .infinity, minHeight: 52)
             .foregroundStyle(.white)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, EoleSpacing.lg)
             .glassEffect(.regular.tint(Color.eolePrimary).interactive(), in: Capsule())
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.18), value: configuration.isPressed)
+            .scaleEffect(!reduceMotion && configuration.isPressed ? 0.98 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: configuration.isPressed)
     }
 }
 
@@ -68,7 +201,7 @@ public struct EoleGlassContainer<Content: View>: View {
     private let spacing: CGFloat
     private let content: Content
 
-    public init(spacing: CGFloat = 12, @ViewBuilder content: () -> Content) {
+    public init(spacing: CGFloat = EoleSpacing.md, @ViewBuilder content: () -> Content) {
         self.spacing = spacing
         self.content = content()
     }
@@ -79,45 +212,27 @@ public struct EoleGlassContainer<Content: View>: View {
 }
 
 public struct EoleGlassIconButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     public init() {}
+
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(width: 44, height: 44)
             .font(.body.weight(.semibold))
+            .contentShape(Circle())
             .glassEffect(.regular.interactive(), in: Circle())
-            .scaleEffect(configuration.isPressed ? 0.94 : 1)
-            .animation(.easeOut(duration: 0.16), value: configuration.isPressed)
+            .scaleEffect(!reduceMotion && configuration.isPressed ? 0.94 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 
+/// Fond système volontairement sobre : aucun gradient ni halo hérité du web.
 public struct EoleAmbientBackground: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     public init() {}
 
     public var body: some View {
-        ZStack {
-            Color.eoleBackground
-            RadialGradient(
-                colors: [.white.opacity(0.9), .clear],
-                center: .topLeading,
-                startRadius: 4,
-                endRadius: 270
-            )
-            RadialGradient(
-                colors: [Color.eoleAccent.opacity(0.22), .clear],
-                center: .bottomTrailing,
-                startRadius: 20,
-                endRadius: 300
-            )
-            if !reduceMotion {
-                Circle()
-                    .fill(Color.white.opacity(0.20))
-                    .frame(width: 190, height: 190)
-                    .blur(radius: 34)
-                    .offset(x: 115, y: 210)
-                    .accessibilityHidden(true)
-            }
-        }
+        Color.eoleBackground
         .ignoresSafeArea()
         .accessibilityHidden(true)
     }
@@ -191,8 +306,8 @@ public struct EoleEyebrow: View {
     }
     public var body: some View {
         Text(text.uppercased())
-            .font(.custom("Avenir Next", size: 11, relativeTo: .caption).weight(.bold))
-            .tracking(2.1)
+            .font(.caption2.weight(.semibold))
+            .tracking(1.4)
             .foregroundStyle(color)
     }
 }
