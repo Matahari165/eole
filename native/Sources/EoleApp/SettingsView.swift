@@ -88,6 +88,8 @@ public struct SettingsView: View {
             Button("Relire la notice") { showSafety = true }
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.eolePrimary)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
         }
     }
 

@@ -7,6 +7,10 @@ import SwiftUI
 /// Les données ne sont pas enfermées dans une grille de cartes répétitives.
 public struct HomeView: View {
     @ObservedObject var store: SessionStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var hasAppeared = false
+    @State private var breathFieldExpanded = false
     var onStart: (SessionConfig) -> Void
     var onAdjust: () -> Void
 
@@ -30,7 +34,7 @@ public struct HomeView: View {
         let last = store.sessions.first
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: 22) {
                 masthead
                 invitation(defaults: defaults)
                 overview(stats: stats)
@@ -38,18 +42,29 @@ public struct HomeView: View {
                 if let last, !last.rounds.isEmpty { recentSession(last) }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 8)
+            .padding(.top, 2)
             .padding(.bottom, 28)
+            .opacity(hasAppeared ? 1 : 0)
+            .offset(y: reduceMotion || hasAppeared ? 0 : 8)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
-        .navigationTitle("Eole")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            if reduceMotion {
+                hasAppeared = true
+            } else {
+                withAnimation(.easeOut(duration: 0.34)) { hasAppeared = true }
+                withAnimation(.eoleBreath(duration: 17).repeatForever(autoreverses: true)) {
+                    breathFieldExpanded = true
+                }
+            }
+        }
     }
 
     private var masthead: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 7) {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
                 EoleEyebrow("Eole")
                 Text("Un instant pour respirer.")
                     .font(.eoleDisplay)
@@ -57,17 +72,17 @@ public struct HomeView: View {
                     .foregroundStyle(Color.eoleForeground)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 12)
-            EoleLogo(size: 52)
+            Spacer(minLength: 8)
+            EoleLogo(size: 44)
         }
     }
 
     private func invitation(defaults: SessionConfig) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 9) {
                     EoleEyebrow("Prêt à commencer ?", color: .eoleAccent)
-                    Text("Laisse le souffle guider le rythme.")
+                    Text("Laisse le souffle\nguider le rythme.")
                         .font(.eoleTitle)
                         .tracking(-0.55)
                         .foregroundStyle(.white)
@@ -77,14 +92,14 @@ public struct HomeView: View {
                         .foregroundStyle(.white.opacity(0.74))
                 }
                 Spacer(minLength: 12)
-                Image(systemName: "wind")
-                    .font(.title2.weight(.medium))
-                    .foregroundStyle(Color.eoleAccent)
-                    .frame(width: 42, height: 42)
-                    .background(.white.opacity(0.12), in: Circle())
-                    .accessibilityHidden(true)
+                if !dynamicTypeSize.isAccessibilitySize {
+                    EoleHomeBreathField(expanded: breathFieldExpanded && !reduceMotion)
+                        .frame(width: 82, height: 82)
+                        .offset(y: -5)
+                        .accessibilityHidden(true)
+                }
             }
-            .padding(.bottom, 19)
+            .padding(.bottom, 17)
 
             EoleGlassContainer(spacing: 10) {
                 HStack(spacing: 10) {
@@ -102,9 +117,15 @@ public struct HomeView: View {
                 }
             }
         }
-        .padding(.vertical, 24)
+        .padding(.vertical, 21)
         .padding(.horizontal, 20)
-        .background(Color.eoleSessionDeep)
+        .background(
+            LinearGradient(
+                colors: [Color(hex: 0x174A45), Color.eoleSessionDeep],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         // Le champ de pratique reste continu, sans carte décorative.
         .padding(.horizontal, -20)
     }
@@ -122,7 +143,8 @@ public struct HomeView: View {
                 stat(title: "Série", value: "\(stats.currentStreak) j")
             }
             .padding(.vertical, 14)
-            .background(Color.white.opacity(0.45), in: RoundedRectangle(cornerRadius: EoleRadius.md))
+            .overlay(alignment: .top) { Divider().opacity(0.65) }
+            .overlay(alignment: .bottom) { Divider().opacity(0.65) }
         }
     }
 
@@ -199,5 +221,27 @@ public struct HomeView: View {
         case .normal: return "normal"
         case .fast: return "rapide"
         }
+    }
+}
+
+/// Une topographie discrète du souffle : le mouvement reste derrière le
+/// contenu, ne change jamais la mise en page et disparaît avec Réduire les animations.
+private struct EoleHomeBreathField: View {
+    let expanded: Bool
+
+    var body: some View {
+        ZStack {
+            ForEach(0..<4, id: \.self) { index in
+                EoleContourShape(variant: index + 20)
+                    .stroke(Color.white.opacity(0.16 + Double(index) * 0.08), lineWidth: 1.2)
+                    .padding(CGFloat(index) * 7)
+                    .scaleEffect(expanded ? 1.02 : 0.96)
+            }
+            Circle()
+                .fill(Color.eoleAccent)
+                .frame(width: 5, height: 5)
+        }
+        .rotationEffect(.degrees(expanded ? 1.5 : -1))
+        .allowsHitTesting(false)
     }
 }

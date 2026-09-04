@@ -3,6 +3,7 @@ import Charts
 import EoleCore
 #endif
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Progrès : lecture de la pratique avec une hiérarchie éditoriale et des
 /// graphiques sans effets décoratifs qui nuiraient aux valeurs.
@@ -10,7 +11,6 @@ public struct StatsView: View {
     @ObservedObject var store: SessionStore
     @State private var days = 7
     @State private var sessionToDelete: BreathSession?
-    @State private var exportURL: URL?
     private let onPrepare: () -> Void
 
     public init(store: SessionStore, onPrepare: @escaping () -> Void = {}) {
@@ -91,7 +91,7 @@ public struct StatsView: View {
         Button(title) { days = value }
             .font(.caption.weight(.semibold))
             .foregroundStyle(days == value ? Color.eolePrimaryStrong : Color.eoleMuted)
-            .frame(minWidth: 42, minHeight: 36)
+            .frame(minWidth: 44, minHeight: 44)
             .glassEffect(
                 days == value ? .regular.tint(Color.eoleAccent.opacity(0.72)).interactive() : .regular.interactive(),
                 in: Capsule()
@@ -306,29 +306,31 @@ public struct StatsView: View {
     }
 
     private var exportAction: some View {
-        Group {
-            if let exportURL {
-                ShareLink(item: exportURL) {
-                    Label("Partager l'historique CSV", systemImage: "square.and.arrow.up")
-                }
-            } else {
-                Button { export() } label: {
-                    Label("Exporter l'historique CSV", systemImage: "square.and.arrow.up")
-                }
-            }
+        ShareLink(
+            item: SessionsCSVExport(csv: buildSessionsCsv(store.sessions)),
+            preview: SharePreview("Historique Eole")
+        ) {
+            Label("Exporter l'historique CSV", systemImage: "square.and.arrow.up")
         }
         .font(.caption.weight(.semibold))
         .foregroundStyle(Color.eolePrimary)
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .center)
+        .contentShape(Rectangle())
     }
 
-    private func export() {
-        let csv = buildSessionsCsv(store.sessions)
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("eole-historique-\(formatter.string(from: Date())).csv")
-        try? csv.write(to: url, atomically: true, encoding: .utf8)
-        exportURL = url
+}
+
+private struct SessionsCSVExport: Transferable {
+    let csv: String
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .commaSeparatedText) { export in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("eole-historique-\(formatter.string(from: Date())).csv")
+            try export.csv.write(to: url, atomically: true, encoding: .utf8)
+            return SentTransferredFile(url)
+        }
     }
 }

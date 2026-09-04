@@ -9,6 +9,7 @@ public struct ConfiguratorView: View {
     @State private var rounds: Int
     @State private var breaths: Int
     @State private var pace: Pace
+    @State private var defaultsSaved = false
     var onStart: (SessionConfig) -> Void
 
     public init(onStart: @escaping (SessionConfig) -> Void) {
@@ -45,12 +46,18 @@ public struct ConfiguratorView: View {
                     .buttonStyle(EolePrimaryButton())
                 }
 
-                Button("Définir ces réglages par défaut") {
+                Button {
                     AppDefaults.shared.sessionDefaults = SessionConfig(
                         rounds: rounds, breathsPerRound: breaths, pace: pace
                     )
+                    withAnimation(.easeOut(duration: 0.18)) { defaultsSaved = true }
+                } label: {
+                    Label(
+                        defaultsSaved ? "Réglages enregistrés" : "Définir comme réglages par défaut",
+                        systemImage: defaultsSaved ? "checkmark" : "bookmark"
+                    )
                 }
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, minHeight: 44)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.eolePrimary)
                 .contentShape(Rectangle())
@@ -63,6 +70,9 @@ public struct ConfiguratorView: View {
         .background(EoleAmbientBackground())
         .navigationTitle("Nouvelle séance")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: rounds) { _, _ in defaultsSaved = false }
+        .onChange(of: breaths) { _, _ in defaultsSaved = false }
+        .onChange(of: pace) { _, _ in defaultsSaved = false }
     }
 
     private var parameterSection: some View {

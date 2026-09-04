@@ -164,12 +164,18 @@ public struct EoleLogo: View {
     public init(size: CGFloat = 56) { self.size = size }
     public var body: some View {
         ZStack {
-            Circle().stroke(Color.eolePrimary.opacity(0.22), lineWidth: 1)
-            Circle().trim(from: 0.05, to: 0.78)
-                .stroke(Color.eolePrimary, style: StrokeStyle(lineWidth: 2.6, lineCap: .round))
-                .rotationEffect(.degrees(-54))
-            Circle().fill(Color.eolePrimary).frame(width: 5, height: 5)
-                .offset(y: -size * 0.28)
+            EoleContourShape(variant: 31)
+                .trim(from: 0.06, to: 0.72)
+                .stroke(Color.eolePrimary, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                .padding(size * 0.08)
+                .rotationEffect(.degrees(-48))
+            EoleContourShape(variant: 37)
+                .trim(from: 0.18, to: 0.61)
+                .stroke(Color.eoleSecondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                .padding(size * 0.25)
+                .rotationEffect(.degrees(122))
+            Circle().fill(Color.eolePrimary).frame(width: 4.5, height: 4.5)
+                .offset(x: size * 0.26, y: -size * 0.17)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
