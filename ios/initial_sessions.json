@@ -1,0 +1,80 @@
+[
+  {
+    "id": "a5e4f8f0-cc4a-4bf2-8db0-9f5d3b14d8a7",
+    "status": "completed",
+    "plannedRounds": 2,
+    "breathsPerRound": 30,
+    "pace": "normal",
+    "startedAt": "2026-09-04T12:01:24.000Z",
+    "completedAt": "2026-09-04T12:10:55.000Z",
+    "rounds": [
+      { "roundIndex": 1, "breathsCompleted": 30, "retentionSeconds": 131 },
+      { "roundIndex": 2, "breathsCompleted": 30, "retentionSeconds": 156 }
+    ]
+  },
+  {
+    "id": "9b05bc9c-21a0-4619-a9eb-d79d31343202",
+    "status": "completed",
+    "plannedRounds": 2,
+    "breathsPerRound": 30,
+    "pace": "normal",
+    "startedAt": "2026-08-29T06:17:37.289Z",
+    "completedAt": "2026-08-29T06:27:53.568Z",
+    "rounds": [
+      { "roundIndex": 1, "breathsCompleted": 30, "retentionSeconds": 151 },
+      { "roundIndex": 2, "breathsCompleted": 30, "retentionSeconds": 181 }
+    ]
+  },
+  {
+    "id": "5b7ec132-113a-4fbf-a6b0-e2138bbd3e25",
+    "status": "stopped",
+    "plannedRounds": 3,
+    "breathsPerRound": 35,
+    "pace": "normal",
+    "startedAt": "2026-08-28T05:58:55.926Z",
+    "completedAt": "2026-08-28T06:10:36.160Z",
+    "rounds": [
+      { "roundIndex": 1, "breathsCompleted": 35, "retentionSeconds": 166 },
+      { "roundIndex": 2, "breathsCompleted": 35, "retentionSeconds": 201 }
+    ]
+  },
+  {
+    "id": "44ab27c1-031b-4768-9bf8-254fad5500bf",
+    "status": "stopped",
+    "plannedRounds": 3,
+    "breathsPerRound": 35,
+    "pace": "normal",
+    "startedAt": "2026-08-27T06:36:17.235Z",
+    "completedAt": "2026-08-27T06:47:29.283Z",
+    "rounds": [
+      { "roundIndex": 1, "breathsCompleted": 35, "retentionSeconds": 152 },
+      { "roundIndex": 2, "breathsCompleted": 35, "retentionSeconds": 191 }
+    ]
+  },
+  {
+    "id": "40912256-dce2-4955-b61e-f0ecf0512027",
+    "status": "stopped",
+    "plannedRounds": 3,
+    "breathsPerRound": 35,
+    "pace": "normal",
+    "startedAt": "2026-08-26T14:30:33.788Z",
+    "completedAt": "2026-08-26T14:42:14.388Z",
+    "rounds": [
+      { "roundIndex": 1, "breathsCompleted": 35, "retentionSeconds": 176 },
+      { "roundIndex": 2, "breathsCompleted": 35, "retentionSeconds": 196 }
+    ]
+  },
+  {
+    "id": "593e7d34-147f-40a4-8be8-b1c8f545ddd2",
+    "status": "stopped",
+    "plannedRounds": 3,
+    "breathsPerRound": 35,
+    "pace": "normal",
+    "startedAt": "2026-08-25T07:02:38.047Z",
+    "completedAt": "2026-08-25T07:13:10.533Z",
+    "rounds": [
+      { "roundIndex": 1, "breathsCompleted": 35, "retentionSeconds": 135 },
+      { "roundIndex": 2, "breathsCompleted": 35, "retentionSeconds": 170 }
+    ]
+  }
+]

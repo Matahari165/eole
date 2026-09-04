@@ -12,6 +12,7 @@
 - Conserve une identité visuelle cohérente, naturelle et centrée sur la respiration. Évite l'apparence générique des applications générées par IA, les cartes répétitives et les espaces vides sans fonction.
 - Chaque texte visible doit aider à comprendre, décider ou agir. Le titre de l'onglet reste `Eole`.
 - Eole est conçu et vérifié uniquement au format iPhone `390x844`. Ne réalise aucun test ni aucune adaptation spécifique pour Mac ou ordinateur.
+- L'application native cible exclusivement iOS 26. Utilise les API Liquid Glass natives sans fallback iOS 17-25, et réserve le verre aux contrôles et à la navigation plutôt qu'aux surfaces de contenu.
 - Vérifie contraste, lisibilité, focus visible, zones tactiles et information indépendante de la couleur.
 - Utilise le navigateur intégré pour toute modification visuelle ou interactive significative ; une petite correction évidente peut recevoir une vérification proportionnée.
 
@@ -24,6 +25,7 @@
 - Relis le diff final. Un commit local, un push, un déploiement et une vérification en production sont des preuves distinctes.
 - Ne publie, ne déploie, n'envoie de message et ne modifie aucun service externe sans autorisation explicite.
 - Ne mets jamais dans le code, Git, les journaux ou les réponses des identifiants, clés, jetons, sessions ou autres données sensibles.
+- Pour le client iOS, conserve les séances dans SwiftData et garde la synchronisation cloud désactivée tant qu'un parcours d'authentification natif n'est pas explicitement validé.
 
 ## Sous-agents
 
