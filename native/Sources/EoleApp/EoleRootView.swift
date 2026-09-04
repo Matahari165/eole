@@ -10,6 +10,7 @@ public struct EoleRootView: View {
     @ObservedObject private var store: SessionStore
     @State private var sessionConfig: SessionConfig?
     @State private var pendingSessionConfig: SessionConfig?
+    @State private var showActiveSession = false
     @State private var showConfigurator = false
     @State private var showSafety = !AppDefaults.shared.safetyNoticeSeen
     private let audio: EoleAudioEngine
@@ -31,7 +32,7 @@ public struct EoleRootView: View {
             NavigationStack {
                 HomeView(
                     store: store,
-                    onStart: { sessionConfig = $0 },
+                    onStart: { beginSession($0) },
                     onAdjust: { showConfigurator = true }
                 )
             }
@@ -57,7 +58,7 @@ public struct EoleRootView: View {
         .sheet(isPresented: $showConfigurator, onDismiss: {
             guard let config = pendingSessionConfig else { return }
             pendingSessionConfig = nil
-            sessionConfig = config
+            beginSession(config)
         }) {
             NavigationStack {
                 ConfiguratorView(onStart: {
@@ -66,10 +67,14 @@ public struct EoleRootView: View {
                 })
             }
         }
-        .fullScreenCover(item: $sessionConfig) { config in
-            NavigationStack {
-                ActiveSessionView(config: config, store: store, audio: audio, haptics: haptics) {
-                    sessionConfig = nil
+        .fullScreenCover(isPresented: $showActiveSession, onDismiss: {
+            sessionConfig = nil
+        }) {
+            if let config = sessionConfig {
+                NavigationStack {
+                    ActiveSessionView(config: config, store: store, audio: audio, haptics: haptics) {
+                        showActiveSession = false
+                    }
                 }
             }
         }
@@ -81,10 +86,11 @@ public struct EoleRootView: View {
             Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux.")
         }
     }
-}
 
-extension SessionConfig: Identifiable {
-    public var id: String { "\(rounds)-\(breathsPerRound)-\(pace.rawValue)" }
+    private func beginSession(_ config: SessionConfig) {
+        sessionConfig = config
+        showActiveSession = true
+    }
 }
 
 /// Les onglets non visibles ne construisent leur contenu qu'à la première

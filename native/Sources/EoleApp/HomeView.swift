@@ -106,8 +106,10 @@ public struct HomeView: View {
                     Button { onStart(defaults) } label: {
                         Label("Commencer", systemImage: "play.fill")
                             .frame(maxWidth: .infinity)
+                            .contentShape(Capsule())
                     }
                     .buttonStyle(EolePrimaryButton())
+                    .accessibilityHint("Ouvre immédiatement la séance avec ces réglages")
                     Button { onAdjust() } label: {
                         Image(systemName: "slider.horizontal.3")
                             .frame(width: 48, height: 48)
