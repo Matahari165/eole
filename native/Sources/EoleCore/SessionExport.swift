@@ -1,6 +1,6 @@
 import Foundation
 
-// Port de src/lib/export-sessions.ts — BOM, séparateur ";", "\r\n", 1 ligne par round.
+// Export CSV : BOM, séparateur ";", "\r\n", une ligne par round.
 
 public func csvCell(_ value: String) -> String {
     if value.contains(";") || value.contains("\"") || value.contains("\n") || value.contains("\r") {

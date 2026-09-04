@@ -1,6 +1,6 @@
 import Foundation
 
-// Port de src/lib/retention-timing.ts — ding à chaque minute pleine de rétention.
+// Repère sonore à chaque minute pleine de rétention.
 
 public func getNewRetentionMinute(elapsedSeconds: Double, lastMinute: Int) -> Int? {
     let completedMinute = Int(floor(elapsedSeconds / 60))

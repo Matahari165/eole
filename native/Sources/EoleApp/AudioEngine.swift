@@ -320,10 +320,6 @@ public final class EoleAudioEngine {
         player.play()
     }
 
-    private func canScheduleAudioNodes() -> Bool {
-        engineReady && currentNodeFormat() != nil
-    }
-
     private func currentNodeFormat() -> AVAudioFormat? {
         guard engine.isRunning else { return nil }
         let output = engine.outputNode.outputFormat(forBus: 0)

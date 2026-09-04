@@ -1,23 +1,14 @@
 import Foundation
 
-// Port de src/lib/validation.ts — mêmes règles, mêmes bornes.
+// Validation des données persistées et importées.
 
-private func uuidRegex() -> NSRegularExpression {
+private let sharedUuidRegex: NSRegularExpression = {
     // swiftlint:disable:next force_try
     try! NSRegularExpression(
         pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
         options: [.caseInsensitive]
     )
-}
-
-public func isUuid(_ value: String) -> Bool {
-    let range = NSRange(value.startIndex..<value.endIndex, in: value)
-    return uuidRegex().firstMatch(in: value, range: range) != nil
-}
-
-private func isIntegerBetween(_ value: Int, min: Int, max: Int) -> Bool {
-    value >= min && value <= max
-}
+}()
 
 private func makeISOFormatter(fractional: Bool) -> ISO8601DateFormatter {
     let formatter = ISO8601DateFormatter()
@@ -25,6 +16,15 @@ private func makeISOFormatter(fractional: Bool) -> ISO8601DateFormatter {
         ? [.withInternetDateTime, .withFractionalSeconds]
         : [.withInternetDateTime]
     return formatter
+}
+
+public func isUuid(_ value: String) -> Bool {
+    let range = NSRange(value.startIndex..<value.endIndex, in: value)
+    return sharedUuidRegex.firstMatch(in: value, range: range) != nil
+}
+
+private func isIntegerBetween(_ value: Int, min: Int, max: Int) -> Bool {
+    value >= min && value <= max
 }
 
 func parseDate(_ value: String) -> Date? {

@@ -7,13 +7,11 @@ import SwiftUI
 /// Les données ne sont pas enfermées dans une grille de cartes répétitives.
 public struct HomeView: View {
     @ObservedObject var store: SessionStore
-    var firstName: String = ""
     var onStart: (SessionConfig) -> Void
     var onAdjust: () -> Void
 
-    public init(store: SessionStore, firstName: String = "", onStart: @escaping (SessionConfig) -> Void, onAdjust: @escaping () -> Void) {
+    public init(store: SessionStore, onStart: @escaping (SessionConfig) -> Void, onAdjust: @escaping () -> Void) {
         self.store = store
-        self.firstName = firstName
         self.onStart = onStart
         self.onAdjust = onAdjust
     }
@@ -45,7 +43,7 @@ public struct HomeView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 7) {
                 EoleEyebrow("Eole")
-                Text(firstName.isEmpty ? "Un instant pour respirer." : "Bonjour, \(firstName).")
+                Text("Un instant pour respirer.")
                     .font(.eoleDisplay)
                     .tracking(-1.15)
                     .foregroundStyle(Color.eoleForeground)
@@ -99,7 +97,7 @@ public struct HomeView: View {
         .padding(.vertical, 24)
         .padding(.horizontal, 20)
         .background(Color.eoleSessionDeep)
-        // Le champ de pratique est continu, comme dans la version web.
+        // Le champ de pratique reste continu, sans carte décorative.
         .padding(.horizontal, -20)
     }
 

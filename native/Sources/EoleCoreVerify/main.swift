@@ -1,7 +1,7 @@
 import EoleCore
 import Foundation
 
-// Vérification de parité avec tests/*.test.ts du web.
+// Vérification autonome de la logique métier native.
 // Sortie 0 si tout passe, 1 sinon. Lancer avec : swift run EoleCoreVerify
 
 @main
@@ -102,21 +102,7 @@ struct EoleCoreVerify {
         check(getNewRetentionMinute(elapsedSeconds: 119, lastMinute: 1) == nil, "119s → nil")
         check(getNewRetentionMinute(elapsedSeconds: 120, lastMinute: 1) == 2, "120s → 2")
 
-        // parseSessionConfig + normalizeSessionDefaults — session-defaults.test.ts
-        check(
-            parseSessionConfig(rounds: nil, breaths: nil, pace: nil) == defaultSessionConfig,
-            "config vide → défaut"
-        )
-        check(
-            parseSessionConfig(rounds: "5", breaths: "45", pace: "slow")
-                == SessionConfig(rounds: 5, breathsPerRound: 45, pace: .slow),
-            "config explicite conservée"
-        )
-        check(
-            parseSessionConfig(rounds: "20", breaths: "13", pace: "turbo")
-                == SessionConfig(rounds: 8, breathsPerRound: 15, pace: .normal),
-            "config hors bornes clampée"
-        )
+        // Réglages persistés
         check(
             normalizeSessionDefaults(rounds: 20, breathsPerRound: 13, pace: .fast) == defaultSessionConfig,
             "defaults invalides → défaut"
@@ -126,12 +112,6 @@ struct EoleCoreVerify {
                 == SessionConfig(rounds: 5, breathsPerRound: 45, pace: .slow),
             "defaults valides conservés"
         )
-
-        // normalizeMusicTrack — repository.test.ts:31
-        check(normalizeMusicTrack("ocean") == .meditation, "ocean → meditation")
-        check(normalizeMusicTrack("pluie") == .bambou, "pluie → bambou")
-        check(normalizeMusicTrack("foret") == .serenite, "foret → serenite")
-        check(normalizeMusicTrack("inconnu") == .bambou, "inconnu → bambou")
 
         // PACE_TIMINGS + validation
         check(paceTimings[.slow] == PaceTiming(inhale: 3000, exhale: 3000), "timing slow")

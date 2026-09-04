@@ -4,7 +4,7 @@ import EoleCore
 import Combine
 import Foundation
 
-/// Port de use-breath-session.ts : même machine à états, mêmes durées.
+/// Machine à états de la séance et chronométrage de chaque phase.
 /// Différence iOS : la rétention est ancrée sur Date (pas un compteur), donc juste
 /// même en arrière-plan — recalculée au retour via scenePhase.
 @MainActor
@@ -42,6 +42,12 @@ public final class SessionEngine: ObservableObject {
     private var hasStarted = false
     private var hasPersisted = false
     private var pendingSession: BreathSession?
+
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
 
     public init(config: SessionConfig, audio: EoleAudioEngine, haptics: EoleHaptics) {
         self.config = config
@@ -109,7 +115,7 @@ public final class SessionEngine: ObservableObject {
     // MARK: - Séquence
 
     private func run() async {
-        // Compte à rebours 3×1 s + cues, comme le web.
+        // Compte à rebours de trois secondes avec repères sonores.
         phase = .countdown
         for value in [3, 2, 1] {
             guard !Task.isCancelled else { return }
@@ -208,8 +214,7 @@ public final class SessionEngine: ObservableObject {
         guard !hasPersisted else { return }
         hasPersisted = true
         displayTimer?.invalidate()
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let formatter = Self.isoFormatter
         let session = BreathSession(
             id: UUID().uuidString,
             status: status,
@@ -243,7 +248,7 @@ public final class SessionEngine: ObservableObject {
         errorMessage = message
         audio.release()
         haptics.release()
-        phase = .complete // résultats conservés à l'écran + réessayer, comme le web
+        phase = .complete // Les résultats restent visibles en cas d'échec local.
     }
 
     public func retryPersist() {

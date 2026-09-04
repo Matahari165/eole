@@ -3,8 +3,8 @@ import EoleCore
 #endif
 import SwiftUI
 
-/// Racine iPhone : 3 onglets comme la bottom-nav web (app-shell.tsx),
-/// séance présentée plein écran, notice sécurité à la première ouverture.
+/// Racine iPhone : trois onglets, séance plein écran et notice de sécurité à la
+/// première ouverture.
 /// Le wrapper Xcode ajoute `@main struct EolePhoneApp: App` autour de EoleRootView.
 public struct EoleRootView: View {
     @ObservedObject private var store: SessionStore
@@ -64,7 +64,6 @@ public struct EoleRootView: View {
                 })
             }
         }
-        #if os(iOS)
         .fullScreenCover(item: $sessionConfig) { config in
             NavigationStack {
                 ActiveSessionView(config: config, store: store, audio: audio, haptics: haptics) {
@@ -72,15 +71,6 @@ public struct EoleRootView: View {
                 }
             }
         }
-        #else
-        .sheet(item: $sessionConfig) { config in
-            NavigationStack {
-                ActiveSessionView(config: config, store: store, audio: audio, haptics: haptics) {
-                    sessionConfig = nil
-                }
-            }
-        }
-        #endif
         .alert("Pratique en sécurité", isPresented: $showSafety) {
             Button("Compris", role: .cancel) {
                 AppDefaults.shared.safetyNoticeSeen = true
@@ -88,7 +78,6 @@ public struct EoleRootView: View {
         } message: {
             Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux.")
         }
-        .onAppear { store.retryPending() }
     }
 }
 

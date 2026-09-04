@@ -1,6 +1,6 @@
 import Foundation
 
-// Port de src/lib/analytics.ts — mêmes calculs, mêmes cas limites.
+// Statistiques et séries temporelles de l'historique local.
 
 public struct SessionStats: Sendable, Equatable {
     public var sessionCount: Int

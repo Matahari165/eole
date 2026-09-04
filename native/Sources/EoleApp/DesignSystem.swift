@@ -1,7 +1,7 @@
 import SwiftUI
 import Foundation
 
-// Système visuel Eole : palette du web, transposée dans les rôles natifs iOS.
+// Système visuel natif d'Eole.
 public extension Color {
     static let eolePrimary = Color(hex: 0x176F65)
     static let eolePrimaryStrong = Color(hex: 0x0C514B)
@@ -44,22 +44,6 @@ public extension Font {
 public extension Animation {
     static func eoleBreath(duration: Double) -> Animation {
         .timingCurve(0.37, 0, 0.63, 1, duration: duration)
-    }
-}
-
-/// Surface de contenu non vitrée : le verre reste réservé aux contrôles.
-public struct EoleCard<Content: View>: View {
-    private let content: Content
-    public init(@ViewBuilder content: () -> Content) { self.content = content() }
-
-    public var body: some View {
-        content
-            .padding(18)
-            .background(Color.white.opacity(0.58), in: RoundedRectangle(cornerRadius: EoleRadius.lg))
-            .overlay {
-                RoundedRectangle(cornerRadius: EoleRadius.lg)
-                    .stroke(Color.white.opacity(0.72), lineWidth: 1)
-            }
     }
 }
 

@@ -3,7 +3,7 @@ import EoleCore
 #endif
 import SwiftUI
 
-/// Contours organiques de session-visuals.tsx : 8 formes irrégulières, fermées
+/// Huit contours organiques irréguliers, fermés
 /// au repos (scale .46→1 selon l'anneau), ouvertes à l'inspire.
 public struct BreathContoursView: View {
     public enum MotionPhase { case rest, inhale, exhale }

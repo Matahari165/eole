@@ -6,6 +6,6 @@ coverage/
 *.log
 *.tsbuildinfo
 .DS_Store
-.vercel
+.vercel/
 ios/**/xcuserdata/
 native/.build/

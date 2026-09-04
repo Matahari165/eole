@@ -3,8 +3,8 @@ import EoleCore
 #endif
 import SwiftUI
 
-/// Écran de séance immersive plein écran (active-session-screen.tsx) :
-/// compte à rebours, contours synchronisés, rétention au double-tap,
+/// Écran de séance immersif plein écran : compte à rebours, contours
+/// synchronisés, rétention au double-tap,
 /// récupération 15 s, confirmation d'arrêt, écran final.
 public struct ActiveSessionView: View {
     @StateObject private var engine: SessionEngine
@@ -58,7 +58,6 @@ public struct ActiveSessionView: View {
                 let savedLocally = store.saveSession(session)
                 if savedLocally {
                     // La copie locale est la fin de la séance. Une éventuelle
-                    // synchronisation distante est suivie séparément par le store.
                     engine.markSaved()
                 } else {
                     engine.markSaveFailed("La séance n'a pas pu être enregistrée.")
@@ -92,6 +91,7 @@ public struct ActiveSessionView: View {
         }
         return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
+            .allowsHitTesting(false)
             .animation(reduceMotion ? nil : .eoleBreath(duration: 0.8), value: engine.phase)
     }
 
@@ -106,6 +106,7 @@ public struct ActiveSessionView: View {
         .opacity(engine.phase == .retention ? 0.45 : 1)
         .animation(reduceMotion ? nil : .eoleBreath(duration: 2), value: engine.phase)
         .ignoresSafeArea()
+        .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
 

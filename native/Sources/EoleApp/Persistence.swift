@@ -4,10 +4,9 @@ import EoleCore
 import Foundation
 import SwiftData
 
-/// Enregistrement SwiftData de la représentation historique `BreathSession`.
-/// Les dates et UUID restent les chaînes du contrat web pour préserver leur
-/// précision et leur format lors de l'import. Les tours sont encodés dans un
-/// champ Data versionnable ; les réglages restent indépendants de l'historique.
+/// Enregistrement SwiftData d'une séance de respiration.
+/// Les dates et UUID conservent leur précision lors de l'import. Les tours sont
+/// encodés dans un champ Data versionnable.
 @Model
 public final class StoredBreathSession {
     @Attribute(.unique) public var id: String
@@ -20,7 +19,7 @@ public final class StoredBreathSession {
     public var roundsData: Data
     public var pendingSync: Bool
 
-    public init(session: BreathSession, pendingSync: Bool = false) {
+    public init(session: BreathSession) {
         self.id = session.id
         self.statusRaw = session.status.rawValue
         self.plannedRounds = session.plannedRounds
@@ -29,10 +28,12 @@ public final class StoredBreathSession {
         self.startedAt = session.startedAt
         self.completedAt = session.completedAt
         self.roundsData = (try? JSONEncoder().encode(session.rounds)) ?? Data()
-        self.pendingSync = pendingSync
+        // Conservé dans le schéma pour assurer la compatibilité avec les bases
+        // créées avant le passage au stockage exclusivement local.
+        self.pendingSync = false
     }
 
-    public func update(from session: BreathSession, pendingSync: Bool? = nil) {
+    public func update(from session: BreathSession) {
         id = session.id
         statusRaw = session.status.rawValue
         plannedRounds = session.plannedRounds
@@ -41,7 +42,7 @@ public final class StoredBreathSession {
         startedAt = session.startedAt
         completedAt = session.completedAt
         roundsData = (try? JSONEncoder().encode(session.rounds)) ?? Data()
-        if let pendingSync { self.pendingSync = pendingSync }
+        pendingSync = false
     }
 
     public func makeSession() -> BreathSession? {
@@ -84,13 +85,10 @@ public final class SessionStore: ObservableObject {
     private static let importMarkerKey = "eole.initial-sessions.v2"
     private let modelContainer: ModelContainer
     private let modelContext: ModelContext
-    private let sync: SyncClient
-
-    public init(modelContainer: ModelContainer? = nil, sync: SyncClient) {
+    public init(modelContainer: ModelContainer? = nil) {
         let container = modelContainer ?? Self.makePersistentContainer()
         self.modelContainer = container
         self.modelContext = ModelContext(container)
-        self.sync = sync
         importInitialSessionsIfNeeded()
         reload()
     }
@@ -98,52 +96,20 @@ public final class SessionStore: ObservableObject {
     public func reload() {
         sessions = fetchRecords().compactMap { $0.makeSession() }
             .filter(isValidSession)
-            .sorted { $0.completedAt > $1.completedAt }
     }
 
-    /// L'écriture locale est effectuée avant toute tentative distante.
-    /// Le booléen indique uniquement si la session a été acceptée localement.
-    /// Une synchronisation distante éventuelle continue en arrière-plan et ne
-    /// doit pas maintenir l'écran de séance dans l'état « sauvegarde ».
+    /// Le booléen indique si la session a été acceptée et enregistrée localement.
     @discardableResult
     public func saveSession(_ session: BreathSession) -> Bool {
-        guard isValidSession(session), upsert(session, pendingSync: sync.isEnabled) else { return false }
-        guard sync.isEnabled else { return true }
-
-        Task {
-            let synced = await sync.postSession(session)
-            await MainActor.run {
-                self.setPendingSync(!synced, for: session.id)
-                self.reload()
-            }
-        }
-        return true
+        isValidSession(session) && upsert(session)
     }
 
     public func deleteSession(id: String) {
-        if let record = fetchRecords().first(where: { $0.id == id }) {
+        if let record = fetchRecord(id: id) {
             modelContext.delete(record)
             saveContext()
         }
-        if sync.isEnabled {
-            Task { _ = await sync.deleteSession(id: id) }
-        }
         reload()
-    }
-
-    /// Réessaie les sessions marquées `pendingSync` dans SwiftData.
-    public func retryPending() {
-        let pending = fetchRecords().filter { $0.pendingSync }
-            .compactMap { $0.makeSession() }.filter(isValidSession)
-        guard sync.isEnabled, !pending.isEmpty else { return }
-
-        Task {
-            for session in pending {
-                let synced = await sync.postSession(session)
-                await MainActor.run { self.setPendingSync(!synced, for: session.id) }
-            }
-            await MainActor.run { self.reload() }
-        }
     }
 
     // MARK: - SwiftData
@@ -159,25 +125,30 @@ public final class SessionStore: ObservableObject {
     }
 
     private func fetchRecords() -> [StoredBreathSession] {
-        (try? modelContext.fetch(FetchDescriptor<StoredBreathSession>())) ?? []
+        let descriptor = FetchDescriptor<StoredBreathSession>(
+            sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    private func fetchRecord(id: String) -> StoredBreathSession? {
+        let targetID = id
+        let descriptor = FetchDescriptor<StoredBreathSession>(
+            predicate: #Predicate { $0.id == targetID }
+        )
+        return try? modelContext.fetch(descriptor).first
     }
 
     @discardableResult
-    private func upsert(_ session: BreathSession, pendingSync: Bool) -> Bool {
-        if let existing = fetchRecords().first(where: { $0.id == session.id }) {
-            existing.update(from: session, pendingSync: pendingSync)
+    private func upsert(_ session: BreathSession) -> Bool {
+        if let existing = fetchRecord(id: session.id) {
+            existing.update(from: session)
         } else {
-            modelContext.insert(StoredBreathSession(session: session, pendingSync: pendingSync))
+            modelContext.insert(StoredBreathSession(session: session))
         }
         guard saveContext() else { return false }
         reload()
         return true
-    }
-
-    private func setPendingSync(_ pending: Bool, for id: String) {
-        guard let record = fetchRecords().first(where: { $0.id == id }) else { return }
-        record.pendingSync = pending
-        saveContext()
     }
 
     @discardableResult
@@ -238,7 +209,8 @@ public final class SessionStore: ObservableObject {
 }
 
 /// Réglages locaux non liés à l'historique des sessions.
-/// L'historique et la file de synchronisation sont exclusivement SwiftData.
+/// L'historique est conservé dans SwiftData ; les préférences légères restent
+/// dans UserDefaults.
 public final class AppDefaults: @unchecked Sendable {
     public static let shared = AppDefaults()
     private let store: UserDefaults

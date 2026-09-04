@@ -9,7 +9,7 @@ struct EolePhoneApp: App {
     @StateObject private var store: SessionStore
 
     init() {
-        _store = StateObject(wrappedValue: SessionStore(sync: SyncClient()))
+        _store = StateObject(wrappedValue: SessionStore())
     }
 
     var body: some Scene {

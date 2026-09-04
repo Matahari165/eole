@@ -5,7 +5,7 @@ import Foundation
 import UIKit
 #endif
 
-/// Équivalent natif de navigator.vibrate — désactivé par défaut comme sur le web.
+/// Repères haptiques natifs, désactivés par défaut.
 @MainActor
 public final class EoleHaptics {
     public var enabled = false
@@ -42,7 +42,7 @@ public final class EoleHaptics {
         #endif
     }
 
-    /// Impulsion 35 ms du web (transitions de phase).
+    /// Impulsion brève lors des transitions de phase.
     public func tap() {
         #if os(iOS)
         guard enabled else { return }
@@ -63,7 +63,7 @@ public final class EoleHaptics {
         #endif
     }
 
-    /// Équivalent de navigator.vibrate([24, 35, 24]) au début d'une rétention.
+    /// Double impulsion au début d'une rétention.
     public func ding() {
         #if os(iOS)
         guard enabled, CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }

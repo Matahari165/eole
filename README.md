@@ -1,50 +1,43 @@
 # Eole
 
-Eole est une application web mobile personnelle de respiration guidée. Elle accompagne les respirations, chronomètre chaque rétention, guide la récupération de 15 secondes et conserve les résultats dans une base Neon permanente.
+Eole est une application iPhone native de respiration guidée, développée en SwiftUI pour iOS 26. Elle guide chaque phase d'une séance, chronomètre les rétentions et conserve l'historique localement avec SwiftData.
 
-Application en production : [eole-sandy.vercel.app](https://eole-sandy.vercel.app)
+## Fonctionnement
 
-## Backend
+- 1 à 8 rounds, 10 à 60 respirations et trois rythmes.
+- Sons respiratoires, ambiances et vibrations réglables.
+- Rétention libre, récupération guidée de 15 secondes et arrêt protégé.
+- Statistiques sur 7 ou 30 jours et export CSV.
+- Données et préférences stockées uniquement sur l'iPhone.
 
-- Le projet Neon `Eole` est hébergé à Francfort sur l’offre gratuite.
-- L’espace personnel est protégé par un code d’accès côté serveur et un cookie
-  signé, `HttpOnly` et limité au même site.
-- Le navigateur appelle uniquement l’API serveur d’Eole ; le mot de passe Neon reste secret dans Vercel.
-- Les réglages, les séances et les rounds sont communs à cet espace personnel unique.
-- Les routes de données refusent toute requête non authentifiée. Les écritures
-  vérifient aussi leur origine pour limiter les requêtes intersites.
+## Structure
 
-## Lancer le projet
+- `ios/Eole.xcodeproj` : projet et point d'entrée de l'application.
+- `ios/Assets.xcassets` : icône et ressources visuelles.
+- `ios/Resources/Audio` : fichiers audio embarqués et leurs licences.
+- `native/Sources/EoleApp` : vues, moteur de séance, audio et persistance.
+- `native/Sources/EoleCore` : modèles, validation, statistiques et export.
+- `native/Sources/EoleCoreVerify` : vérifications autonomes de la logique métier.
 
-```bash
-npm install
-npm run dev
-```
+## Lancer l'application
 
-Sans configuration Neon, Eole fonctionne en mode aperçu avec des données locales clairement signalées.
+1. Ouvrir `ios/Eole.xcodeproj` dans Xcode.
+2. Choisir un simulateur ou un iPhone sous iOS 26.
+3. Lancer le scheme `Eole`.
 
-Pour activer la sauvegarde permanente, copier `.env.example` vers `.env.local`, puis renseigner :
+Le format de référence est l'iPhone `390×844`.
 
-- `DATABASE_URL` avec la chaîne de connexion Neon groupée ;
-- `NEXT_PUBLIC_EOLE_CLOUD_ENABLED=true` ;
-- `EOLE_ACCESS_SECRET` avec un code personnel d’au moins 12 caractères, distinct
-  de tout autre mot de passe. Sans cette variable, le stockage cloud reste
-  volontairement verrouillé.
-
-Pour un nouveau projet Neon, exécuter uniquement `neon/migrations/20260812140000_personal_cloud_storage.sql`. Cette migration autonome crée l’espace personnel sans Neon Auth. Le fichier `20260812130000_initial_eole_schema.sql` conserve seulement l’historique de la première migration avec authentification.
-
-## Vérifier le projet
+## Vérifier la logique métier
 
 ```bash
-npm run verify
+cd native
+swift run EoleCoreVerify
 ```
 
-Cette commande contrôle le code, les types, les calculs statistiques et la compilation de production.
+Le projet Xcode doit aussi être compilé avant livraison afin de vérifier l'intégration SwiftUI et les ressources embarquées.
 
-Si la connexion disparaît après une séance, Eole garde temporairement le résultat
-sur l’iPhone et le synchronise au retour du réseau. Le service worker ne met en
-cache que les ressources statiques et audio, jamais les réponses de l’API privée.
+## Données et sécurité
 
-## Ajouter l’application sur iPhone
+Les séances restent dans SwiftData et les réglages légers dans `UserDefaults`. Aucune synchronisation distante ni authentification applicative n'est active.
 
-Ouvrir Eole dans Safari, toucher **Partager**, puis **Sur l’écran d’accueil**. Eole s’ouvre alors comme une application web indépendante, sans App Store.
+La respiration rapide suivie d'une apnée peut provoquer vertiges ou malaise. L'application affiche une notice à la première ouverture : pratiquer assis ou allongé, jamais dans l'eau, au volant ou dans une situation dangereuse en cas de malaise.

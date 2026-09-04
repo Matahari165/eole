@@ -1,7 +1,5 @@
 import Foundation
 
-// Port fidèle de src/lib/types.ts — mêmes valeurs, mêmes bornes.
-
 public enum Pace: String, Codable, Sendable, CaseIterable {
     case slow, normal, fast
 }
@@ -63,11 +61,6 @@ public struct BreathSession: Codable, Sendable, Equatable {
     }
 }
 
-public struct UserProfile: Codable, Sendable, Equatable {
-    public var firstName: String
-    public var username: String
-}
-
 public struct SoundSettings: Codable, Sendable, Equatable {
     public var musicTrack: MusicTrack
     public var musicVolume: Int
@@ -81,16 +74,6 @@ public let defaultSoundSettings = SoundSettings(
     musicTrack: .bambou, musicVolume: 32, breathVolume: 72, hapticsEnabled: false
 )
 
-/// Mêmes alias historiques que le web : pluie→bambou, ocean→meditation, foret→serenite.
-public func normalizeMusicTrack(_ value: String?) -> MusicTrack {
-    switch value {
-    case "bambou", "pluie": return .bambou
-    case "meditation", "ocean": return .meditation
-    case "serenite", "foret": return .serenite
-    default: return defaultSoundSettings.musicTrack
-    }
-}
-
 public struct PaceTiming: Sendable, Equatable {
     public var inhale: Int
     public var exhale: Int
@@ -101,7 +84,7 @@ public struct PaceTiming: Sendable, Equatable {
     }
 }
 
-/// PACE_TIMINGS web en millisecondes : slow 3000/3000, normal 2000/2000, fast 1250/1250.
+/// Durées d'inspiration et d'expiration en millisecondes.
 public let paceTimings: [Pace: PaceTiming] = [
     .slow: PaceTiming(inhale: 3000, exhale: 3000),
     .normal: PaceTiming(inhale: 2000, exhale: 2000),
