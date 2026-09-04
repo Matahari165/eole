@@ -16,6 +16,14 @@ public struct HomeView: View {
         self.onAdjust = onAdjust
     }
 
+    private static let sessionDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
     public var body: some View {
         let defaults = AppDefaults.shared.sessionDefaults
         let stats = calculateStats(store.sessions)
@@ -162,8 +170,8 @@ public struct HomeView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
-                ForEach(Array(session.rounds.enumerated()), id: \.element.roundIndex) { index, round in
-                    if index > 0 { Divider().frame(height: 42) }
+                ForEach(session.rounds, id: \.roundIndex) { round in
+                    if round.roundIndex != session.rounds.first?.roundIndex { Divider().frame(height: 42) }
                     VStack(spacing: 4) {
                         Text("R\(round.roundIndex)").font(.caption).foregroundStyle(Color.eoleMuted)
                         Text(formatDuration(Double(round.retentionSeconds)))
@@ -182,11 +190,7 @@ public struct HomeView: View {
 
     private func formatSessionDate(_ value: String) -> String {
         guard let date = parseDate(value) else { return String(value.prefix(10)) }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        return Self.sessionDateFormatter.string(from: date)
     }
 
     private func paceLabel(_ pace: Pace) -> String {

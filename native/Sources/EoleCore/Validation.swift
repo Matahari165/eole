@@ -2,14 +2,6 @@ import Foundation
 
 // Validation des données persistées et importées.
 
-private let sharedUuidRegex: NSRegularExpression = {
-    // swiftlint:disable:next force_try
-    try! NSRegularExpression(
-        pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-        options: [.caseInsensitive]
-    )
-}()
-
 private func makeISOFormatter(fractional: Bool) -> ISO8601DateFormatter {
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = fractional
@@ -19,8 +11,7 @@ private func makeISOFormatter(fractional: Bool) -> ISO8601DateFormatter {
 }
 
 public func isUuid(_ value: String) -> Bool {
-    let range = NSRange(value.startIndex..<value.endIndex, in: value)
-    return sharedUuidRegex.firstMatch(in: value, range: range) != nil
+    UUID(uuidString: value) != nil
 }
 
 private func isIntegerBetween(_ value: Int, min: Int, max: Int) -> Bool {

@@ -36,14 +36,15 @@ public func calculateStats(_ sessions: [BreathSession], today: Date = Date()) ->
     }
 
     let activeDays = Set(valid.compactMap { parseDate($0.completedAt).map { localDateKey($0) } })
+    let calendar = Calendar.current
     var streak = 0
-    var cursor = Calendar.current.startOfDay(for: today)
-    if !activeDays.contains(localDateKey(cursor)) {
-        cursor = Calendar.current.date(byAdding: .day, value: -1, to: cursor) ?? cursor
+    var cursor = calendar.startOfDay(for: today)
+    if !activeDays.contains(localDateKey(cursor, calendar: calendar)) {
+        cursor = calendar.date(byAdding: .day, value: -1, to: cursor) ?? cursor
     }
-    while activeDays.contains(localDateKey(cursor)) {
+    while activeDays.contains(localDateKey(cursor, calendar: calendar)) {
         streak += 1
-        cursor = Calendar.current.date(byAdding: .day, value: -1, to: cursor) ?? cursor
+        cursor = calendar.date(byAdding: .day, value: -1, to: cursor) ?? cursor
     }
 
     let count = Double(valid.count)
@@ -70,15 +71,18 @@ public func buildDailySeries(_ sessions: [BreathSession], days: Int, today: Date
     }
     let calendar = Calendar.current
     let start = calendar.startOfDay(for: today)
+    // Une seule passe de parsing : les séances sont groupées par jour au lieu
+    // d'être refiltrées avec un parseDate pour chaque jour de la série.
+    var byDay: [String: [BreathSession]] = [:]
+    byDay.reserveCapacity(sessions.count)
+    for session in sessions where !session.rounds.isEmpty {
+        guard let completed = parseDate(session.completedAt) else { continue }
+        byDay[localDateKey(completed, calendar: calendar), default: []].append(session)
+    }
     return (0..<days).map { index in
         let date = calendar.date(byAdding: .day, value: index - (days - 1), to: start) ?? start
-        let key = localDateKey(date)
-        let matching = sessions.filter { session in
-            guard !session.rounds.isEmpty,
-                  let completed = parseDate(session.completedAt)
-            else { return false }
-            return localDateKey(completed) == key
-        }
+        let key = localDateKey(date, calendar: calendar)
+        let matching = byDay[key] ?? []
         let retentions = matching.flatMap { $0.rounds.map(\.retentionSeconds) }
         return DailyPoint(
             key: key,

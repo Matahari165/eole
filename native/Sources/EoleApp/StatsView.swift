@@ -18,6 +18,14 @@ public struct StatsView: View {
         self.onPrepare = onPrepare
     }
 
+    private static let sessionDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
     public var body: some View {
         let stats = calculateStats(store.sessions)
         let series = buildDailySeries(store.sessions, days: days)
@@ -262,11 +270,7 @@ public struct StatsView: View {
 
     private func formatSessionDate(_ value: String) -> String {
         guard let date = parseDate(value) else { return String(value.prefix(10)) }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        return Self.sessionDateFormatter.string(from: date)
     }
 
     private func formatSessionDuration(_ session: BreathSession) -> String {

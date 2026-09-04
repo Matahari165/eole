@@ -38,6 +38,7 @@ public struct EoleRootView: View {
             .tabItem { Label("Accueil", systemImage: "house") }
             NavigationStack {
                 StatsView(store: store, onPrepare: { showConfigurator = true })
+                    .lazyTab()
             }
             .tabItem { Label("Progrès", systemImage: "chart.bar") }
             NavigationStack {
@@ -45,6 +46,7 @@ public struct EoleRootView: View {
                     audio.apply(settings: settings)
                     haptics.enabled = settings.hapticsEnabled
                 })
+                .lazyTab()
             }
             .tabItem { Label("Réglages", systemImage: "gearshape") }
         }
@@ -83,4 +85,24 @@ public struct EoleRootView: View {
 
 extension SessionConfig: Identifiable {
     public var id: String { "\(rounds)-\(breathsPerRound)-\(pace.rawValue)" }
+}
+
+/// Les onglets non visibles ne construisent leur contenu qu'à la première
+/// ouverture : ni Charts ni le décodage des réglages ne pèsent sur le launch.
+private struct LazyTab<Content: View>: View {
+    private let build: () -> Content
+
+    init(@ViewBuilder build: @escaping () -> Content) {
+        self.build = build
+    }
+
+    var body: some View {
+        build()
+    }
+}
+
+private extension View {
+    func lazyTab() -> some View {
+        LazyTab { self }
+    }
 }
