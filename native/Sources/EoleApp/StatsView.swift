@@ -39,14 +39,14 @@ public struct StatsView: View {
                     primaryMetric(stats)
                     secondaryMetrics(stats)
                     retentionChart(series)
-                    consistencyChart(series)
+                    consistencyChart(stats)
                     history
                     exportAction
                 }
             }
             .padding(.horizontal, 20)
             .padding(.top, 10)
-            .padding(.bottom, 32)
+            .padding(.bottom, 96)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
@@ -102,7 +102,9 @@ public struct StatsView: View {
     }
 
     private func primaryMetric(_ stats: SessionStats) -> some View {
-        EolePanel {
+        let progress = progressionText()
+
+        return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
                 EoleSectionHeader("Rétention moyenne")
                 HStack(alignment: .lastTextBaseline, spacing: 8) {
@@ -117,15 +119,26 @@ public struct StatsView: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.eoleMuted)
                 }
-                Text("Meilleur repère : \(formatDuration(Double(stats.maxRetention)))")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.eoleMuted)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Meilleur repère : \(formatDuration(Double(stats.maxRetention)))")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.eoleMuted)
+                    if let progress {
+                        Text(progress.text)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(progress.positive ? Color.eolePrimary : Color.eoleMuted)
+                    }
+                }
             }
         }
     }
 
     private func secondaryMetrics(_ stats: SessionStats) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let sessions = store.sessions.filter { !$0.rounds.isEmpty }
+        let retentionTotal = sessions.flatMap { $0.rounds.map(\.retentionSeconds) }.reduce(0, +)
+        let breathsTotal = sessions.flatMap { $0.rounds.map(\.breathsCompleted) }.reduce(0, +)
+
+        return VStack(alignment: .leading, spacing: 12) {
             EoleSectionHeader("En un coup d’œil")
             HStack(alignment: .top, spacing: 12) {
                 EoleMetricTile(
@@ -134,9 +147,21 @@ public struct StatsView: View {
                     detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : nil
                 )
                 EoleMetricTile(
+                    label: "Rounds",
+                    value: "\(stats.totalRounds)",
+                    detail: "Ø \(oneDecimal(stats.averageRounds)) / séance"
+                )
+            }
+            HStack(alignment: .top, spacing: 12) {
+                EoleMetricTile(
                     label: "Temps total",
                     value: formatDuration(stats.totalPracticeSeconds),
-                    detail: "de pratique"
+                    detail: "dont \(formatDuration(Double(retentionTotal))) de rétention"
+                )
+                EoleMetricTile(
+                    label: "Respirations",
+                    value: "\(breathsTotal)",
+                    detail: topPaceLabel(sessions).map { "Cadence : \($0)" }
                 )
             }
         }
@@ -160,40 +185,36 @@ public struct StatsView: View {
     }
 
     private func retentionChart(_ series: [DailyPoint]) -> some View {
-        let maximum = max(60, (series.compactMap(\.averageRetention).max() ?? 0) + 15)
+        let values = series.compactMap(\.averageRetention).map(Double.init)
+        let top = max(60, ((values.max() ?? 0) / 60).rounded(.up) * 60)
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
                 EoleSectionHeader("Rétention par jour")
-                Chart {
-                    ForEach(Array(retentionRuns(series).enumerated()), id: \.offset) { _, run in
-                        ForEach(run, id: \.key) { point in
-                            if let retention = point.averageRetention {
-                                LineMark(
-                                    x: .value("Jour", point.label),
-                                    y: .value("Secondes", retention),
-                                    series: .value("Série", run.first?.key ?? point.key)
-                                )
-                                .foregroundStyle(Color.eolePrimary)
-                                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
-                                .interpolationMethod(.linear)
-                                PointMark(
-                                    x: .value("Jour", point.label),
-                                    y: .value("Secondes", retention)
-                                )
-                                .foregroundStyle(Color.eolePrimary)
-                                .symbolSize(32)
+                Chart(series, id: \.key) { point in
+                    if let retention = point.averageRetention {
+                        BarMark(
+                            x: .value("Jour", point.label),
+                            y: .value("Rétention", Double(retention))
+                        )
+                        .foregroundStyle(Color.eolePrimary)
+                        .cornerRadius(6)
+                        .annotation(position: .top, alignment: .center) {
+                            if days == 7 {
+                                Text(shortDuration(Double(retention)))
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Color.eoleMuted)
                             }
                         }
                     }
                 }
-                .chartYScale(domain: 0...maximum)
+                .chartYScale(domain: 0...top)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
+                    AxisMarks(position: .leading, values: .stride(by: 60.0)) { value in
                         AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.55))
                         AxisValueLabel {
-                            if let seconds = value.as(Int.self) {
-                                Text("\(seconds) s")
+                            if let seconds = value.as(Double.self) {
+                                Text(shortDuration(seconds))
                             }
                         }
                         .font(.caption2)
@@ -201,7 +222,7 @@ public struct StatsView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 4 : 5)) { _ in
+                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 7 : 5)) { _ in
                         AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
                     }
                 }
@@ -213,21 +234,29 @@ public struct StatsView: View {
         }
     }
 
-    private func consistencyChart(_ series: [DailyPoint]) -> some View {
-        let maximum = max(1, series.map(\.sessions).max() ?? 0)
+    private func consistencyChart(_ stats: SessionStats) -> some View {
+        let rounds = roundsSeries(store.sessions, days: days)
+        let maximum = max(1, rounds.map(\.rounds).max() ?? 0)
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
                 EoleSectionHeader("Régularité")
-                Chart(series, id: \.key) { point in
+                Chart(rounds) { point in
                     BarMark(
                         x: .value("Jour", point.label),
-                        y: .value("Séances", point.sessions)
+                        y: .value("Rounds", point.rounds)
                     )
                     .foregroundStyle(Color.eoleSecondary)
                     .cornerRadius(5)
+                    .annotation(position: .top, alignment: .center) {
+                        if days == 7, point.rounds > 0 {
+                            Text("\(point.rounds)")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Color.eoleMuted)
+                        }
+                    }
                 }
-                .chartYScale(domain: 0...maximum)
+                .chartYScale(domain: 0...(maximum + 1))
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .automatic(desiredCount: min(4, maximum + 1))) { _ in
                         AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.55))
@@ -235,15 +264,41 @@ public struct StatsView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 4 : 5)) { _ in
+                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 7 : 5)) { _ in
                         AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
                     }
                 }
                 .frame(height: 150)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Nombre de séances par jour")
-                .accessibilityValue(Text(consistencyAccessibility(series)))
+                .accessibilityLabel("Rounds par jour")
+                .accessibilityValue(Text(roundsAccessibility(rounds)))
+                weekDots(stats: stats)
             }
+        }
+    }
+
+    private func weekDots(stats: SessionStats) -> some View {
+        let active = activeDayKeys(last: 7)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let weekDays = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0 - 6, to: today) }
+
+        return HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                ForEach(Array(weekDays.enumerated()), id: \.offset) { _, date in
+                    Circle()
+                        .frame(width: 10, height: 10)
+                        .foregroundStyle(active.contains(localDateKey(date, calendar: calendar)) ? Color.eolePrimary : Color.eoleBorder.opacity(0.6))
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Sept derniers jours")
+            .accessibilityValue(Text(weekDotsAccessibility(active: active, days: weekDays, calendar: calendar)))
+            Spacer(minLength: 8)
+            Text(stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : "Aucune série en cours")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(stats.currentStreak > 0 ? Color.eolePrimary : Color.eoleMuted)
         }
     }
 
@@ -308,22 +363,102 @@ public struct StatsView: View {
         .accessibilityHint("Ouvre les options de partage de l’historique")
     }
 
-    private func retentionRuns(_ series: [DailyPoint]) -> [[DailyPoint]] {
-        var runs: [[DailyPoint]] = []
-        var current: [DailyPoint] = []
+    private func shortDuration(_ seconds: Double) -> String {
+        let total = Int(seconds.rounded())
+        return "\(total / 60):\(String(format: "%02d", total % 60))"
+    }
 
-        for point in series {
-            if point.averageRetention == nil {
-                if !current.isEmpty {
-                    runs.append(current)
-                    current.removeAll(keepingCapacity: true)
-                }
-            } else {
-                current.append(point)
+    private func oneDecimal(_ value: Double) -> String {
+        String(format: "%.1f", value).replacingOccurrences(of: ".", with: ",")
+    }
+
+    private struct RoundsPoint: Identifiable {
+        var id: String { key }
+        let key: String
+        let label: String
+        let rounds: Int
+    }
+
+    private func roundsSeries(_ sessions: [BreathSession], days: Int) -> [RoundsPoint] {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        if days <= 7 {
+            formatter.setLocalizedDateFormatFromTemplate("EEE")
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate("d")
+        }
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        var byDay: [String: Int] = [:]
+        for session in sessions where !session.rounds.isEmpty {
+            guard let completed = parseDate(session.completedAt) else { continue }
+            byDay[localDateKey(completed, calendar: calendar), default: 0] += session.rounds.count
+        }
+        return (0..<days).map { index in
+            let date = calendar.date(byAdding: .day, value: index - (days - 1), to: start) ?? start
+            let key = localDateKey(date, calendar: calendar)
+            return RoundsPoint(key: key, label: formatter.string(from: date), rounds: byDay[key] ?? 0)
+        }
+    }
+
+    private func activeDayKeys(last days: Int) -> Set<String> {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        var keys = Set<String>()
+        for session in store.sessions where !session.rounds.isEmpty {
+            guard let completed = parseDate(session.completedAt) else { continue }
+            let day = calendar.startOfDay(for: completed)
+            if let distance = calendar.dateComponents([.day], from: day, to: start).day,
+               distance >= 0, distance < days {
+                keys.insert(localDateKey(completed, calendar: calendar))
             }
         }
-        if !current.isEmpty { runs.append(current) }
-        return runs
+        return keys
+    }
+
+    private func averageRetention(of sessions: [BreathSession]) -> Double? {
+        let values = sessions.flatMap { $0.rounds.map(\.retentionSeconds) }
+        guard !values.isEmpty else { return nil }
+        return Double(values.reduce(0, +)) / Double(values.count)
+    }
+
+    private func progressionText() -> (text: String, positive: Bool)? {
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: Date())
+        guard let currentStart = calendar.date(byAdding: .day, value: -(days - 1), to: start),
+              let previousStart = calendar.date(byAdding: .day, value: -(2 * days - 1), to: start)
+        else { return nil }
+        let previousEnd = currentStart
+        var current: [BreathSession] = []
+        var previous: [BreathSession] = []
+        for session in store.sessions where !session.rounds.isEmpty {
+            guard let completed = parseDate(session.completedAt) else { continue }
+            if completed >= currentStart {
+                current.append(session)
+            } else if completed >= previousStart, completed < previousEnd {
+                previous.append(session)
+            }
+        }
+        guard let currentAvg = averageRetention(of: current),
+              let previousAvg = averageRetention(of: previous), previousAvg > 0
+        else { return nil }
+        let delta = Int((currentAvg - previousAvg).rounded())
+        guard delta != 0 else { return nil }
+        let sign = delta > 0 ? "+" : "−"
+        return ("\(sign)\(formatDuration(Double(abs(delta)))) vs période précédente", delta > 0)
+    }
+
+    private func topPaceLabel(_ sessions: [BreathSession]) -> String? {
+        var counts: [Pace: Int] = [:]
+        for session in sessions {
+            counts[session.pace, default: 0] += 1
+        }
+        guard let top = counts.max(by: { $0.value < $1.value })?.key else { return nil }
+        switch top {
+        case .slow: return "lente"
+        case .normal: return "normale"
+        case .fast: return "rapide"
+        }
     }
 
     private func retentionSummary(_ session: BreathSession) -> String {
@@ -352,9 +487,19 @@ public struct StatsView: View {
         }.joined(separator: "; ")
     }
 
-    private func consistencyAccessibility(_ series: [DailyPoint]) -> String {
-        series.map { point in
-            "\(point.label) : \(point.sessions) séance\(point.sessions == 1 ? "" : "s")"
+    private func roundsAccessibility(_ rounds: [RoundsPoint]) -> String {
+        rounds.map { point in
+            "\(point.label) : \(point.rounds) round\(point.rounds == 1 ? "" : "s")"
+        }.joined(separator: "; ")
+    }
+
+    private func weekDotsAccessibility(active: Set<String>, days: [Date], calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        return days.map { date in
+            let mark = active.contains(localDateKey(date, calendar: calendar)) ? "pratiqué" : "repos"
+            return "\(formatter.string(from: date)) : \(mark)"
         }.joined(separator: "; ")
     }
 }

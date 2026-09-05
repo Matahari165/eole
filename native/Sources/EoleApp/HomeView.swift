@@ -115,11 +115,6 @@ public struct HomeView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(EoleSpacing.md)
-
-                    HStack(spacing: EoleSpacing.md) {
-                        EoleMetricTile(label: "Séances", value: "\(stats.sessionCount)", detail: "au total")
-                        EoleMetricTile(label: "Série", value: "\(stats.currentStreak) j", detail: "jours de suite")
-                    }
                 }
             }
         }
