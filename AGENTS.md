@@ -1,41 +1,47 @@
 # Règles du projet Eole
 
-## Communication et cadrage
+## Produit et invariants
 
-- Réponds en français, simplement et sans phrases inutiles. Commence par la conclusion utile.
-- Avant toute modification, donne un plan court, les hypothèses importantes et les critères de réussite.
+- Eole est une application personnelle native centrée sur la respiration, conçue uniquement pour iPhone `390 × 844` et iOS 26.
+- Utilise les API Liquid Glass natives sans fallback iOS 17–25 ; réserve le verre aux contrôles et à la navigation plutôt qu'aux surfaces de contenu.
+- Conserve les séances dans SwiftData et garde la synchronisation cloud désactivée tant qu'un parcours d'authentification natif n'est pas explicitement validé.
+- Préserve les données existantes, les migrations prudentes et les changements hors périmètre.
+
+## Autonomie, délégation et coordination
+
+- L'agent principal reste responsable du périmètre, des décisions finales, de la cohérence, de la vérification et de la synthèse.
+- Pour chaque tâche non triviale, évalue les sous-tâches qui bénéficient réellement d'une analyse, recherche, implémentation ou vérification séparée. Si une délégation apporte une valeur claire, utilise au moins un sous-agent **GPT-5.6 Luna `high`**.
+- Utilise **Luna `xhigh`** pour une difficulté élevée, un diagnostic ambigu, une revue critique ou une vérification indépendante. Utilise deux, trois ou quatre sous-agents lorsque plusieurs lots sont réellement indépendants et que cela accélère le travail ou améliore la preuve.
+- Ne délègue pas une tâche triviale, strictement séquentielle ou trop petite pour justifier le coût de coordination. Ne crée pas de doublons.
+- Chaque sous-agent reçoit une mission bornée, son périmètre de fichiers, les invariants à respecter et la preuve attendue. Il ne modifie pas silencieusement le travail d'un autre agent.
+- Les agents coordonnent eux-mêmes les dépendances, l'ordre des travaux, les fichiers réservés, les conflits et la reprise après blocage. Ils ne demandent pas à l'utilisateur d'organiser leur travail.
+
+## Git et sauvegardes
+
+- Avant toute modification, inspecte la branche, l'état Git et les changements existants. Préserve tout changement hors périmètre.
+- Les agents gèrent eux-mêmes les sauvegardes récupérables, les commits locaux cohérents et l'intégration des lots vérifiés. Un commit peut servir de point de reprise avant une opération risquée.
+- Utilise une branche ou un worktree séparé lorsque des tâches parallèles peuvent se chevaucher. Ne réinitialise pas, n'écrase pas et ne supprime pas le travail existant.
+- Relis le diff final et vérifie que la documentation d'état reflète l'état réel lorsqu'elle est concernée.
+- Push, publication, déploiement, dépense, contact d'un tiers et modification d'un service externe exigent une autorisation explicite.
+
+## Interface et microcopy
+
+- Construis une direction visuelle propre à Eole : typographie, palette, densité, formes, icônes et mouvement doivent servir la respiration. Évite l'AI slop : gradients gratuits, cartes identiques, gros titres décoratifs, interfaces copiées ou styles mélangés sans raison.
+- Avant une création ou refonte importante, choisis une direction claire et vérifie-la avec des références pertinentes. Ne remplace pas l'identité d'Eole par un thème générique.
+- Purge les textes visibles inutiles : sous-titres redondants, phrases évidentes, labels répétés, aide décorative et confirmations bavardes. Garde uniquement ce qui aide à comprendre, décider, agir, attendre, corriger une erreur ou utiliser l'accessibilité.
+- Vérifie contraste, Dynamic Type, VoiceOver, libellés, focus et zones tactiles. Utilise le navigateur intégré pour toute modification visuelle ou interactive significative ; une petite correction évidente peut recevoir une vérification proportionnée.
+
+## Développement et définition de terminé
+
+- Utilise la solution la plus simple, les API Apple existantes et les dépendances justifiées.
+- Après une modification, vérifie les cas pertinents : normal, chargement, vide, erreur, interruption, arrière-plan, reprise et migration de données.
+- Distingue toujours compilation, tests, simulateur, appareil réel et preuve de séance physique. Une compilation réussie ne prouve pas un parcours réel.
+- Une tâche n'est terminée qu'après implémentation, inspection du résultat, correction des échecs liés à la tâche, vérifications adaptées, relecture du diff et rapport des limites restantes.
+- Une demande d'audit, de conseil ou de lecture seule n'autorise aucune modification.
+
+## Communication
+
+- Réponds en français, simplement et directement. Commence par la conclusion utile.
+- Avant une modification, donne un plan court, les hypothèses importantes et les critères de réussite.
 - Si une ambiguïté peut changer significativement le résultat, pose une seule question et attends la réponse avant de coder.
-- Une demande de conseil, d'explication, d'audit ou de lecture seule n'autorise aucune modification.
-
-## Interface et expérience utilisateur
-
-- Conserve une identité visuelle cohérente, naturelle et centrée sur la respiration. Évite l'apparence générique des applications générées par IA, les cartes répétitives et les espaces vides sans fonction.
-- Chaque texte visible doit aider à comprendre, décider ou agir. Le titre de l'onglet reste `Eole`.
-- Eole est conçu et vérifié uniquement au format iPhone `390x844`. Ne réalise aucun test ni aucune adaptation spécifique pour Mac ou ordinateur.
-- L'application native cible exclusivement iOS 26. Utilise les API Liquid Glass natives sans fallback iOS 17-25, et réserve le verre aux contrôles et à la navigation plutôt qu'aux surfaces de contenu.
-- Vérifie contraste, lisibilité, focus visible, zones tactiles et information indépendante de la couleur.
-- Utilise le navigateur intégré pour toute modification visuelle ou interactive significative ; une petite correction évidente peut recevoir une vérification proportionnée.
-
-## Développement, qualité et Git
-
-- Inspecte les conventions et l'état Git avant de modifier. Préserve les changements existants et reste strictement dans le périmètre demandé.
-- Utilise la solution la plus simple qui répond au besoin, réutilise l'existant et n'ajoute pas de dépendance sans bénéfice clair.
-- Utilise une branche par modification cohérente et livrable ; ne mélange pas deux sujets indépendants.
-- Après une modification, vérifie selon le risque : cas normal, chargement, absence de données, erreur, accessibilité, types, lint, tests et build pertinents.
-- Relis le diff final. Un commit local, un push, un déploiement et une vérification en production sont des preuves distinctes.
-- Ne publie, ne déploie, n'envoie de message et ne modifie aucun service externe sans autorisation explicite.
-- Ne mets jamais dans le code, Git, les journaux ou les réponses des identifiants, clés, jetons, sessions ou autres données sensibles.
-- Pour le client iOS, conserve les séances dans SwiftData et garde la synchronisation cloud désactivée tant qu'un parcours d'authentification natif n'est pas explicitement validé.
-
-## Sous-agents
-
-- L'agent principal reste responsable du plan, des décisions finales, de l'intégration, des conflits, des vérifications et de la synthèse.
-- Utilise au moins un sous-agent dès qu'une étape peut utilement être analysée, recherchée, exécutée ou vérifiée séparément. N'en utilise pas seulement lorsque la tâche est réellement triviale ou que la délégation n'apporterait aucune valeur pratique.
-- Lorsque le choix du modèle est disponible, utilise exclusivement GPT-5.6 Luna pour les sous-agents : `high` par défaut et `xhigh` pour les analyses difficiles, diagnostics ambigus, recherches de bugs ou revues critiques. N'utilise pas un autre modèle comme sous-agent.
-- Délègue des tâches bornées et utiles. Évite les doublons et coordonne directement les agents lorsque leurs périmètres peuvent se chevaucher ; aucun agent ne doit écraser le travail d'un autre.
-
-## Restitution
-
-- Après une étape technique importante, explique brièvement ce qui fonctionne, comment et pourquoi, avec un exemple concret si utile.
-- Pour un audit ou un diagnostic, sépare les faits vérifiés, les hypothèses, les causes écartées et les inconnues.
-- Termine toute modification par : ce qui a changé, les vérifications effectuées, puis les limites ou risques restants.
+- Pour un audit ou un diagnostic, sépare faits vérifiés, hypothèses, causes écartées et inconnues.
