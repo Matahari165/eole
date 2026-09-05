@@ -227,7 +227,7 @@ public struct EoleGlassIconButtonStyle: ButtonStyle {
     }
 }
 
-/// Fond système volontairement sobre : aucun gradient ni halo hérité du web.
+/// Fond système volontairement sobre : les surfaces de contenu restent lisibles.
 public struct EoleAmbientBackground: View {
     public init() {}
 
@@ -294,20 +294,5 @@ public struct EoleLogo: View {
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
-    }
-}
-
-public struct EoleEyebrow: View {
-    private let text: String
-    private let color: Color
-    public init(_ text: String, color: Color = .eolePrimary) {
-        self.text = text
-        self.color = color
-    }
-    public var body: some View {
-        Text(text.uppercased())
-            .font(.caption2.weight(.semibold))
-            .tracking(1.4)
-            .foregroundStyle(color)
     }
 }

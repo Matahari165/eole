@@ -47,7 +47,7 @@ struct EoleCoreVerify {
             return calendar.date(from: DateComponents(year: 2026, month: 8, day: 7))!
         }
 
-        // calculateStats — analytics.test.ts:43
+        // Statistiques de pratique
         let stats = calculateStats(fixtureSessions(), today: august7())
         check(stats.sessionCount == 2, "stats.sessionCount == 2")
         check(stats.totalRounds == 4, "stats.totalRounds == 4")
@@ -68,7 +68,7 @@ struct EoleCoreVerify {
             "sessions sans rounds ignorées"
         )
 
-        // buildDailySeries — analytics.test.ts:57
+        // Série quotidienne
         let series = buildDailySeries(fixtureSessions() + [empty], days: 3, today: august7())
         check(series.count == 3, "series.count == 3")
         check(series[0].sessions == 0, "jour vide sans faux positif")
@@ -76,11 +76,11 @@ struct EoleCoreVerify {
         check(series[1].averageRetention == 90, "moyenne jour 1 == 90")
         check(series[2].averageRetention == 75, "moyenne jour 2 == 75")
 
-        // formatDuration — analytics.test.ts:67
+        // Formatage des durées
         check(formatDuration(42) == "42 s", "formatDuration(42)")
         check(formatDuration(92) == "1 min 32 s", "formatDuration(92)")
 
-        // buildSessionsCsv — export-sessions.test.ts:5
+        // Export CSV
         let csvSession = BreathSession(
             id: "11111111-1111-4111-8111-111111111111", status: .completed,
             plannedRounds: 2, breathsPerRound: 35, pace: .normal,
@@ -96,7 +96,7 @@ struct EoleCoreVerify {
         check(csv.contains(";1;35;62\r\n"), "CSV ligne round 1")
         check(csv.contains(";2;35;75\r\n"), "CSV ligne round 2")
 
-        // getNewRetentionMinute — dérivé de retention-timing.ts
+        // Notification des minutes de rétention
         check(getNewRetentionMinute(elapsedSeconds: 59, lastMinute: 0) == nil, "59s → nil")
         check(getNewRetentionMinute(elapsedSeconds: 60, lastMinute: 0) == 1, "60s → 1")
         check(getNewRetentionMinute(elapsedSeconds: 119, lastMinute: 1) == nil, "119s → nil")

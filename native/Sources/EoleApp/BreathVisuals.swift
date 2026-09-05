@@ -12,7 +12,7 @@ public struct BreathContoursView: View {
     private let pace: Pace
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Mêmes fermetures que les --contour-closed CSS (inset 0→49%).
+    /// Fermetures progressives du contour (inset 0→49%).
     private static let closedScales: [CGFloat] = [0.46, 0.48, 0.5, 0.53, 0.57, 0.64, 0.78, 1.0]
 
     public init(motion: MotionPhase, pace: Pace) {

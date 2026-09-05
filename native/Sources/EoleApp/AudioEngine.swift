@@ -12,9 +12,9 @@ import Foundation
 import UIKit
 #endif
 
-/// Équivalent natif de src/lib/audio-engine.ts.
-/// Ordre de recherche : MP3 du bundle (à copier depuis public/audio/) puis synthèse
-/// locale (bruit filtré + oscillateurs), comme le fallback bruit rose du web.
+/// Moteur audio natif d'Eole.
+/// Ordre de recherche : MP3 du bundle puis synthèse locale
+/// (bruit filtré + oscillateurs) comme solution de secours.
 @MainActor
 public final class EoleAudioEngine {
     private var engine = AVAudioEngine()
@@ -103,7 +103,7 @@ public final class EoleAudioEngine {
         #endif
     }
 
-    /// unlock() web : catégorie lecture pour ignorer le commutateur silencieux (iOS 17+).
+    /// Prépare la session audio et les ressources de la séance.
     public func unlock(pace: Pace) async {
         #if os(iOS)
         do {
@@ -219,10 +219,9 @@ public final class EoleAudioEngine {
         }
     }
 
-    /// duckAmbient web (.48–.78) : l'ambiance recule sous les sons-guides.
+    /// Réduit temporairement l'ambiance sous les sons-guides.
     public func duckAmbient(depth: Float = 0.6) {
-        // Le web transmet directement la profondeur de ducking (0.48–0.78),
-        // et non son complément.
+        // La profondeur est transmise directement, et non son complément.
         ambientPlayer?.volume = ambientLevel() * max(0, min(1, depth))
     }
 
@@ -257,7 +256,7 @@ public final class EoleAudioEngine {
         }
     }
 
-    /// Sélection de la variante par proximité de durée (comme getBreathAssetPath).
+    /// Sélectionne la variante audio la plus proche de la durée cible.
     private func playRecordedBreath(inhale: Bool, duration: Double) -> Bool {
         let variant: String
         switch duration {
@@ -276,7 +275,7 @@ public final class EoleAudioEngine {
 
     // MARK: - Cues
 
-    /// playCue web : sine 520 Hz, 0.62 s.
+    /// Guide sonore court.
     public func playCue(frequency: Double = 520) {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.58)
@@ -284,7 +283,7 @@ public final class EoleAudioEngine {
         restoreAfter(0.62)
     }
 
-    /// Bol tibétain web : 216 Hz + partiels, jusqu'à 6 s.
+    /// Son de fin de rétention avec partiels, jusqu'à 6 secondes.
     public func playDing() {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.48)
@@ -292,7 +291,7 @@ public final class EoleAudioEngine {
         restoreAfter(6.5)
     }
 
-    /// playSoftDing web : 432 Hz doux.
+    /// Indication sonore douce.
     public func playSoftDing() {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.78)
