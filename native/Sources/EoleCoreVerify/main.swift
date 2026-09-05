@@ -113,6 +113,13 @@ struct EoleCoreVerify {
             "defaults valides conservés"
         )
 
+        // Présentation d'une séance : la configuration et l'identité voyagent
+        // ensemble, sans état plein écran vide possible.
+        let firstLaunch = SessionLaunch(config: defaultSessionConfig)
+        let secondLaunch = SessionLaunch(config: defaultSessionConfig)
+        check(firstLaunch.config == defaultSessionConfig, "lancement conserve sa configuration")
+        check(firstLaunch.id != secondLaunch.id, "deux lancements identiques ont une identité distincte")
+
         // PACE_TIMINGS + validation
         check(paceTimings[.slow] == PaceTiming(inhale: 3000, exhale: 3000), "timing slow")
         check(paceTimings[.normal] == PaceTiming(inhale: 2000, exhale: 2000), "timing normal")

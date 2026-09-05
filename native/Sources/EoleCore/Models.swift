@@ -24,6 +24,21 @@ public struct SessionConfig: Codable, Sendable, Equatable {
     }
 }
 
+/// Identité unique d'un lancement de séance.
+///
+/// L'écran plein format dépend de cet objet unique : il ne peut donc jamais
+/// être présenté sans sa configuration, même lors de deux lancements
+/// successifs avec exactement les mêmes réglages.
+public struct SessionLaunch: Identifiable, Sendable, Equatable {
+    public let id: UUID
+    public let config: SessionConfig
+
+    public init(id: UUID = UUID(), config: SessionConfig) {
+        self.id = id
+        self.config = config
+    }
+}
+
 public struct RoundResult: Codable, Sendable, Equatable {
     public var roundIndex: Int
     public var breathsCompleted: Int

@@ -8,9 +8,8 @@ import SwiftUI
 /// Le wrapper Xcode ajoute `@main struct EolePhoneApp: App` autour de EoleRootView.
 public struct EoleRootView: View {
     @ObservedObject private var store: SessionStore
-    @State private var sessionConfig: SessionConfig?
+    @State private var activeSession: SessionLaunch?
     @State private var pendingSessionConfig: SessionConfig?
-    @State private var showActiveSession = false
     @State private var showConfigurator = false
     @State private var showSafety = !AppDefaults.shared.safetyNoticeSeen
     private let audio: EoleAudioEngine
@@ -69,14 +68,10 @@ public struct EoleRootView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(isPresented: $showActiveSession, onDismiss: {
-            sessionConfig = nil
-        }) {
-            if let config = sessionConfig {
-                NavigationStack {
-                    ActiveSessionView(config: config, store: store, audio: audio, haptics: haptics) {
-                        showActiveSession = false
-                    }
+        .fullScreenCover(item: $activeSession) { launch in
+            NavigationStack {
+                ActiveSessionView(config: launch.config, store: store, audio: audio, haptics: haptics) {
+                    activeSession = nil
                 }
             }
         }
@@ -90,8 +85,7 @@ public struct EoleRootView: View {
     }
 
     private func beginSession(_ config: SessionConfig) {
-        sessionConfig = config
-        showActiveSession = true
+        activeSession = SessionLaunch(config: config)
     }
 }
 

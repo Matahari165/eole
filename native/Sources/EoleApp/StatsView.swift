@@ -69,10 +69,7 @@ public struct StatsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            EoleSectionHeader("Ta progression", subtitle: "Une lecture simple de ta pratique.")
-            Text("Période des graphiques")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color.eoleMuted)
+            EoleSectionHeader("Ta progression")
             periodControl
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -107,7 +104,7 @@ public struct StatsView: View {
     private func primaryMetric(_ stats: SessionStats) -> some View {
         EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Rétention moyenne", subtitle: "Le temps moyen tenu par round")
+                EoleSectionHeader("Rétention moyenne")
                 HStack(alignment: .lastTextBaseline, spacing: 8) {
                     Text(formatDuration(stats.averageRetention))
                         .font(.system(.largeTitle, design: .rounded).weight(.semibold))
@@ -167,7 +164,7 @@ public struct StatsView: View {
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Rétention par jour", subtitle: "Moyenne en secondes · les jours sans séance restent vides")
+                EoleSectionHeader("Rétention par jour")
                 Chart {
                     ForEach(Array(retentionRuns(series).enumerated()), id: \.offset) { _, run in
                         ForEach(run, id: \.key) { point in
@@ -221,7 +218,7 @@ public struct StatsView: View {
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Régularité", subtitle: "Nombre de séances par jour")
+                EoleSectionHeader("Régularité")
                 Chart(series, id: \.key) { point in
                     BarMark(
                         x: .value("Jour", point.label),
@@ -254,7 +251,7 @@ public struct StatsView: View {
         let recentSessions = Array(store.sessions.filter { !$0.rounds.isEmpty }.prefix(8))
 
         return VStack(alignment: .leading, spacing: 12) {
-            EoleSectionHeader("Dernières séances", subtitle: "Les huit plus récentes")
+            EoleSectionHeader("Dernières séances")
             EolePanel {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(recentSessions, id: \.id) { session in

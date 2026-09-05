@@ -99,7 +99,7 @@ public struct HomeView: View {
 
     private func metrics(_ stats: SessionStats) -> some View {
         VStack(alignment: .leading, spacing: EoleSpacing.md) {
-            EoleSectionHeader("Tes repères", subtitle: "Une vue rapide de ta pratique")
+            EoleSectionHeader("Tes repères")
             EolePanel(padding: EoleSpacing.md) {
                 VStack(spacing: EoleSpacing.md) {
                     VStack(alignment: .leading, spacing: EoleSpacing.sm) {

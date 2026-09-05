@@ -42,6 +42,10 @@ public struct ActiveSessionView: View {
                 centerStage
                 Spacer()
             }
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                if engine.phase == .retention { engine.endRetention() }
+            }
         }
         .foregroundStyle(.white)
         .navigationBarBackButtonHidden(true)
@@ -105,8 +109,7 @@ public struct ActiveSessionView: View {
     }
 
     private var topBar: some View {
-        HStack {
-            Spacer()
+        ZStack {
             VStack(spacing: 2) {
                 Text("Round \(engine.round) sur \(config.rounds)")
                     .font(.subheadline).monospacedDigit()
@@ -117,14 +120,17 @@ public struct ActiveSessionView: View {
                         .accessibilityLabel("Respiration \(engine.breath) sur \(config.breathsPerRound)")
                 }
             }
-            Spacer()
-            Button { showStopConfirm = true } label: {
-                Image(systemName: "xmark")
-                    .foregroundStyle(.white)
+            .frame(maxWidth: .infinity, alignment: .center)
+            HStack {
+                Spacer()
+                Button { showStopConfirm = true } label: {
+                    Image(systemName: "xmark")
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(EoleGlassIconButtonStyle())
+                .tint(.white.opacity(0.84))
+                .accessibilityLabel("Arrêter la séance")
             }
-            .buttonStyle(EoleGlassIconButtonStyle())
-            .tint(.white.opacity(0.84))
-            .accessibilityLabel("Arrêter la séance")
         }
         .padding(.horizontal, 18)
         .padding(.top, 8)
@@ -179,7 +185,13 @@ public struct ActiveSessionView: View {
                 .tint(.white.opacity(0.92))
                 .foregroundStyle(Color.eolePrimaryStrong)
                 .controlSize(.extraLarge)
+                Text("Double-tape pour terminer")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.62))
+                    .accessibilityHidden(true)
             }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         case .recoveryInhale, .recoveryHold, .recoveryExhale:
             VStack(spacing: 12) {
                 BreathContoursView(
