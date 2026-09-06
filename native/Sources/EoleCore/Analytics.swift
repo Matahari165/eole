@@ -13,6 +13,21 @@ public struct SessionStats: Sendable, Equatable {
     public var currentStreak: Int
 }
 
+public struct RoundPalierStat: Identifiable, Sendable, Equatable {
+    public var id: Int { roundIndex }
+    public var roundIndex: Int
+    public var count: Int
+    public var averageSeconds: Double
+    public var maxSeconds: Int
+
+    public init(roundIndex: Int, count: Int, averageSeconds: Double, maxSeconds: Int) {
+        self.roundIndex = roundIndex
+        self.count = count
+        self.averageSeconds = averageSeconds
+        self.maxSeconds = maxSeconds
+    }
+}
+
 public struct DailyPoint: Sendable, Equatable {
     public var key: String
     public var label: String
@@ -74,6 +89,27 @@ public func calculateStats(_ sessions: [BreathSession], today: Date = Date()) ->
         averageSessionSeconds: valid.isEmpty ? 0 : totalPractice / count,
         currentStreak: streak
     )
+}
+
+public func calculateRoundStats(_ sessions: [BreathSession]) -> [RoundPalierStat] {
+    let valid = sessions.filter { !$0.rounds.isEmpty }
+    var byRound: [Int: [Int]] = [:]
+    for session in valid {
+        for round in session.rounds {
+            byRound[round.roundIndex, default: []].append(round.retentionSeconds)
+        }
+    }
+    return byRound.keys.sorted().map { index in
+        let times = byRound[index] ?? []
+        let avg = times.isEmpty ? 0 : Double(times.reduce(0, +)) / Double(times.count)
+        let maxTime = times.max() ?? 0
+        return RoundPalierStat(
+            roundIndex: index,
+            count: times.count,
+            averageSeconds: avg,
+            maxSeconds: maxTime
+        )
+    }
 }
 
 public func buildDailySeries(_ sessions: [BreathSession], days: Int, today: Date = Date()) -> [DailyPoint] {

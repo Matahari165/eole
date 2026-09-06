@@ -79,6 +79,16 @@ struct EoleCoreVerify {
         check(series[2].averageRetention == 75, "moyenne jour 2 == 75")
         check(series[2].totalRetention == 75, "total jour 2 == 75 s")
 
+        // Paliers par round
+        let roundStats = calculateRoundStats(fixtureSessions() + [empty])
+        check(roundStats.count == 3, "roundStats.count == 3")
+        check(roundStats[0].roundIndex == 1, "round 1 index")
+        checkEqual(roundStats[0].averageSeconds, 67.5, "round 1 moyenne")
+        check(roundStats[0].maxSeconds == 75, "round 1 max")
+        check(roundStats[2].roundIndex == 3, "round 3 index")
+        checkEqual(roundStats[2].averageSeconds, 120.0, "round 3 moyenne")
+        check(roundStats[2].maxSeconds == 120, "round 3 max")
+
         // Formatage des durées
         check(formatDuration(42) == "42 s", "formatDuration(42)")
         check(formatDuration(92) == "1 min 32 s", "formatDuration(92)")

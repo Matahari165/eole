@@ -21,6 +21,7 @@ public struct StatsView: View {
     public var body: some View {
         let stats = calculateStats(store.sessions)
         let series = buildDailySeries(store.sessions, days: days)
+        let roundStats = calculateRoundStats(store.sessions)
 
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -37,6 +38,9 @@ public struct StatsView: View {
                     primaryMetric(stats)
                     secondaryMetrics(stats)
                     retentionChart(series)
+                    if !roundStats.isEmpty {
+                        roundPaliersSection(roundStats)
+                    }
                     consistencySection(stats)
                     history
                     exportAction
@@ -333,6 +337,67 @@ public struct StatsView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Temps de rétention total par jour sur \(days) jours")
                 .accessibilityValue(Text("Moyenne : \(shortDuration(averageTotal))"))
+            }
+        }
+    }
+
+    private func roundPaliersSection(_ roundStats: [RoundPalierStat]) -> some View {
+        let maxAvg = max(1.0, roundStats.map(\.averageSeconds).max() ?? 1.0)
+
+        return EolePanel {
+            VStack(alignment: .leading, spacing: 14) {
+                EoleSectionHeader("Paliers par round", subtitle: "Moyenne et record selon le tour")
+
+                VStack(spacing: 12) {
+                    ForEach(Array(roundStats.enumerated()), id: \.element.id) { index, palier in
+                        VStack(spacing: 6) {
+                            HStack(alignment: .lastTextBaseline) {
+                                HStack(spacing: 8) {
+                                    Text("R\(palier.roundIndex)")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Color.eolePrimary)
+                                        .frame(width: 30, height: 22)
+                                        .background(Color.eoleAccent.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                    Text(formatDuration(palier.averageSeconds))
+                                        .font(.subheadline.weight(.semibold))
+                                        .monospacedDigit()
+                                        .foregroundStyle(Color.eoleForeground)
+                                }
+                                Spacer()
+                                if index > 0 {
+                                    let diff = palier.averageSeconds - roundStats[index - 1].averageSeconds
+                                    let sign = diff >= 0 ? "+" : ""
+                                    Text("\(sign)\(formatDuration(abs(diff)))")
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(diff >= 0 ? Color.eolePrimary : Color.eoleMuted)
+                                        .padding(.trailing, 4)
+                                }
+                                Text("Record : \(formatDuration(Double(palier.maxSeconds)))")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.eoleMuted)
+                            }
+
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Capsule()
+                                        .fill(Color.eoleSurfaceSoft)
+                                        .frame(height: 7)
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color.eoleSecondary, Color.eolePrimary],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .frame(width: max(8, geo.size.width * CGFloat(palier.averageSeconds / maxAvg)), height: 7)
+                                }
+                            }
+                            .frame(height: 7)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
             }
         }
     }
