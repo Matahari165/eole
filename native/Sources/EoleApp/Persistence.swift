@@ -193,6 +193,7 @@ public final class SessionStore: ObservableObject {
         modelContext.insert(SessionImportMarker(key: Self.importMarkerKey))
         do {
             try modelContext.save()
+            UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
         } catch {
             modelContext.rollback()
             assertionFailure("Échec de l'écriture du marqueur d'import Eole : \(error)")
@@ -200,7 +201,14 @@ public final class SessionStore: ObservableObject {
     }
 
     private var hasImportMarker: Bool {
-        fetchMarkers().contains { $0.key == Self.importMarkerKey }
+        if UserDefaults.standard.bool(forKey: Self.importMarkerKey) {
+            return true
+        }
+        let exists = fetchMarkers().contains { $0.key == Self.importMarkerKey }
+        if exists {
+            UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
+        }
+        return exists
     }
 
     private func fetchMarkers() -> [SessionImportMarker] {

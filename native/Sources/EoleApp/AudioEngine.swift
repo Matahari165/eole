@@ -122,6 +122,44 @@ public final class EoleAudioEngine {
         prepareAudioAssetsAndCues()
     }
 
+    /// Pré-charge les fichiers audio en avance pour un démarrage immédiat de la séance.
+    public func prewarm(pace: Pace = .normal) {
+        preparedPace = pace
+        let variant: String
+        switch pace {
+        case .fast: variant = "fast"
+        case .normal: variant = "normal"
+        case .slow: variant = "slow"
+        }
+        let breathNames = ["eole-inhale-\(variant)", "eole-exhale-\(variant)"]
+        let ambientNames = [ambientFileName(for: musicTrack)]
+        let urls = (breathNames + ambientNames).compactMap { name in
+            bundleAudioURL(named: name).map { (name, $0) }
+        }
+        guard !urls.isEmpty else { return }
+
+        Task.detached(priority: .utility) { [weak self] in
+            var players: [String: AVAudioPlayer] = [:]
+            for entry in urls {
+                let (name, url) = entry
+                if let player = try? AVAudioPlayer(contentsOf: url) {
+                    player.prepareToPlay()
+                    players[name] = player
+                }
+            }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                for (name, player) in players {
+                    if breathNames.contains(name), self.preparedBreathPlayers[name] == nil {
+                        self.preparedBreathPlayers[name] = player
+                    } else if ambientNames.contains(name), self.preparedAmbientPlayers[name] == nil {
+                        self.preparedAmbientPlayers[name] = player
+                    }
+                }
+            }
+        }
+    }
+
     public func release() {
         stopAmbient(fadeSeconds: 0)
         ambientFadeTask?.cancel()

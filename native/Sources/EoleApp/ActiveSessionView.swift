@@ -139,24 +139,25 @@ public struct ActiveSessionView: View {
     @ViewBuilder
     private var centerStage: some View {
         switch engine.phase {
-        case .ready:
-            ProgressView("Préparation…")
-                .tint(.white)
-                .foregroundStyle(.white)
-        case .starting:
-            ProgressView("Préparation du son…")
-                .tint(.white)
-                .foregroundStyle(.white)
+        case .ready, .starting:
+            VStack(spacing: 16) {
+                Text("Installe-toi.")
+                    .font(.title2)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+            .transition(.opacity)
         case .countdown:
             VStack(spacing: 16) {
                 Text("Installe-toi.").font(.title2)
-                    Text("\(engine.countdownValue)")
+                Text("\(engine.countdownValue)")
                     .font(.system(size: countdownFontSize, weight: .regular))
                     .monospacedDigit()
+                    .contentTransition(.numericText())
                     .frame(width: 210, height: 210)
                     .glassEffect(.regular.tint(.white.opacity(0.08)), in: Circle())
                     .accessibilityLabel("Compte à rebours : \(engine.countdownValue)")
             }
+            .transition(.opacity)
         case .inhale, .exhale:
             VStack(spacing: 12) {
                 BreathContoursView(

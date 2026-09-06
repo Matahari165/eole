@@ -58,14 +58,17 @@ public final class SessionEngine: ObservableObject {
     public func start() {
         guard !hasStarted, phase == .ready else { return }
         hasStarted = true
-        phase = .starting
         task = Task { @MainActor [weak self] in
             guard let self else { return }
-            await self.audio.unlock(pace: self.config.pace)
-            guard !Task.isCancelled else { return }
-            self.audio.startAmbient(track: self.audio.musicTrack)
+            let audioUnlockTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.audio.unlock(pace: self.config.pace)
+                if !Task.isCancelled {
+                    self.audio.startAmbient(track: self.audio.musicTrack)
+                }
+            }
             self.haptics.prepare()
-            await self.run()
+            await self.run(audioUnlockTask: audioUnlockTask)
         }
     }
 
@@ -114,7 +117,7 @@ public final class SessionEngine: ObservableObject {
 
     // MARK: - Séquence
 
-    private func run() async {
+    private func run(audioUnlockTask: Task<Void, Never>) async {
         // Compte à rebours de trois secondes avec repères sonores.
         phase = .countdown
         for value in [3, 2, 1] {
@@ -124,6 +127,8 @@ public final class SessionEngine: ObservableObject {
             haptics.tap()
             guard await sleep(seconds: 1) else { return }
         }
+
+        _ = await audioUnlockTask.value
 
         let timing = paceTimings[config.pace] ?? paceTimings[.normal]!
         for currentRound in 1...config.rounds {

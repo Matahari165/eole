@@ -27,33 +27,52 @@ public struct EoleRootView: View {
     }
 
     public var body: some View {
-        TabView {
-            NavigationStack {
-                HomeView(
-                    store: store,
-                    onStart: { beginSession($0) },
-                    onAdjust: { showConfigurator = true }
-                )
-            }
-            .tabItem { Label("Accueil", systemImage: "house") }
-            NavigationStack {
-                StatsView(store: store, onPrepare: { showConfigurator = true })
+        ZStack {
+            TabView {
+                NavigationStack {
+                    HomeView(
+                        store: store,
+                        onStart: { beginSession($0) },
+                        onAdjust: { showConfigurator = true }
+                    )
+                }
+                .tabItem { Label("Accueil", systemImage: "house") }
+                NavigationStack {
+                    StatsView(store: store, onPrepare: { showConfigurator = true })
+                        .lazyTab()
+                }
+                .tabItem { Label("Progrès", systemImage: "chart.bar") }
+                NavigationStack {
+                    SettingsView(onSettingsChanged: { settings in
+                        audio.apply(settings: settings)
+                        haptics.enabled = settings.hapticsEnabled
+                    })
                     .lazyTab()
+                }
+                .tabItem { Label("Réglages", systemImage: "gearshape") }
             }
-            .tabItem { Label("Progrès", systemImage: "chart.bar") }
-            NavigationStack {
-                SettingsView(onSettingsChanged: { settings in
-                    audio.apply(settings: settings)
-                    haptics.enabled = settings.hapticsEnabled
-                })
-                .lazyTab()
+            .tint(Color.eolePrimary)
+            // Sur iOS 26, TabView reçoit automatiquement la barre Liquid Glass
+            // système : aucun fond opaque n'est ajouté par Eole.
+            .tabBarMinimizeBehavior(.onScrollDown)
+
+            if let launch = activeSession {
+                ActiveSessionView(config: launch.config, store: store, audio: audio, haptics: haptics) {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        activeSession = nil
+                    }
+                }
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 1.03)),
+                    removal: .opacity.combined(with: .scale(scale: 0.97))
+                ))
+                .zIndex(100)
             }
-            .tabItem { Label("Réglages", systemImage: "gearshape") }
         }
-        .tint(Color.eolePrimary)
-        // Sur iOS 26, TabView reçoit automatiquement la barre Liquid Glass
-        // système : aucun fond opaque n'est ajouté par Eole.
-        .tabBarMinimizeBehavior(.onScrollDown)
+        .task {
+            audio.prewarm(pace: AppDefaults.shared.sessionDefaults.pace)
+            haptics.prepare()
+        }
         .sheet(isPresented: $showConfigurator, onDismiss: {
             guard let config = pendingSessionConfig else { return }
             pendingSessionConfig = nil
@@ -68,13 +87,6 @@ public struct EoleRootView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .fullScreenCover(item: $activeSession) { launch in
-            NavigationStack {
-                ActiveSessionView(config: launch.config, store: store, audio: audio, haptics: haptics) {
-                    activeSession = nil
-                }
-            }
-        }
         .alert("Pratique en sécurité", isPresented: $showSafety) {
             Button("Compris", role: .cancel) {
                 AppDefaults.shared.safetyNoticeSeen = true
@@ -85,7 +97,9 @@ public struct EoleRootView: View {
     }
 
     private func beginSession(_ config: SessionConfig) {
-        activeSession = SessionLaunch(config: config)
+        withAnimation(.easeInOut(duration: 0.35)) {
+            activeSession = SessionLaunch(config: config)
+        }
     }
 }
 
