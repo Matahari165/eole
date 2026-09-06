@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 /// détails temporels. Les données restent issues exclusivement de SessionStore.
 public struct StatsView: View {
     @ObservedObject var store: SessionStore
-    @State private var days = 7
+    @State private var days = 30
     @State private var sessionToDelete: BreathSession?
     private let onPrepare: () -> Void
 
@@ -17,14 +17,6 @@ public struct StatsView: View {
         self.store = store
         self.onPrepare = onPrepare
     }
-
-    private static let sessionDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
 
     public var body: some View {
         let stats = calculateStats(store.sessions)
@@ -39,19 +31,19 @@ public struct StatsView: View {
                     primaryMetric(stats)
                     secondaryMetrics(stats)
                     retentionChart(series)
-                    consistencyChart(stats)
+                    consistencySection(stats)
                     history
                     exportAction
                 }
             }
             .padding(.horizontal, 20)
             .padding(.top, 10)
-            .padding(.bottom, 96)
+            .padding(.bottom, 120)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
         .navigationTitle("Progrès")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .alert("Supprimer cette séance ?", isPresented: Binding(
             get: { sessionToDelete != nil },
             set: { if !$0 { sessionToDelete = nil } }
@@ -144,7 +136,7 @@ public struct StatsView: View {
                 EoleMetricTile(
                     label: "Séances",
                     value: "\(stats.sessionCount)",
-                    detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : nil
+                    detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : "Pratique régulière"
                 )
                 EoleMetricTile(
                     label: "Rounds",
@@ -154,14 +146,14 @@ public struct StatsView: View {
             }
             HStack(alignment: .top, spacing: 12) {
                 EoleMetricTile(
-                    label: "Temps total",
-                    value: formatDuration(stats.totalPracticeSeconds),
-                    detail: "dont \(formatDuration(Double(retentionTotal))) de rétention"
+                    label: "Temps en rétention",
+                    value: formatDuration(Double(retentionTotal)),
+                    detail: "Sur \(formatDuration(stats.totalPracticeSeconds)) total"
                 )
                 EoleMetricTile(
                     label: "Respirations",
                     value: "\(breathsTotal)",
-                    detail: topPaceLabel(sessions).map { "Cadence : \($0)" }
+                    detail: topPaceLabel(sessions).map { "Cadence \($0)" } ?? "Rythmées"
                 )
             }
         }
@@ -185,32 +177,71 @@ public struct StatsView: View {
     }
 
     private func retentionChart(_ series: [DailyPoint]) -> some View {
-        let values = series.compactMap(\.averageRetention).map(Double.init)
-        let top = max(60, ((values.max() ?? 0) / 60).rounded(.up) * 60)
+        let values = series.compactMap(\.totalRetention).map(Double.init)
+        let top = max(120, ((values.max() ?? 0) / 60).rounded(.up) * 60)
+        let averageTotal = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Rétention par jour")
-                Chart(series, id: \.key) { point in
-                    if let retention = point.averageRetention {
-                        BarMark(
-                            x: .value("Jour", point.label),
-                            y: .value("Rétention", Double(retention))
-                        )
-                        .foregroundStyle(Color.eolePrimary)
-                        .cornerRadius(6)
-                        .annotation(position: .top, alignment: .center) {
-                            if days == 7 {
-                                Text(shortDuration(Double(retention)))
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(Color.eoleMuted)
+                HStack(alignment: .firstTextBaseline) {
+                    EoleSectionHeader("Rétention totale par jour", subtitle: "Cumul quotidien (\(days) j)")
+                    Spacer()
+                    if averageTotal > 0 {
+                        Text("Moy. \(shortDuration(averageTotal))")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.eoleSecondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.eoleSecondary.opacity(0.12), in: Capsule())
+                    }
+                }
+
+                Chart {
+                    ForEach(series, id: \.key) { point in
+                        if let total = point.totalRetention {
+                            BarMark(
+                                x: .value("Jour", point.label),
+                                y: .value("Temps total", Double(total)),
+                                width: days == 30 ? .fixed(5) : .fixed(24)
+                            )
+                            .foregroundStyle(Color.eolePrimary)
+                            .cornerRadius(3)
+                            .annotation(position: .top, alignment: .center) {
+                                if days == 7 {
+                                    Text(shortDuration(Double(total)))
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundStyle(Color.eoleMuted)
+                                }
                             }
+                        } else {
+                            BarMark(
+                                x: .value("Jour", point.label),
+                                y: .value("Temps total", top * 0.02),
+                                width: days == 30 ? .fixed(3) : .fixed(12)
+                            )
+                            .foregroundStyle(Color.eoleBorder.opacity(0.35))
+                            .cornerRadius(2)
                         }
+                    }
+
+                    if averageTotal > 0 {
+                        RuleMark(y: .value("Moyenne", averageTotal))
+                            .foregroundStyle(Color.eoleSecondary)
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                            .annotation(position: .top, alignment: .leading) {
+                                Text("Moyenne \(shortDuration(averageTotal))")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(Color.eoleSecondary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.eoleSurface, in: Capsule())
+                                    .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+                            }
                     }
                 }
                 .chartYScale(domain: 0...top)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .stride(by: 60.0)) { value in
+                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
                         AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.55))
                         AxisValueLabel {
                             if let seconds = value.as(Double.self) {
@@ -222,84 +253,89 @@ public struct StatsView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 7 : 5)) { _ in
+                    AxisMarks(values: .automatic(desiredCount: days == 30 ? 6 : 7)) { _ in
                         AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
                     }
                 }
                 .frame(height: 190)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Rétention moyenne par jour")
-                .accessibilityValue(Text(retentionAccessibility(series)))
+                .accessibilityLabel("Temps de rétention total par jour sur \(days) jours")
+                .accessibilityValue(Text("Moyenne : \(shortDuration(averageTotal))"))
             }
         }
     }
 
-    private func consistencyChart(_ stats: SessionStats) -> some View {
-        let rounds = roundsSeries(store.sessions, days: days)
-        let maximum = max(1, rounds.map(\.rounds).max() ?? 0)
-
-        return EolePanel {
-            VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Régularité")
-                Chart(rounds) { point in
-                    BarMark(
-                        x: .value("Jour", point.label),
-                        y: .value("Rounds", point.rounds)
-                    )
-                    .foregroundStyle(Color.eoleSecondary)
-                    .cornerRadius(5)
-                    .annotation(position: .top, alignment: .center) {
-                        if days == 7, point.rounds > 0 {
-                            Text("\(point.rounds)")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(Color.eoleMuted)
-                        }
-                    }
-                }
-                .chartYScale(domain: 0...(maximum + 1))
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: min(4, maximum + 1))) { _ in
-                        AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.55))
-                        AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: days == 7 ? 7 : 5)) { _ in
-                        AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
-                    }
-                }
-                .frame(height: 150)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Rounds par jour")
-                .accessibilityValue(Text(roundsAccessibility(rounds)))
-                weekDots(stats: stats)
-            }
-        }
-    }
-
-    private func weekDots(stats: SessionStats) -> some View {
+    private func consistencySection(_ stats: SessionStats) -> some View {
         let active = activeDayKeys(last: 7)
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let weekDays = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0 - 6, to: today) }
 
-        return HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                ForEach(Array(weekDays.enumerated()), id: \.offset) { _, date in
-                    Circle()
-                        .frame(width: 10, height: 10)
-                        .foregroundStyle(active.contains(localDateKey(date, calendar: calendar)) ? Color.eolePrimary : Color.eoleBorder.opacity(0.6))
-                        .accessibilityHidden(true)
+        return EolePanel(padding: 16) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    EoleSectionHeader("Régularité de la semaine")
+                    Spacer()
+                    if stats.currentStreak > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .font(.caption.weight(.semibold))
+                            Text("Série : \(stats.currentStreak) j")
+                                .font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(Color.eolePrimary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.eoleAccent.opacity(0.6), in: Capsule())
+                    }
                 }
+
+                HStack(spacing: 0) {
+                    ForEach(Array(weekDays.enumerated()), id: \.offset) { _, date in
+                        let isPracticed = active.contains(localDateKey(date, calendar: calendar))
+                        let isToday = calendar.isDateInToday(date)
+                        let dayLabel = weekDayLabel(date, calendar: calendar)
+
+                        VStack(spacing: 8) {
+                            Text(dayLabel)
+                                .font(.caption2.weight(isToday ? .bold : .medium))
+                                .foregroundStyle(isToday ? Color.eolePrimary : Color.eoleMuted)
+
+                            ZStack {
+                                Circle()
+                                    .fill(isPracticed ? Color.eolePrimary : Color.eoleSurfaceSoft)
+                                    .frame(width: 32, height: 32)
+                                    .overlay {
+                                        Circle()
+                                            .stroke(isToday ? Color.eolePrimary : Color.eoleBorder.opacity(0.5), lineWidth: isToday ? 1.5 : 0.5)
+                                    }
+
+                                if isPracticed {
+                                    Image(systemName: "checkmark")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.white)
+                                } else {
+                                    Circle()
+                                        .fill(Color.eoleBorder.opacity(0.35))
+                                        .frame(width: 6, height: 6)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Sept derniers jours")
+                .accessibilityValue(Text(weekDotsAccessibility(active: active, days: weekDays, calendar: calendar)))
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Sept derniers jours")
-            .accessibilityValue(Text(weekDotsAccessibility(active: active, days: weekDays, calendar: calendar)))
-            Spacer(minLength: 8)
-            Text(stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : "Aucune série en cours")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(stats.currentStreak > 0 ? Color.eolePrimary : Color.eoleMuted)
         }
+    }
+
+    private func weekDayLabel(_ date: Date, calendar: Calendar) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        return formatter.string(from: date).capitalized
     }
 
     private var history: some View {
@@ -372,35 +408,6 @@ public struct StatsView: View {
         String(format: "%.1f", value).replacingOccurrences(of: ".", with: ",")
     }
 
-    private struct RoundsPoint: Identifiable {
-        var id: String { key }
-        let key: String
-        let label: String
-        let rounds: Int
-    }
-
-    private func roundsSeries(_ sessions: [BreathSession], days: Int) -> [RoundsPoint] {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
-        if days <= 7 {
-            formatter.setLocalizedDateFormatFromTemplate("EEE")
-        } else {
-            formatter.setLocalizedDateFormatFromTemplate("d")
-        }
-        let calendar = Calendar.current
-        let start = calendar.startOfDay(for: Date())
-        var byDay: [String: Int] = [:]
-        for session in sessions where !session.rounds.isEmpty {
-            guard let completed = parseDate(session.completedAt) else { continue }
-            byDay[localDateKey(completed, calendar: calendar), default: 0] += session.rounds.count
-        }
-        return (0..<days).map { index in
-            let date = calendar.date(byAdding: .day, value: index - (days - 1), to: start) ?? start
-            let key = localDateKey(date, calendar: calendar)
-            return RoundsPoint(key: key, label: formatter.string(from: date), rounds: byDay[key] ?? 0)
-        }
-    }
-
     private func activeDayKeys(last days: Int) -> Set<String> {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: Date())
@@ -467,8 +474,7 @@ public struct StatsView: View {
     }
 
     private func formatSessionDate(_ value: String) -> String {
-        guard let date = parseDate(value) else { return String(value.prefix(10)) }
-        return Self.sessionDateFormatter.string(from: date)
+        formatLatestSessionDate(value)
     }
 
     private func formatSessionDuration(_ session: BreathSession) -> String {
@@ -480,16 +486,10 @@ public struct StatsView: View {
 
     private func retentionAccessibility(_ series: [DailyPoint]) -> String {
         series.map { point in
-            if let value = point.averageRetention {
+            if let value = point.totalRetention {
                 return "\(point.label) : \(formatDuration(Double(value)))"
             }
             return "\(point.label) : aucune séance"
-        }.joined(separator: "; ")
-    }
-
-    private func roundsAccessibility(_ rounds: [RoundsPoint]) -> String {
-        rounds.map { point in
-            "\(point.label) : \(point.rounds) round\(point.rounds == 1 ? "" : "s")"
         }.joined(separator: "; ")
     }
 

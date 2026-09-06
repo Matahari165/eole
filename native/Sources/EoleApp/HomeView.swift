@@ -21,7 +21,7 @@ public struct HomeView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: EoleSpacing.xl) {
-                practicePanel(defaults)
+                practicePanel(defaults, stats: stats)
                 if stats.sessionCount == 0 {
                     firstPracticePanel
                 } else {
@@ -33,7 +33,7 @@ public struct HomeView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, EoleSpacing.sm)
-            .padding(.bottom, EoleSpacing.xxl)
+            .padding(.bottom, 110)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
@@ -41,24 +41,46 @@ public struct HomeView: View {
         .navigationBarTitleDisplayMode(.large)
     }
 
-    private func practicePanel(_ defaults: SessionConfig) -> some View {
+    private func practicePanel(_ defaults: SessionConfig, stats: SessionStats) -> some View {
         EolePanel(padding: 20) {
             VStack(alignment: .leading, spacing: EoleSpacing.lg) {
-                HStack(alignment: .top, spacing: EoleSpacing.md) {
-                    Image(systemName: "wind")
-                        .font(.title2.weight(.medium))
-                        .foregroundStyle(Color.eolePrimary)
-                        .frame(width: 48, height: 48)
-                        .background(Color.eoleAccent, in: Circle())
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: EoleSpacing.xs) {
-                        Text("Ta prochaine séance")
-                            .font(.title3.weight(.semibold))
-                        Text(sessionSummary(defaults))
-                            .font(.subheadline)
-                            .foregroundStyle(Color.eoleMuted)
-                            .fixedSize(horizontal: false, vertical: true)
+                HStack(alignment: .top) {
+                    HStack(spacing: EoleSpacing.md) {
+                        Image(systemName: "wind")
+                            .font(.title3.weight(.medium))
+                            .foregroundStyle(Color.eolePrimary)
+                            .frame(width: 44, height: 44)
+                            .background(Color.eoleAccent, in: Circle())
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Ta prochaine séance")
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(Color.eoleForeground)
+                            Text("Pratique guidée")
+                                .font(.caption)
+                                .foregroundStyle(Color.eoleMuted)
+                        }
                     }
+                    Spacer()
+                    if stats.currentStreak > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .font(.caption.weight(.semibold))
+                            Text("\(stats.currentStreak) j")
+                                .font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(Color.eolePrimary)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.eoleAccent.opacity(0.6), in: Capsule())
+                        .accessibilityLabel("Série en cours : \(stats.currentStreak) jours")
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    configTag("\(defaults.rounds) rounds", icon: "arrow.triangle.2.circlepath")
+                    configTag("\(defaults.breathsPerRound) resp.", icon: "lungs.fill")
+                    configTag("Cadence \(paceLabel(defaults.pace))", icon: "metronome.fill")
                 }
 
                 EoleGlassContainer(spacing: EoleSpacing.sm) {
@@ -80,6 +102,23 @@ public struct HomeView: View {
         }
     }
 
+    private func configTag(_ text: String, icon: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.eolePrimary)
+            Text(text)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.eoleForeground)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.eoleSurfaceSoft, in: Capsule())
+        .overlay {
+            Capsule().stroke(Color.eoleBorder.opacity(0.4), lineWidth: 0.5)
+        }
+    }
+
     private var firstPracticePanel: some View {
         EoleSectionHeader(
             "Tes repères apparaîtront ici",
@@ -92,46 +131,104 @@ public struct HomeView: View {
     private func metrics(_ stats: SessionStats) -> some View {
         VStack(alignment: .leading, spacing: EoleSpacing.md) {
             EoleSectionHeader("Tes repères")
-            EolePanel(padding: EoleSpacing.md) {
-                VStack(spacing: EoleSpacing.md) {
-                    VStack(alignment: .leading, spacing: EoleSpacing.sm) {
-                        Text("Meilleure rétention")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.eoleMuted)
+            HStack(spacing: 12) {
+                EolePanel(padding: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trophy")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.eolePrimary)
+                            Text("Record")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.eoleMuted)
+                        }
                         Text(formatDuration(Double(stats.maxRetention)))
-                            .font(.system(.largeTitle, design: .rounded, weight: .semibold))
+                            .font(.system(.title2, design: .rounded).weight(.bold))
                             .monospacedDigit()
-                        Text("Prochain repère : \(formatDuration(Double(nextMilestone(after: stats.maxRetention))))")
-                            .font(.caption)
+                            .foregroundStyle(Color.eoleForeground)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+
+                        let next = nextMilestone(after: stats.maxRetention)
+                        Text("Palier : \(formatDuration(Double(next)))")
+                            .font(.caption2)
                             .foregroundStyle(Color.eolePrimary)
+                            .lineLimit(1)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(EoleSpacing.md)
+                    .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+                }
+
+                EolePanel(padding: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.eoleSecondary)
+                            Text("Moyenne")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.eoleMuted)
+                        }
+                        Text(formatDuration(stats.averageRetention))
+                            .font(.system(.title2, design: .rounded).weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.eoleForeground)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+
+                        Text("\(stats.totalRounds) rounds au total")
+                            .font(.caption2)
+                            .foregroundStyle(Color.eoleMuted)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
                 }
             }
         }
     }
 
     private func latestSession(_ session: BreathSession) -> some View {
-        VStack(alignment: .leading, spacing: EoleSpacing.md) {
+        let totalRetention = session.rounds.map(\.retentionSeconds).reduce(0, +)
+        let maxRetention = max(1, session.rounds.map(\.retentionSeconds).max() ?? 1)
+
+        return VStack(alignment: .leading, spacing: EoleSpacing.md) {
             EoleSectionHeader("Dernière séance", subtitle: formatSessionDate(session.completedAt))
             EolePanel(padding: EoleSpacing.lg) {
-                HStack(spacing: 0) {
-                    ForEach(session.rounds, id: \.roundIndex) { round in
-                        VStack(spacing: EoleSpacing.xs) {
-                            Text("R\(round.roundIndex)")
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(Color.eoleMuted)
-                            Text(formatDuration(Double(round.retentionSeconds)))
-                                .font(.subheadline.weight(.semibold))
-                                .monospacedDigit()
-                                .minimumScaleFactor(0.72)
-                        }
-                        .frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: EoleSpacing.md) {
+                    HStack {
+                        Text("\(session.rounds.count) rounds")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(Color.eoleMuted)
+                        Spacer()
+                        Text("Rétention cumulée : \(formatDuration(Double(totalRetention)))")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.eolePrimary)
                     }
+
+                    HStack(alignment: .bottom, spacing: 10) {
+                        ForEach(session.rounds, id: \.roundIndex) { round in
+                            VStack(spacing: 6) {
+                                let ratio = CGFloat(round.retentionSeconds) / CGFloat(maxRetention)
+                                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                    .fill(Color.eolePrimary.opacity(0.85))
+                                    .frame(width: 24, height: max(8, 44 * ratio))
+
+                                Text("R\(round.roundIndex)")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Color.eoleMuted)
+
+                                Text(formatDuration(Double(round.retentionSeconds)))
+                                    .font(.caption.weight(.semibold))
+                                    .monospacedDigit()
+                                    .minimumScaleFactor(0.72)
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    }
+                    .padding(.top, 4)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Rétentions de la dernière séance")
+                .accessibilityLabel("Dernière séance : \(session.rounds.count) rounds, rétention cumulée \(formatDuration(Double(totalRetention)))")
             }
         }
     }

@@ -18,6 +18,21 @@ public struct DailyPoint: Sendable, Equatable {
     public var label: String
     public var sessions: Int
     public var averageRetention: Int?
+    public var totalRetention: Int?
+
+    public init(
+        key: String,
+        label: String,
+        sessions: Int,
+        averageRetention: Int?,
+        totalRetention: Int? = nil
+    ) {
+        self.key = key
+        self.label = label
+        self.sessions = sessions
+        self.averageRetention = averageRetention
+        self.totalRetention = totalRetention
+    }
 }
 
 public func localDateKey(_ date: Date, calendar: Calendar = .current) -> String {
@@ -84,13 +99,15 @@ public func buildDailySeries(_ sessions: [BreathSession], days: Int, today: Date
         let key = localDateKey(date, calendar: calendar)
         let matching = byDay[key] ?? []
         let retentions = matching.flatMap { $0.rounds.map(\.retentionSeconds) }
+        let total = retentions.isEmpty ? nil : retentions.reduce(0, +)
         return DailyPoint(
             key: key,
             label: formatter.string(from: date),
             sessions: matching.count,
             averageRetention: retentions.isEmpty
                 ? nil
-                : Int((Double(retentions.reduce(0, +)) / Double(retentions.count)).rounded())
+                : Int((Double(retentions.reduce(0, +)) / Double(retentions.count)).rounded()),
+            totalRetention: total
         )
     }
 }

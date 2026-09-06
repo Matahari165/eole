@@ -73,8 +73,11 @@ struct EoleCoreVerify {
         check(series.count == 3, "series.count == 3")
         check(series[0].sessions == 0, "jour vide sans faux positif")
         check(series[0].averageRetention == nil, "jour vide → averageRetention null")
+        check(series[0].totalRetention == nil, "jour vide → totalRetention null")
         check(series[1].averageRetention == 90, "moyenne jour 1 == 90")
+        check(series[1].totalRetention == 270, "total jour 1 == 270 s")
         check(series[2].averageRetention == 75, "moyenne jour 2 == 75")
+        check(series[2].totalRetention == 75, "total jour 2 == 75 s")
 
         // Formatage des durées
         check(formatDuration(42) == "42 s", "formatDuration(42)")
