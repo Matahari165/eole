@@ -180,27 +180,85 @@ public struct StatsView: View {
         let values = series.compactMap(\.totalRetention).map(Double.init)
         let top = max(120, ((values.max() ?? 0) / 60).rounded(.up) * 60)
         let averageTotal = values.isEmpty ? 0 : values.reduce(0, +) / Double(values.count)
+        let stepSeconds: Double = top <= 240 ? 60 : (top <= 600 ? 120 : 180)
+
+        let labelMap: [String: String] = {
+            let df = DateFormatter()
+            df.locale = Locale(identifier: "fr_FR")
+            if days <= 7 {
+                df.setLocalizedDateFormatFromTemplate("EEE")
+            } else {
+                df.setLocalizedDateFormatFromTemplate("d MMM")
+            }
+            var map: [String: String] = [:]
+            for point in series {
+                if let date = parseDate(point.key) {
+                    map[point.key] = df.string(from: date)
+                } else {
+                    map[point.key] = point.label
+                }
+            }
+            return map
+        }()
+
+        let xTickKeys: [String] = {
+            guard !series.isEmpty else { return [] }
+            if days <= 7 {
+                return series.map(\.key)
+            }
+            let step = max(1, (series.count - 1) / 5)
+            var ticks: [String] = []
+            var i = 0
+            while i < series.count {
+                ticks.append(series[i].key)
+                i += step
+            }
+            if let last = series.last?.key, !ticks.contains(last) {
+                ticks.append(last)
+            }
+            return ticks
+        }()
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                HStack(alignment: .firstTextBaseline) {
-                    EoleSectionHeader("Rétention totale par jour", subtitle: "Cumul quotidien (\(days) j)")
-                    Spacer()
-                    if averageTotal > 0 {
-                        Text("Moy. \(shortDuration(averageTotal))")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.eoleSecondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.eoleSecondary.opacity(0.12), in: Capsule())
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Rétention totale par jour")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(Color.eoleForeground)
+
+                        if averageTotal > 0 {
+                            HStack(spacing: 6) {
+                                HStack(spacing: 3) {
+                                    RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
+                                    RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
+                                    RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
+                                }
+                                .foregroundStyle(Color.eoleSecondary)
+                                Text("Moyenne : \(shortDuration(averageTotal))")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(Color.eoleSecondary)
+                            }
+                        } else {
+                            Text("Cumul quotidien (\(days) j)")
+                                .font(.caption)
+                                .foregroundStyle(Color.eoleMuted)
+                        }
                     }
+                    Spacer()
+                    Text("\(days) jours")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Color.eoleMuted)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.eoleSurfaceSoft, in: Capsule())
                 }
 
                 Chart {
                     ForEach(series, id: \.key) { point in
                         if let total = point.totalRetention {
                             BarMark(
-                                x: .value("Jour", point.label),
+                                x: .value("Jour", point.key),
                                 y: .value("Temps total", Double(total)),
                                 width: days == 30 ? .fixed(5) : .fixed(24)
                             )
@@ -215,7 +273,7 @@ public struct StatsView: View {
                             }
                         } else {
                             BarMark(
-                                x: .value("Jour", point.label),
+                                x: .value("Jour", point.key),
                                 y: .value("Temps total", top * 0.02),
                                 width: days == 30 ? .fixed(3) : .fixed(12)
                             )
@@ -227,22 +285,24 @@ public struct StatsView: View {
                     if averageTotal > 0 {
                         RuleMark(y: .value("Moyenne", averageTotal))
                             .foregroundStyle(Color.eoleSecondary)
-                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
-                            .annotation(position: .top, alignment: .leading) {
-                                Text("Moyenne \(shortDuration(averageTotal))")
-                                    .font(.caption2.weight(.bold))
+                            .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                            .annotation(position: .top, alignment: .trailing) {
+                                Text(shortDuration(averageTotal))
+                                    .font(.system(size: 10, weight: .bold))
                                     .foregroundStyle(Color.eoleSecondary)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Color.eoleSurface, in: Capsule())
-                                    .shadow(color: .black.opacity(0.08), radius: 2, y: 1)
+                                    .background(Color.eoleSurface.opacity(0.94), in: Capsule())
+                                    .overlay {
+                                        Capsule().stroke(Color.eoleSecondary.opacity(0.35), lineWidth: 0.5)
+                                    }
                             }
                     }
                 }
                 .chartYScale(domain: 0...top)
                 .chartYAxis {
-                    AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
-                        AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.55))
+                    AxisMarks(position: .leading, values: .stride(by: stepSeconds)) { value in
+                        AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.4))
                         AxisValueLabel {
                             if let seconds = value.as(Double.self) {
                                 Text(shortDuration(seconds))
@@ -253,8 +313,15 @@ public struct StatsView: View {
                     }
                 }
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: days == 30 ? 6 : 7)) { _ in
-                        AxisValueLabel().font(.caption2).foregroundStyle(Color.eoleMuted)
+                    AxisMarks(values: xTickKeys) { value in
+                        AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.35))
+                        AxisValueLabel {
+                            if let key = value.as(String.self), let label = labelMap[key] {
+                                Text(label)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(Color.eoleMuted)
+                            }
+                        }
                     }
                 }
                 .frame(height: 190)
