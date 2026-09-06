@@ -23,7 +23,13 @@ public struct StatsView: View {
         let series = buildDailySeries(store.sessions, days: days)
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Progrès")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(Color.eoleForeground)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, 4)
+
                 header
                 if stats.sessionCount == 0 {
                     emptyState
@@ -37,13 +43,12 @@ public struct StatsView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 10)
             .padding(.bottom, 120)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
         .navigationTitle("Progrès")
-        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .navigationBar)
         .alert("Supprimer cette séance ?", isPresented: Binding(
             get: { sessionToDelete != nil },
             set: { if !$0 { sessionToDelete = nil } }

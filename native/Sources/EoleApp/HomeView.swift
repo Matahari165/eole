@@ -20,7 +20,13 @@ public struct HomeView: View {
         let stats = calculateStats(store.sessions)
 
         ScrollView {
-            VStack(alignment: .leading, spacing: EoleSpacing.xl) {
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Aujourd’hui")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(Color.eoleForeground)
+                    .accessibilityAddTraits(.isHeader)
+                    .padding(.top, 4)
+
                 practicePanel(defaults, stats: stats)
                 if stats.sessionCount == 0 {
                     firstPracticePanel
@@ -32,19 +38,18 @@ public struct HomeView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, EoleSpacing.sm)
             .padding(.bottom, 110)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
         .navigationTitle("Aujourd’hui")
-        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .navigationBar)
     }
 
     private func practicePanel(_ defaults: SessionConfig, stats: SessionStats) -> some View {
         EolePanel(padding: 20) {
             VStack(alignment: .leading, spacing: EoleSpacing.lg) {
-                HStack(alignment: .top) {
+                HStack(alignment: .center) {
                     HStack(spacing: EoleSpacing.md) {
                         Image(systemName: "wind")
                             .font(.title3.weight(.medium))
@@ -52,14 +57,9 @@ public struct HomeView: View {
                             .frame(width: 44, height: 44)
                             .background(Color.eoleAccent, in: Circle())
                             .accessibilityHidden(true)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Ta prochaine séance")
-                                .font(.headline.weight(.semibold))
-                                .foregroundStyle(Color.eoleForeground)
-                            Text("Pratique guidée")
-                                .font(.caption)
-                                .foregroundStyle(Color.eoleMuted)
-                        }
+                        Text("Ta prochaine séance")
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(Color.eoleForeground)
                     }
                     Spacer()
                     if stats.currentStreak > 0 {
@@ -80,7 +80,7 @@ public struct HomeView: View {
                 HStack(spacing: 8) {
                     configTag("\(defaults.rounds) rounds", icon: "arrow.triangle.2.circlepath")
                     configTag("\(defaults.breathsPerRound) resp.", icon: "lungs.fill")
-                    configTag("Cadence \(paceLabel(defaults.pace))", icon: "metronome.fill")
+                    configTag(paceLabel(defaults.pace), icon: "metronome.fill")
                 }
 
                 EoleGlassContainer(spacing: EoleSpacing.sm) {
@@ -110,9 +110,10 @@ public struct HomeView: View {
             Text(text)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Color.eoleForeground)
+                .lineLimit(1)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 7)
         .background(Color.eoleSurfaceSoft, in: Capsule())
         .overlay {
             Capsule().stroke(Color.eoleBorder.opacity(0.4), lineWidth: 0.5)
@@ -243,8 +244,8 @@ public struct HomeView: View {
 
     private func paceLabel(_ pace: Pace) -> String {
         switch pace {
-        case .slow: return "lente"
-        case .normal: return "normale"
+        case .slow: return "lent"
+        case .normal: return "normal"
         case .fast: return "rapide"
         }
     }

@@ -23,13 +23,22 @@ public struct SettingsView: View {
                     Text("Méditation").tag(BreathMusicTrack.meditation)
                     Text("Sérénité").tag(BreathMusicTrack.serenite)
                 }
-                .pickerStyle(.navigationLink)
+                .pickerStyle(.menu)
 
                 Text(trackDescription(settings.musicTrack))
                     .font(.footnote)
                     .foregroundStyle(Color.eoleMuted)
             } header: {
-                Label("Ambiance", systemImage: "waveform")
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Réglages")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundStyle(Color.eoleForeground)
+                        .textCase(nil)
+                        .accessibilityAddTraits(.isHeader)
+                        .padding(.top, 4)
+
+                    Label("Ambiance", systemImage: "waveform")
+                }
             } footer: {
                 Text("Le paysage sonore accompagne la séance sans prendre le dessus sur les repères respiratoires.")
             }
@@ -83,7 +92,7 @@ public struct SettingsView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .tint(Color.eolePrimary)
         .navigationTitle("Réglages")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .onChange(of: settings) { _, newSettings in
             persist(newSettings)
         }
