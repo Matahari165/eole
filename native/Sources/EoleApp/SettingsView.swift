@@ -9,9 +9,15 @@ import SwiftUI
 public struct SettingsView: View {
     @State private var settings = AppDefaults.shared.soundSettings
     @State private var showSafety = false
+    @State private var isPlayingAmbientPreview = false
+    private let audio: EoleAudioEngine?
     private let onSettingsChanged: (SoundSettings) -> Void
 
-    public init(onSettingsChanged: @escaping (SoundSettings) -> Void = { _ in }) {
+    public init(
+        audio: EoleAudioEngine? = nil,
+        onSettingsChanged: @escaping (SoundSettings) -> Void = { _ in }
+    ) {
+        self.audio = audio
         self.onSettingsChanged = onSettingsChanged
     }
 
@@ -25,9 +31,25 @@ public struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
 
-                Text(trackDescription(settings.musicTrack))
-                    .font(.footnote)
-                    .foregroundStyle(Color.eoleMuted)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(trackDescription(settings.musicTrack))
+                        .font(.footnote)
+                        .foregroundStyle(Color.eoleMuted)
+                    Spacer()
+                    Button {
+                        toggleAmbientPreview()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: isPlayingAmbientPreview ? "stop.circle.fill" : "play.circle.fill")
+                                .font(.subheadline)
+                            Text(isPlayingAmbientPreview ? "Arrêter" : "Écouter")
+                                .font(.footnote.weight(.medium))
+                        }
+                        .foregroundStyle(Color.eolePrimary)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(isPlayingAmbientPreview ? "Arrêter l'extrait musical" : "Écouter un extrait de \(settings.musicTrack.rawValue)")
+                }
 
                 Picker("Repères sonores", selection: $settings.bellStyle) {
                     Text("Clarté").tag(BellStyle.clarte)
@@ -35,9 +57,25 @@ public struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
 
-                Text(bellStyleDescription(settings.bellStyle))
-                    .font(.footnote)
-                    .foregroundStyle(Color.eoleMuted)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(bellStyleDescription(settings.bellStyle))
+                        .font(.footnote)
+                        .foregroundStyle(Color.eoleMuted)
+                    Spacer()
+                    Button {
+                        audio?.previewBell(style: settings.bellStyle)
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "bell.badge.waveform")
+                                .font(.subheadline)
+                            Text("Tester")
+                                .font(.footnote.weight(.medium))
+                        }
+                        .foregroundStyle(Color.eolePrimary)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Tester le son de cloche")
+                }
             } header: {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Réglages")
@@ -103,8 +141,18 @@ public struct SettingsView: View {
         .tint(Color.eolePrimary)
         .navigationTitle("Réglages")
         .toolbar(.hidden, for: .navigationBar)
-        .onChange(of: settings) { _, newSettings in
+        .onChange(of: settings) { oldSettings, newSettings in
             persist(newSettings)
+            if oldSettings.bellStyle != newSettings.bellStyle {
+                audio?.previewBell(style: newSettings.bellStyle)
+            }
+            if isPlayingAmbientPreview && oldSettings.musicTrack != newSettings.musicTrack {
+                audio?.previewAmbient(track: newSettings.musicTrack)
+            }
+        }
+        .onDisappear {
+            audio?.stopPreview()
+            isPlayingAmbientPreview = false
         }
         .alert("Pratique en sécurité", isPresented: $showSafety) {
             Button("Compris", role: .cancel) {}
@@ -152,5 +200,15 @@ public struct SettingsView: View {
     private func persist(_ newSettings: SoundSettings) {
         AppDefaults.shared.soundSettings = newSettings
         onSettingsChanged(newSettings)
+    }
+
+    private func toggleAmbientPreview() {
+        if isPlayingAmbientPreview {
+            audio?.stopPreview()
+            isPlayingAmbientPreview = false
+        } else {
+            audio?.previewAmbient(track: settings.musicTrack)
+            isPlayingAmbientPreview = true
+        }
     }
 }

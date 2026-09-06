@@ -29,6 +29,8 @@ public final class EoleAudioEngine {
     private var preparedBreathPlayers: [String: AVAudioPlayer] = [:]
     private var preparedAmbientPlayers: [String: AVAudioPlayer] = [:]
     private var preparedTones: [String: [Float]] = [:]
+    private var previewAmbientPlayer: AVAudioPlayer?
+    private var previewStopTask: Task<Void, Never>?
 
     private struct ToneSpec: Sendable {
         let key: String
@@ -414,6 +416,127 @@ public final class EoleAudioEngine {
             playTone(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4])
             restoreAfter(0.85)
         }
+    }
+
+    // MARK: - Aperçus sonores (Réglages)
+
+    /// Joue un extrait de cloche selon le style choisi (Clarté ou Bols tibétains).
+    public func previewBell(style: BellStyle? = nil) {
+        let chosenStyle = style ?? bellStyle
+        #if os(iOS)
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {}
+        #endif
+
+        if !engine.isRunning {
+            do {
+                engine.prepare()
+                try engine.start()
+                engineReady = engine.isRunning && currentNodeFormat() != nil
+            } catch {}
+        }
+        guard let format = currentNodeFormat() else { return }
+
+        let spec: ToneSpec
+        if chosenStyle == .tibetan {
+            spec = ToneSpec(
+                key: "preview-tibetan",
+                frequency: 174,
+                seconds: 3.2,
+                level: 0.34,
+                harmonics: [1, 2.78, 5.42, 8.16],
+                decayRate: 0.8
+            )
+        } else {
+            spec = ToneSpec(
+                key: "preview-clarte",
+                frequency: 216,
+                seconds: 2.8,
+                level: 0.30,
+                harmonics: [1, 2.4, 3.9],
+                decayRate: 1.2
+            )
+        }
+
+        let frames = Int(format.sampleRate * spec.seconds)
+        var samples = [Float](repeating: 0, count: frames)
+        let harmonicWeight = max(1.0, spec.harmonics.indices.map { 1.0 / Double($0 + 2) }.reduce(0, +))
+        let effectiveVol = max(0.5, Double(breathVolume) / 100.0)
+        for index in 0..<frames {
+            let t = Double(index) / format.sampleRate
+            let attack = min(1.0, t / 0.015)
+            let release = min(1.0, max(0.0, (spec.seconds - t) / 0.05))
+            let envelope = attack * release * exp(-t * spec.decayRate)
+            var sample = 0.0
+            for (hIdx, ratio) in spec.harmonics.enumerated() {
+                let damping = exp(-t * spec.decayRate * Double(hIdx) * 0.5)
+                sample += (sin(2 * .pi * spec.frequency * ratio * t) / Double(hIdx + 2)) * damping
+            }
+            samples[index] = Float((sample / harmonicWeight) * envelope * spec.level * effectiveVol)
+        }
+
+        guard let buffer = makeBuffer(samples: samples, format: format) else { return }
+        let player: AVAudioPlayerNode
+        if let cuePlayer {
+            player = cuePlayer
+            player.stop()
+        } else {
+            let newPlayer = AVAudioPlayerNode()
+            engine.attach(newPlayer)
+            engine.connect(newPlayer, to: engine.mainMixerNode, format: format)
+            cuePlayer = newPlayer
+            player = newPlayer
+        }
+        player.scheduleBuffer(buffer, at: nil, options: .interrupts)
+        player.play()
+    }
+
+    /// Joue un aperçu d'ambiance de quelques secondes puis s'estompe doucement.
+    public func previewAmbient(track: BreathMusicTrack) {
+        #if os(iOS)
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {}
+        #endif
+        stopPreview()
+
+        let name = ambientFileName(for: track)
+        guard let url = bundleAudioURL(named: name),
+              let player = try? AVAudioPlayer(contentsOf: url) else { return }
+
+        let targetVol = max(0.25, Float(musicVolume) / 100.0)
+        player.volume = targetVol
+        player.play()
+        previewAmbientPlayer = player
+
+        previewStopTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, let self, let p = self.previewAmbientPlayer else { return }
+            for step in 1...10 {
+                try? await Task.sleep(nanoseconds: 80_000_000)
+                if Task.isCancelled { break }
+                p.volume = targetVol * Float(10 - step) / 10.0
+            }
+            p.stop()
+            if self.previewAmbientPlayer === p {
+                self.previewAmbientPlayer = nil
+            }
+        }
+    }
+
+    public func stopPreview() {
+        previewStopTask?.cancel()
+        previewStopTask = nil
+        previewAmbientPlayer?.stop()
+        previewAmbientPlayer = nil
+        cuePlayer?.stop()
+    }
+
+    public var isPreviewingAmbient: Bool {
+        previewAmbientPlayer?.isPlaying == true
     }
 
     private func playTone(frequency: Double, seconds: Double, level: Double, harmonics: [Double] = [1]) {

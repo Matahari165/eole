@@ -43,10 +43,13 @@ public struct EoleRootView: View {
                 }
                 .tabItem { Label("Progrès", systemImage: "chart.bar") }
                 NavigationStack {
-                    SettingsView(onSettingsChanged: { settings in
-                        audio.apply(settings: settings)
-                        haptics.enabled = settings.hapticsEnabled
-                    })
+                    SettingsView(
+                        audio: audio,
+                        onSettingsChanged: { settings in
+                            audio.apply(settings: settings)
+                            haptics.enabled = settings.hapticsEnabled
+                        }
+                    )
                     .lazyTab()
                 }
                 .tabItem { Label("Réglages", systemImage: "gearshape") }
