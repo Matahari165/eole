@@ -161,6 +161,32 @@ struct EoleCoreVerify {
         check(isValidSession(csvSession), "session valide acceptée")
         check(isValidSettings(defaultSoundSettings), "réglages par défaut valides")
 
+        // BellStyle & SoundSettings rétrocompatibilité
+        check(defaultSoundSettings.bellStyle == .clarte, "bellStyle par défaut = clarte")
+        let tibetanSettings = SoundSettings(musicTrack: .meditation, musicVolume: 40, breathVolume: 80, hapticsEnabled: true, bellStyle: .tibetan)
+        check(isValidSettings(tibetanSettings), "réglages avec bols tibétains valides")
+
+        // Décodage JSON sans champ bellStyle (anciennes sauvegardes d'utilisateurs)
+        let legacyJson = """
+        {"musicTrack":"bambou","musicVolume":30,"breathVolume":70,"hapticsEnabled":false}
+        """.data(using: .utf8)!
+        if let decodedLegacy = try? JSONDecoder().decode(SoundSettings.self, from: legacyJson) {
+            check(decodedLegacy.bellStyle == .clarte, "décodage legacy sans bellStyle utilise le repli .clarte")
+            check(decodedLegacy.musicTrack == .bambou, "décodage legacy conserve track")
+        } else {
+            check(false, "échec décodage legacy JSON")
+        }
+
+        // Décodage JSON avec bellStyle explicite
+        let tibetanJson = """
+        {"musicTrack":"serenite","musicVolume":50,"breathVolume":90,"hapticsEnabled":true,"bellStyle":"tibetan"}
+        """.data(using: .utf8)!
+        if let decodedTibetan = try? JSONDecoder().decode(SoundSettings.self, from: tibetanJson) {
+            check(decodedTibetan.bellStyle == .tibetan, "décodage JSON explicite tibetan")
+        } else {
+            check(false, "échec décodage tibetan JSON")
+        }
+
         if failures > 0 {
             print("\(failures) ÉCHEC(S)")
             exit(1)

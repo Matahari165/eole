@@ -49,6 +49,7 @@ public final class EoleAudioEngine {
     public var musicVolume: Int = 32
     public var breathVolume: Int = 72
     public var musicTrack: BreathMusicTrack = .bambou
+    public var bellStyle: BellStyle = .clarte
 
     public init() {
         #if os(iOS)
@@ -95,6 +96,7 @@ public final class EoleAudioEngine {
         musicVolume = settings.musicVolume
         breathVolume = settings.breathVolume
         musicTrack = settings.musicTrack
+        bellStyle = settings.bellStyle
     }
 
     deinit {
@@ -378,24 +380,40 @@ public final class EoleAudioEngine {
     public func playCue(frequency: Double = 520) {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.58)
-        playTone(frequency: frequency, seconds: 0.62, level: 0.25)
-        restoreAfter(0.62)
+        if bellStyle == .tibetan {
+            let tibetanFreq = frequency <= 480 ? 396.0 : (frequency <= 540 ? 432.0 : 528.0)
+            playTone(frequency: tibetanFreq, seconds: 0.95, level: 0.26, harmonics: [1, 2.05])
+            restoreAfter(0.95)
+        } else {
+            playTone(frequency: frequency, seconds: 0.62, level: 0.25)
+            restoreAfter(0.62)
+        }
     }
 
     /// Son de fin de rétention avec partiels, jusqu'à 6 secondes.
     public func playDing() {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.48)
-        playTone(frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9])
-        restoreAfter(6.5)
+        if bellStyle == .tibetan {
+            playTone(frequency: 174, seconds: 7.5, level: 0.34, harmonics: [1, 2.78, 5.42, 8.16])
+            restoreAfter(7.5)
+        } else {
+            playTone(frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9])
+            restoreAfter(6.5)
+        }
     }
 
     /// Indication sonore méditative pour le compte à rebours de récupération.
     public func playSoftDing() {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.78)
-        playTone(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4])
-        restoreAfter(0.85)
+        if bellStyle == .tibetan {
+            playTone(frequency: 704, seconds: 1.6, level: 0.24, harmonics: [1, 2.02, 3.15])
+            restoreAfter(1.6)
+        } else {
+            playTone(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4])
+            restoreAfter(0.85)
+        }
     }
 
     private func playTone(frequency: Double, seconds: Double, level: Double, harmonics: [Double] = [1]) {
@@ -490,6 +508,10 @@ public final class EoleAudioEngine {
             ToneSpec(key: toneKey(frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1], decayRate: 1.8),
             ToneSpec(key: toneKey(frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9]), frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9], decayRate: 0.8),
             ToneSpec(key: toneKey(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4]), frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4], decayRate: 3.2),
+            ToneSpec(key: toneKey(frequency: 396, seconds: 0.95, level: 0.26, harmonics: [1, 2.05]), frequency: 396, seconds: 0.95, level: 0.26, harmonics: [1, 2.05], decayRate: 1.4),
+            ToneSpec(key: toneKey(frequency: 432, seconds: 0.95, level: 0.26, harmonics: [1, 2.05]), frequency: 432, seconds: 0.95, level: 0.26, harmonics: [1, 2.05], decayRate: 1.4),
+            ToneSpec(key: toneKey(frequency: 174, seconds: 7.5, level: 0.34, harmonics: [1, 2.78, 5.42, 8.16]), frequency: 174, seconds: 7.5, level: 0.34, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.42),
+            ToneSpec(key: toneKey(frequency: 704, seconds: 1.6, level: 0.24, harmonics: [1, 2.02, 3.15]), frequency: 704, seconds: 1.6, level: 0.24, harmonics: [1, 2.02, 3.15], decayRate: 1.6),
         ]
         assetPreparationTask?.cancel()
         playerPreparationTask?.cancel()

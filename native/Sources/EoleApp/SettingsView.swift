@@ -28,6 +28,16 @@ public struct SettingsView: View {
                 Text(trackDescription(settings.musicTrack))
                     .font(.footnote)
                     .foregroundStyle(Color.eoleMuted)
+
+                Picker("Repères sonores", selection: $settings.bellStyle) {
+                    Text("Clarté").tag(BellStyle.clarte)
+                    Text("Bols tibétains").tag(BellStyle.tibetan)
+                }
+                .pickerStyle(.menu)
+
+                Text(bellStyleDescription(settings.bellStyle))
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
             } header: {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Réglages")
@@ -129,6 +139,13 @@ public struct SettingsView: View {
         case .bambou: return "Pluie douce et régulière."
         case .meditation: return "Un fond d'océan calme."
         case .serenite: return "Une forêt paisible."
+        }
+    }
+
+    private func bellStyleDescription(_ style: BellStyle) -> String {
+        switch style {
+        case .clarte: return "Cloches méditatives pures et cristallines."
+        case .tibetan: return "Bols chantants martelés et cloches traditionnelles à résonance profonde."
         }
     }
 

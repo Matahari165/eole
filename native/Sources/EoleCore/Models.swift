@@ -76,17 +76,45 @@ public struct BreathSession: Codable, Sendable, Equatable {
     }
 }
 
+public enum BellStyle: String, Codable, Sendable, CaseIterable {
+    case clarte, tibetan
+}
+
 public struct SoundSettings: Codable, Sendable, Equatable {
     public var musicTrack: MusicTrack
     public var musicVolume: Int
     public var breathVolume: Int
     public var hapticsEnabled: Bool
+    public var bellStyle: BellStyle
+
+    public init(
+        musicTrack: MusicTrack,
+        musicVolume: Int,
+        breathVolume: Int,
+        hapticsEnabled: Bool,
+        bellStyle: BellStyle = .clarte
+    ) {
+        self.musicTrack = musicTrack
+        self.musicVolume = musicVolume
+        self.breathVolume = breathVolume
+        self.hapticsEnabled = hapticsEnabled
+        self.bellStyle = bellStyle
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.musicTrack = try container.decode(MusicTrack.self, forKey: .musicTrack)
+        self.musicVolume = try container.decode(Int.self, forKey: .musicVolume)
+        self.breathVolume = try container.decode(Int.self, forKey: .breathVolume)
+        self.hapticsEnabled = try container.decode(Bool.self, forKey: .hapticsEnabled)
+        self.bellStyle = try container.decodeIfPresent(BellStyle.self, forKey: .bellStyle) ?? .clarte
+    }
 }
 
 public let defaultSessionConfig = SessionConfig(rounds: 3, breathsPerRound: 35, pace: .normal)
 
 public let defaultSoundSettings = SoundSettings(
-    musicTrack: .bambou, musicVolume: 32, breathVolume: 72, hapticsEnabled: false
+    musicTrack: .bambou, musicVolume: 32, breathVolume: 72, hapticsEnabled: false, bellStyle: .clarte
 )
 
 public struct PaceTiming: Sendable, Equatable {
