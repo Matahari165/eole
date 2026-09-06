@@ -129,6 +129,9 @@ public final class SessionEngine: ObservableObject {
         for currentRound in 1...config.rounds {
             guard !Task.isCancelled else { return }
             round = currentRound
+            if currentRound > 1 {
+                audio.resumeAmbient()
+            }
 
             for currentBreath in 1...config.breathsPerRound {
                 guard !Task.isCancelled else { return }
@@ -157,7 +160,8 @@ public final class SessionEngine: ObservableObject {
             guard !Task.isCancelled else { return }
             displayTimer?.invalidate()
 
-            // Récupération : inspire 2 s, maintien 15→1 s, expire 2 s.
+            // Récupération : pause de la musique d'ambiance pendant les 15 s de maintien.
+            audio.pauseAmbient()
             phase = .recoveryInhale
             audio.playBreath(inhale: true, duration: 2)
             guard await sleep(seconds: 2) else { return }

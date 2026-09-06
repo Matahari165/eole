@@ -15,14 +15,6 @@ public struct HomeView: View {
         self.onAdjust = onAdjust
     }
 
-    private static let sessionDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }()
-
     public var body: some View {
         let defaults = AppDefaults.shared.sessionDefaults
         let stats = calculateStats(store.sessions)
@@ -149,8 +141,7 @@ public struct HomeView: View {
     }
 
     private func formatSessionDate(_ value: String) -> String {
-        guard let date = parseDate(value) else { return String(value.prefix(10)) }
-        return Self.sessionDateFormatter.string(from: date)
+        formatLatestSessionDate(value)
     }
 
     private func paceLabel(_ pace: Pace) -> String {

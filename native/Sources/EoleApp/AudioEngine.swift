@@ -36,6 +36,7 @@ public final class EoleAudioEngine {
         let seconds: Double
         let level: Double
         let harmonics: [Double]
+        let decayRate: Double
     }
     private var engineReady = false
     private var isUnlocked = false
@@ -219,6 +220,66 @@ public final class EoleAudioEngine {
         }
     }
 
+    /// Met en pause la musique d'ambiance avec un fondu doux.
+    public func pauseAmbient(fadeSeconds: Double = 0.4) {
+        ambientFadeTask?.cancel()
+        ambientFadeTask = nil
+        duckingTask?.cancel()
+        duckingTask = nil
+        guard let player = ambientPlayer, player.isPlaying else { return }
+        if fadeSeconds <= 0 {
+            player.pause()
+            return
+        }
+        let steps = 8
+        let startVolume = player.volume
+        ambientFadeTask = Task { @MainActor [weak player] in
+            for step in 1...steps {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(fadeSeconds * 1_000_000_000 / Double(steps)))
+                } catch { return }
+                guard !Task.isCancelled else { return }
+                player?.volume = startVolume * Float(1 - Double(step) / Double(steps))
+            }
+            player?.pause()
+        }
+    }
+
+    /// Reprend la musique d'ambiance avec un fondu montant doux.
+    public func resumeAmbient(fadeSeconds: Double = 0.6) {
+        ambientFadeTask?.cancel()
+        ambientFadeTask = nil
+        duckingTask?.cancel()
+        duckingTask = nil
+        guard musicVolume > 0 else { return }
+        let targetVolume = ambientLevel()
+        if let player = ambientPlayer {
+            if !player.isPlaying {
+                player.volume = 0
+                guard player.play() else { return }
+            }
+            if fadeSeconds <= 0 {
+                player.volume = targetVolume
+                return
+            }
+            let steps = 10
+            ambientFadeTask = Task { @MainActor [weak player] in
+                for step in 1...steps {
+                    do {
+                        try await Task.sleep(nanoseconds: UInt64(fadeSeconds * 1_000_000_000 / Double(steps)))
+                    } catch { return }
+                    guard !Task.isCancelled else { return }
+                    player?.volume = targetVolume * Float(Double(step) / Double(steps))
+                }
+                player?.volume = targetVolume
+            }
+        } else if let track = ambientTrack {
+            startAmbient(track: track)
+        } else {
+            startAmbient(track: musicTrack)
+        }
+    }
+
     /// Réduit temporairement l'ambiance sous les sons-guides.
     public func duckAmbient(depth: Float = 0.6) {
         // La profondeur est transmise directement, et non son complément.
@@ -291,12 +352,12 @@ public final class EoleAudioEngine {
         restoreAfter(6.5)
     }
 
-    /// Indication sonore douce.
+    /// Indication sonore méditative pour le compte à rebours de récupération.
     public func playSoftDing() {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.78)
-        playTone(frequency: 432, seconds: 0.38, level: 0.18)
-        restoreAfter(0.38)
+        playTone(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4])
+        restoreAfter(0.85)
     }
 
     private func playTone(frequency: Double, seconds: Double, level: Double, harmonics: [Double] = [1]) {
@@ -386,11 +447,11 @@ public final class EoleAudioEngine {
         guard let format = currentNodeFormat(), !urls.isEmpty else { return }
         let volume = Double(breathVolume) / 100
         let specs = [
-            ToneSpec(key: toneKey(frequency: 480, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 480, seconds: 0.62, level: 0.25, harmonics: [1]),
-            ToneSpec(key: toneKey(frequency: 540, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 540, seconds: 0.62, level: 0.25, harmonics: [1]),
-            ToneSpec(key: toneKey(frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1]),
-            ToneSpec(key: toneKey(frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9]), frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9]),
-            ToneSpec(key: toneKey(frequency: 432, seconds: 0.38, level: 0.18, harmonics: [1]), frequency: 432, seconds: 0.38, level: 0.18, harmonics: [1]),
+            ToneSpec(key: toneKey(frequency: 480, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 480, seconds: 0.62, level: 0.25, harmonics: [1], decayRate: 1.8),
+            ToneSpec(key: toneKey(frequency: 540, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 540, seconds: 0.62, level: 0.25, harmonics: [1], decayRate: 1.8),
+            ToneSpec(key: toneKey(frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1], decayRate: 1.8),
+            ToneSpec(key: toneKey(frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9]), frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9], decayRate: 0.8),
+            ToneSpec(key: toneKey(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4]), frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4], decayRate: 3.2),
         ]
         assetPreparationTask?.cancel()
         playerPreparationTask?.cancel()
@@ -415,15 +476,19 @@ public final class EoleAudioEngine {
                 for spec in specs {
                     let frames = Int(format.sampleRate * spec.seconds)
                     var samples = [Float](repeating: 0, count: frames)
+                    let harmonicWeight = max(1.0, spec.harmonics.indices.map { 1.0 / Double($0 + 2) }.reduce(0, +))
                     for index in 0..<frames {
                         if index & 2047 == 0, Task.isCancelled { return [:] }
                         let t = Double(index) / format.sampleRate
-                        let envelope = min(1, t / 0.02) * exp(-t * 1.4)
+                        let attack = min(1.0, t / 0.015)
+                        let release = min(1.0, max(0.0, (spec.seconds - t) / 0.05))
+                        let envelope = attack * release * exp(-t * spec.decayRate)
                         var sample = 0.0
                         for (harmonicIndex, ratio) in spec.harmonics.enumerated() {
-                            sample += sin(2 * .pi * spec.frequency * ratio * t) / Double(harmonicIndex + 2)
+                            let damping = exp(-t * spec.decayRate * Double(harmonicIndex) * 0.5)
+                            sample += (sin(2 * .pi * spec.frequency * ratio * t) / Double(harmonicIndex + 2)) * damping
                         }
-                        samples[index] = Float(sample * envelope * spec.level * volume)
+                        samples[index] = Float((sample / harmonicWeight) * envelope * spec.level * volume)
                     }
                     tones[spec.key] = samples
                 }

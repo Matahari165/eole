@@ -109,3 +109,24 @@ public func formatDuration(_ seconds: Double) -> String {
 public func nextMilestone(after maxRetention: Int) -> Int {
     ((maxRetention + 1 + 14) / 15) * 15
 }
+
+/// Libellé temporel pour la dernière séance : "Aujourd’hui" si la séance s'est
+/// terminée le jour même, ou date formatée standard.
+public func formatLatestSessionDate(
+    _ dateString: String,
+    today: Date = Date(),
+    calendar: Calendar = .current,
+    locale: Locale = Locale(identifier: "fr_FR")
+) -> String {
+    guard let date = parseDate(dateString) else {
+        return String(dateString.prefix(10))
+    }
+    if calendar.isDate(date, inSameDayAs: today) {
+        return "Aujourd’hui"
+    }
+    let formatter = DateFormatter()
+    formatter.locale = locale
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .none
+    return formatter.string(from: date)
+}

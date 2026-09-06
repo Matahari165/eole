@@ -80,6 +80,25 @@ struct EoleCoreVerify {
         check(formatDuration(42) == "42 s", "formatDuration(42)")
         check(formatDuration(92) == "1 min 32 s", "formatDuration(92)")
 
+        // Date de dernière séance ("Aujourd’hui" si jour même)
+        var utcCalendar = Calendar(identifier: .gregorian)
+        utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let utcToday = utcCalendar.date(from: DateComponents(year: 2026, month: 8, day: 7, hour: 12))!
+        let todaySession = "2026-08-07T14:30:00.000Z"
+        let pastSession = "2026-08-06T14:30:00.000Z"
+        check(
+            formatLatestSessionDate(todaySession, today: utcToday, calendar: utcCalendar) == "Aujourd’hui",
+            "formatLatestSessionDate aujourd’hui → 'Aujourd’hui'"
+        )
+        check(
+            formatLatestSessionDate(pastSession, today: utcToday, calendar: utcCalendar) != "Aujourd’hui",
+            "formatLatestSessionDate jour antérieur → pas 'Aujourd’hui'"
+        )
+        check(
+            formatLatestSessionDate("invalide", today: utcToday, calendar: utcCalendar) == "invalide",
+            "formatLatestSessionDate date invalide repli sûr"
+        )
+
         // Export CSV
         let csvSession = BreathSession(
             id: "11111111-1111-4111-8111-111111111111", status: .completed,
