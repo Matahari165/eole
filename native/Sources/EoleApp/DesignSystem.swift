@@ -77,6 +77,33 @@ public extension Animation {
     }
 }
 
+/// Durées motion centralisées : toute nouvelle animation réutilise ces tokens
+/// au lieu d'une durée magique dispersée.
+public enum EoleMotion {
+    /// Présentation / dismissal de la séance plein écran.
+    public static let sessionPresent: Double = 0.35
+    /// Cross-fade court du chrome (fond de séance au changement de macro-phase).
+    public static let chromeFade: Double = 0.3
+    /// Press du bouton primaire.
+    public static let pressPrimary: Double = 0.18
+    public static let pressPrimaryScale: CGFloat = 0.98
+    /// Press des boutons icônes.
+    public static let pressIcon: Double = 0.16
+    public static let pressIconScale: CGFloat = 0.94
+    /// Pas du compte à rebours (1 chiffre / seconde).
+    public static let countdown: Double = 1.0
+    /// Transition douce des contrôles hors séance (période, historique).
+    public static let controlTransition: Double = 0.2
+}
+
+/// Fondus audio miroirs des défauts d'EoleAudioEngine, exposés pour rester
+/// synchronisés avec le motion sans dupliquer de littéraux.
+public enum EoleAudioFade {
+    public static let stop: Double = 0.85
+    public static let pause: Double = 0.4
+    public static let resume: Double = 0.6
+}
+
 /// Panneau de contenu natif : surface groupée adaptative, sans verre décoratif.
 public struct EolePanel<Content: View>: View {
     private let padding: CGFloat
@@ -180,6 +207,7 @@ public struct EoleSectionHeader: View {
 /// Action principale utilisant le style Liquid Glass système.
 public struct EolePrimaryButton: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
     public init() {}
 
@@ -187,11 +215,13 @@ public struct EolePrimaryButton: ButtonStyle {
         configuration.label
             .font(.body.weight(.semibold))
             .frame(maxWidth: .infinity, minHeight: 52)
-            .foregroundStyle(.white)
+            // Tint clair en dark : texte sombre fixe pour garder le contraste,
+            // blanc sur tint sombre en light.
+            .foregroundStyle(colorScheme == .dark ? Color(hex: 0x07332F) : .white)
             .padding(.horizontal, EoleSpacing.lg)
             .glassEffect(.regular.tint(Color.eolePrimary).interactive(), in: Capsule())
-            .scaleEffect(!reduceMotion && configuration.isPressed ? 0.98 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: configuration.isPressed)
+            .scaleEffect(!reduceMotion && configuration.isPressed ? EoleMotion.pressPrimaryScale : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: EoleMotion.pressPrimary), value: configuration.isPressed)
     }
 }
 
@@ -222,8 +252,8 @@ public struct EoleGlassIconButtonStyle: ButtonStyle {
             .font(.body.weight(.semibold))
             .contentShape(Circle())
             .glassEffect(.regular.interactive(), in: Circle())
-            .scaleEffect(!reduceMotion && configuration.isPressed ? 0.94 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: configuration.isPressed)
+            .scaleEffect(!reduceMotion && configuration.isPressed ? EoleMotion.pressIconScale : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: EoleMotion.pressIcon), value: configuration.isPressed)
     }
 }
 

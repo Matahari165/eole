@@ -7,6 +7,7 @@ import SwiftUI
 /// toujours accessible depuis le bas de l'écran.
 public struct ConfiguratorView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rounds: Int
     @State private var breaths: Int
     @State private var pace: Pace
@@ -67,19 +68,14 @@ public struct ConfiguratorView: View {
     }
 
     private var introduction: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Prépare ton rythme")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(Color.eoleForeground)
-            Text("Une cadence simple, puis toute ton attention sur le souffle.")
-                .font(.body)
-                .foregroundStyle(Color.eoleMuted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
+        Text("Prépare ton rythme")
+            .font(.subheadline)
+            .foregroundStyle(Color.eoleMuted)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var configurationPanel: some View {
-        nativePanel {
+        EolePanel {
             VStack(alignment: .leading, spacing: 0) {
                 parameterRow(
                     title: "Rounds",
@@ -121,6 +117,7 @@ public struct ConfiguratorView: View {
                 .accessibilityHidden(true)
             stepper
                 .labelsHidden()
+                .frame(minHeight: 44)
                 .tint(Color.eolePrimary)
                 .accessibilityLabel(title)
                 .accessibilityValue("\(value)")
@@ -128,17 +125,11 @@ public struct ConfiguratorView: View {
     }
 
     private var pacePanel: some View {
-        nativePanel {
+        EolePanel {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("Cadence")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(Color.eoleForeground)
-                    Spacer()
-                    Text(paceLabel(pace))
-                        .font(.footnote.weight(.medium))
-                        .foregroundStyle(Color.eolePrimary)
-                }
+                Text("Cadence")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.eoleForeground)
 
                 Picker("Cadence", selection: $pace) {
                     Text("Lente").tag(Pace.slow)
@@ -162,36 +153,22 @@ public struct ConfiguratorView: View {
                 breathsPerRound: breaths,
                 pace: pace
             )
-            withAnimation(.easeOut(duration: 0.18)) { defaultsSaved = true }
+            if reduceMotion {
+                defaultsSaved = true
+            } else {
+                withAnimation(.easeOut(duration: EoleMotion.pressPrimary)) { defaultsSaved = true }
+            }
         } label: {
             Label(
                 defaultsSaved ? "Réglages par défaut enregistrés" : "Enregistrer comme réglages par défaut",
                 systemImage: defaultsSaved ? "checkmark.circle.fill" : "bookmark"
             )
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         }
         .font(.subheadline.weight(.medium))
         .foregroundStyle(Color.eolePrimary)
         .contentShape(Rectangle())
         .accessibilityHint("Utilisera ces valeurs au prochain démarrage")
-    }
-
-    private func nativePanel<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        content()
-            .padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                Color(.secondarySystemGroupedBackground),
-                in: RoundedRectangle(cornerRadius: 22, style: .continuous)
-            )
-    }
-
-    private func paceLabel(_ pace: Pace) -> String {
-        switch pace {
-        case .slow: return "Lente"
-        case .normal: return "Normale"
-        case .fast: return "Rapide"
-        }
     }
 
     private func paceDescription(_ pace: Pace) -> String {

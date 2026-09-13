@@ -43,13 +43,10 @@ public struct ActiveSessionView: View {
                 Spacer()
             }
             .contentShape(Rectangle())
-            .onTapGesture(count: 2) {
-                if engine.phase == .retention { engine.endRetention() }
-            }
         }
         .foregroundStyle(.white)
         .navigationBarBackButtonHidden(true)
-        .interactiveDismissDisabled(engine.phase != .complete || engine.errorMessage != nil)
+        .interactiveDismissDisabled(engine.phase == .saving)
         .onAppear {
             engine.onPersist = { [store, weak engine] session, _ in
                 guard let engine else { return }
@@ -90,7 +87,29 @@ public struct ActiveSessionView: View {
         return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
             .allowsHitTesting(false)
-            .animation(reduceMotion ? nil : .eoleBreath(duration: 0.8), value: engine.phase)
+            // Cross-fade court unique au changement de macro-phase :
+            // inspire/expire partagent la même clé pour ne pas animer à chaque souffle.
+            .animation(reduceMotion ? nil : .eoleBreath(duration: EoleMotion.chromeFade), value: backgroundKey)
+    }
+
+    /// Clé de macro-phase : le fond ne réagit qu'aux vrais changements d'ambiance.
+    private var backgroundKey: String {
+        switch engine.phase {
+        case .inhale, .exhale: return "breathing"
+        default: return engine.phase.rawValue
+        }
+    }
+
+    /// Durée de l'aura asservie aux contours : rythme du pace, 2 s en récupération.
+    private var auraDuration: Double {
+        let timing = paceTimings[config.pace] ?? paceTimings[.normal]!
+        switch engine.phase {
+        case .inhale: return timing.inhaleSeconds
+        case .exhale: return timing.exhaleSeconds
+        case .recoveryInhale: return SessionEngine.recoveryInhaleSeconds
+        case .recoveryHold, .recoveryExhale: return SessionEngine.recoveryExhaleSeconds
+        default: return EoleMotion.chromeFade
+        }
     }
 
     private var sessionAura: some View {
@@ -102,7 +121,7 @@ public struct ActiveSessionView: View {
         )
         .scaleEffect(engine.phase == .inhale || engine.phase == .recoveryInhale ? 1.22 : 0.84)
         .opacity(engine.phase == .retention ? 0.45 : 1)
-        .animation(reduceMotion ? nil : .eoleBreath(duration: 2), value: engine.phase)
+        .animation(reduceMotion ? nil : .eoleBreath(duration: auraDuration), value: engine.phase)
         .ignoresSafeArea()
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -111,8 +130,10 @@ public struct ActiveSessionView: View {
     private var topBar: some View {
         ZStack {
             VStack(spacing: 2) {
-                Text("Round \(engine.round) sur \(config.rounds)")
-                    .font(.subheadline).monospacedDigit()
+                if engine.phase != .complete {
+                    Text("Round \(engine.round) sur \(config.rounds)")
+                        .font(.subheadline).monospacedDigit()
+                }
                 if engine.phase == .inhale || engine.phase == .exhale {
                     Text("\(engine.breath) / \(config.breathsPerRound)")
                         .font(.caption).foregroundStyle(.white.opacity(0.74))
@@ -133,7 +154,7 @@ public struct ActiveSessionView: View {
             }
         }
         .padding(.horizontal, 18)
-        .padding(.top, 8)
+        .safeAreaPadding(.top)
     }
 
     @ViewBuilder
@@ -153,8 +174,10 @@ public struct ActiveSessionView: View {
                     .font(.system(size: countdownFontSize, weight: .regular))
                     .monospacedDigit()
                     .contentTransition(.numericText())
+                    // Fond mat semi-opaque (pas de verre) : chiffre blanc lisible.
                     .frame(width: 210, height: 210)
-                    .glassEffect(.regular.tint(.white.opacity(0.08)), in: Circle())
+                    .background(Color.black.opacity(0.4), in: Circle())
+                    .animation(reduceMotion ? nil : .easeInOut(duration: EoleMotion.countdown), value: engine.countdownValue)
                     .accessibilityLabel("Compte à rebours : \(engine.countdownValue)")
             }
             .transition(.opacity)
@@ -177,6 +200,8 @@ public struct ActiveSessionView: View {
                 Text(retentionLabel)
                     .font(.system(size: retentionFontSize, weight: .regular))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                     .accessibilityLabel("Rétention : \(retentionLabel)")
                 Button { engine.endRetention() } label: {
                     Label("Terminer la rétention", systemImage: "stop.fill")
@@ -184,12 +209,9 @@ public struct ActiveSessionView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .tint(.white.opacity(0.92))
-                .foregroundStyle(Color.eolePrimaryStrong)
+                // Sombre fixe : contraste sur pastille blanche en light comme en dark.
+                .foregroundStyle(Color(hex: 0x0A5C56))
                 .controlSize(.extraLarge)
-                Text("Double-tape pour terminer")
-                    .font(.footnote)
-                    .foregroundStyle(.white.opacity(0.62))
-                    .accessibilityHidden(true)
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
@@ -197,73 +219,87 @@ public struct ActiveSessionView: View {
             VStack(spacing: 12) {
                 BreathContoursView(
                     motion: engine.phase == .recoveryExhale ? .exhale : .inhale,
-                    pace: config.pace
+                    pace: config.pace,
+                    overrideDuration: SessionEngine.recoveryInhaleSeconds
                 )
                 .frame(width: min(320, 460), height: min(320, 460))
-                Text(engine.phase == .recoveryHold ? "\(engine.recoveryCountdown)" : "Récupère")
+                Text(engine.phase == .recoveryHold ? "\(engine.recoveryCountdown)" : "Récupération")
                     .font(.system(size: recoveryFontSize, weight: .regular))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .contentTransition(.numericText())
+                    .animation(reduceMotion ? nil : .easeInOut(duration: EoleMotion.countdown), value: engine.recoveryCountdown)
                     .accessibilityLabel(engine.phase == .recoveryHold ? "Récupération : \(engine.recoveryCountdown) secondes" : "Récupération")
             }
+            .transition(reduceMotion ? .identity : .opacity)
         case .pause:
             ProgressView().tint(.white)
         case .saving:
             VStack(spacing: 8) {
                 ProgressView().tint(.white)
-                Text("Enregistrement…").foregroundStyle(.white.opacity(0.72))
+                Text("Enregistrement…").foregroundStyle(Color.eoleForeground)
             }
             .padding(32)
             .background(.regularMaterial, in: .rect(cornerRadius: EoleRadius.lg))
         case .complete:
             ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 20) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(.largeTitle, design: .rounded, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                Text("Séance terminée")
-                    .font(.largeTitle.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                if let message = engine.errorMessage {
-                    Text(message).font(.footnote).foregroundStyle(.red.opacity(0.9))
-                    Button("Réessayer") { engine.retryPersist() }
-                        .buttonStyle(.glassProminent)
-                        .controlSize(.extraLarge)
-                } else {
-                    Text("Tes progrès sont enregistrés sur cet iPhone.")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.72))
+                VStack(spacing: 20) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(.largeTitle, design: .rounded, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                    Text("Séance terminée")
+                        .font(.largeTitle.weight(.semibold))
                         .multilineTextAlignment(.center)
-                }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 0) {
-                        ForEach(Array(engine.results.enumerated()), id: \.offset) { _, round in
-                            VStack(spacing: 5) {
-                                Text("R\(round.roundIndex)").font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.white.opacity(0.62))
-                                Text(formatDuration(Double(round.retentionSeconds)))
-                                    .font(.headline.weight(.semibold))
-                                    .monospacedDigit()
+                    if let message = engine.errorMessage {
+                        Text(message).font(.footnote).foregroundStyle(.white.opacity(0.9))
+                        Button("Réessayer") { engine.retryPersist() }
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.extraLarge)
+                    } else {
+                        Text("Tes progrès sont enregistrés sur cet iPhone.")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.72))
+                            .multilineTextAlignment(.center)
+                    }
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 0) {
+                            ForEach(Array(engine.results.enumerated()), id: \.offset) { _, round in
+                                VStack(spacing: 5) {
+                                    Text("R\(round.roundIndex)").font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.white.opacity(0.62))
+                                    Text(formatDuration(Double(round.retentionSeconds)))
+                                        .font(.headline.weight(.semibold))
+                                        .monospacedDigit()
+                                }
+                                .frame(minWidth: 92)
                             }
-                            .frame(minWidth: 92)
                         }
                     }
+                    .padding(.vertical, 18)
+                    .padding(.horizontal, 12)
+                    .background(.white.opacity(0.08), in: .rect(cornerRadius: EoleRadius.md))
                 }
-                .padding(.vertical, 18)
-                .padding(.horizontal, 12)
-                .background(.white.opacity(0.08), in: .rect(cornerRadius: EoleRadius.md))
-                if engine.errorMessage == nil {
-                    Button("Terminer") {
-                        onClose()
-                    }
-                    .buttonStyle(.glassProminent)
-                    .tint(.white.opacity(0.92))
-                    .foregroundStyle(Color.eolePrimaryStrong)
-                    .controlSize(.extraLarge)
-                }
-            }
-            .padding(28)
+                .padding(28)
+                // Réserve la place du CTA fixe pour qu'il ne masque pas le récap.
+                .padding(.bottom, 96)
             }
             .frame(maxHeight: .infinity)
+            // CTA fixe en bas (pattern Configurator), sans fond .bar pour
+            // conserver l'immersion sombre de la séance.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Button(engine.errorMessage == nil ? "Terminer" : "Fermer sans enregistrer") {
+                    onClose()
+                }
+                .buttonStyle(.glassProminent)
+                .tint(.white.opacity(0.92))
+                // Sombre fixe : contraste sur pastille blanche en light comme en dark.
+                .foregroundStyle(Color(hex: 0x0A5C56))
+                .controlSize(.extraLarge)
+                .padding(.horizontal, 28)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+            }
         }
     }
 

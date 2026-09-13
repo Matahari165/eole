@@ -31,6 +31,11 @@ public final class SessionEngine: ObservableObject {
     public let audio: EoleAudioEngine
     public let haptics: EoleHaptics
 
+    /// Durées de récupération explicites, partagées avec les visuels.
+    public static let recoveryInhaleSeconds: Double = 2
+    public static let recoveryExhaleSeconds: Double = 2
+    public static let recoveryHoldSeconds: Int = 15
+
     public var onPersist: ((BreathSession, Bool) -> Void)?
 
     private var task: Task<Void, Never>?
@@ -78,7 +83,7 @@ public final class SessionEngine: ObservableObject {
         retentionSeconds = Int(Date().timeIntervalSince(start))
     }
 
-    /// Double-tap (<420 ms géré par TapGesture count:2 côté vue).
+    /// Fin de rétention via le bouton explicite « Terminer la rétention ».
     public func endRetention() {
         guard phase == .retention else { return }
         if let start = retentionStart {
@@ -168,10 +173,10 @@ public final class SessionEngine: ObservableObject {
             // Récupération : pause de la musique d'ambiance pendant les 15 s de maintien.
             audio.pauseAmbient()
             phase = .recoveryInhale
-            audio.playBreath(inhale: true, duration: 2)
-            guard await sleep(seconds: 2) else { return }
+            audio.playBreath(inhale: true, duration: Self.recoveryInhaleSeconds)
+            guard await sleep(seconds: Self.recoveryInhaleSeconds) else { return }
             phase = .recoveryHold
-            for remaining in stride(from: 15, through: 1, by: -1) {
+            for remaining in stride(from: Self.recoveryHoldSeconds, through: 1, by: -1) {
                 guard !Task.isCancelled else { return }
                 recoveryCountdown = remaining
                 if currentRound < config.rounds, remaining <= 3 {
@@ -182,8 +187,8 @@ public final class SessionEngine: ObservableObject {
             phase = .recoveryExhale
             audio.playCue(frequency: 540)
             haptics.tap()
-            audio.playBreath(inhale: false, duration: 2)
-            guard await sleep(seconds: 2) else { return }
+            audio.playBreath(inhale: false, duration: Self.recoveryExhaleSeconds)
+            guard await sleep(seconds: Self.recoveryExhaleSeconds) else { return }
 
             results.append(RoundResult(
                 roundIndex: currentRound,

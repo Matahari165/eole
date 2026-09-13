@@ -31,11 +31,7 @@ public struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
 
-                HStack(alignment: .firstTextBaseline) {
-                    Text(trackDescription(settings.musicTrack))
-                        .font(.footnote)
-                        .foregroundStyle(Color.eoleMuted)
-                    Spacer()
+                previewRow(description: trackDescription(settings.musicTrack)) {
                     Button {
                         toggleAmbientPreview()
                     } label: {
@@ -48,6 +44,7 @@ public struct SettingsView: View {
                         .foregroundStyle(Color.eolePrimary)
                     }
                     .buttonStyle(.borderless)
+                    .frame(minHeight: 44)
                     .accessibilityLabel(isPlayingAmbientPreview ? "Arrêter l'extrait musical" : "Écouter un extrait de \(settings.musicTrack.rawValue)")
                 }
 
@@ -57,11 +54,7 @@ public struct SettingsView: View {
                 }
                 .pickerStyle(.menu)
 
-                HStack(alignment: .firstTextBaseline) {
-                    Text(bellStyleDescription(settings.bellStyle))
-                        .font(.footnote)
-                        .foregroundStyle(Color.eoleMuted)
-                    Spacer()
+                previewRow(description: bellStyleDescription(settings.bellStyle)) {
                     Button {
                         audio?.previewBell(style: settings.bellStyle)
                     } label: {
@@ -74,12 +67,13 @@ public struct SettingsView: View {
                         .foregroundStyle(Color.eolePrimary)
                     }
                     .buttonStyle(.borderless)
+                    .frame(minHeight: 44)
                     .accessibilityLabel("Tester le son de cloche")
                 }
             } header: {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("Réglages")
-                        .font(.system(size: 34, weight: .bold))
+                        .font(.eoleDisplay)
                         .foregroundStyle(Color.eoleForeground)
                         .textCase(nil)
                         .accessibilityAddTraits(.isHeader)
@@ -117,22 +111,13 @@ public struct SettingsView: View {
 
             Section {
                 Label {
-                    Text("Les séances et les réglages restent sur cet iPhone.")
+                    Text("Les séances et les réglages restent sur cet iPhone, sans synchronisation cloud.")
                 } icon: {
                     Image(systemName: "internaldrive")
                         .foregroundStyle(Color.eolePrimary)
                 }
-                Text("Aucune synchronisation cloud n'est activée dans cette version.")
-                    .font(.footnote)
-                    .foregroundStyle(Color.eoleMuted)
             } header: {
                 Text("Données privées")
-            }
-
-            Section {
-                Text("Les changements sont enregistrés automatiquement.")
-                    .font(.footnote)
-                    .foregroundStyle(Color.eoleMuted)
             }
         }
         .formStyle(.grouped)
@@ -157,7 +142,26 @@ public struct SettingsView: View {
         .alert("Pratique en sécurité", isPresented: $showSafety) {
             Button("Compris", role: .cancel) {}
         } message: {
-            Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux.")
+            Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise : pratique assis ou allongé, jamais dans l'eau, au volant ou quand un malaise serait dangereux.")
+        }
+    }
+
+    private func previewRow<Preview: View>(description: String, @ViewBuilder preview: () -> Preview) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(description)
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
+                Spacer()
+                preview()
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text(description)
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
+                preview()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
