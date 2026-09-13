@@ -22,7 +22,7 @@ public struct HomeView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Aujourd’hui")
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.eoleDisplay)
                     .foregroundStyle(Color.eoleForeground)
                     .accessibilityAddTraits(.isHeader)
                     .padding(.top, 4)
@@ -38,7 +38,7 @@ public struct HomeView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 110)
+            .padding(.bottom, 32)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
@@ -47,7 +47,7 @@ public struct HomeView: View {
     }
 
     private func practicePanel(_ defaults: SessionConfig, stats: SessionStats) -> some View {
-        EolePanel(padding: 20) {
+        EolePanel {
             VStack(alignment: .leading, spacing: EoleSpacing.lg) {
                 HStack(alignment: .center) {
                     HStack(spacing: EoleSpacing.md) {
@@ -82,6 +82,7 @@ public struct HomeView: View {
                     configTag("\(defaults.breathsPerRound) resp.", icon: "lungs.fill")
                     configTag(paceLabel(defaults.pace), icon: "metronome.fill")
                 }
+                .accessibilityElement(children: .combine)
 
                 EoleGlassContainer(spacing: EoleSpacing.sm) {
                     HStack(spacing: EoleSpacing.sm) {
@@ -111,6 +112,7 @@ public struct HomeView: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Color.eoleForeground)
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 7)
@@ -121,12 +123,18 @@ public struct HomeView: View {
     }
 
     private var firstPracticePanel: some View {
-        EoleSectionHeader(
-            "Tes repères apparaîtront ici",
-            subtitle: "Après ta première séance, tu retrouveras ta rétention, ta régularité et ton historique.",
-            systemImage: "chart.line.uptrend.xyaxis"
-        )
-        .padding(.horizontal, EoleSpacing.xs)
+        EolePanel {
+            VStack(alignment: .leading, spacing: 14) {
+                EoleSectionHeader(
+                    "Tes repères apparaîtront ici",
+                    subtitle: "Après ta première séance, tu retrouveras ta rétention, ta régularité et ton historique.",
+                    systemImage: "chart.line.uptrend.xyaxis"
+                )
+                Button("Préparer une séance") { onAdjust() }
+                    .buttonStyle(EolePrimaryButton())
+                    .padding(.top, 2)
+            }
+        }
     }
 
     private func metrics(_ stats: SessionStats) -> some View {
@@ -151,7 +159,7 @@ public struct HomeView: View {
                             .minimumScaleFactor(0.8)
 
                         let next = nextMilestone(after: stats.maxRetention)
-                        Text("Palier : \(formatDuration(Double(next)))")
+                        Text("Prochain palier : \(formatDuration(Double(next)))")
                             .font(.caption2)
                             .foregroundStyle(Color.eolePrimary)
                             .lineLimit(1)
@@ -193,7 +201,7 @@ public struct HomeView: View {
 
         return VStack(alignment: .leading, spacing: EoleSpacing.md) {
             EoleSectionHeader("Dernière séance", subtitle: formatSessionDate(session.completedAt))
-            EolePanel(padding: EoleSpacing.lg) {
+            EolePanel {
                 VStack(alignment: .leading, spacing: EoleSpacing.md) {
                     HStack {
                         Text("\(session.rounds.count) rounds")
@@ -211,7 +219,7 @@ public struct HomeView: View {
                                 let ratio = CGFloat(round.retentionSeconds) / CGFloat(maxRetention)
                                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                                     .fill(Color.eolePrimary.opacity(0.85))
-                                    .frame(width: 24, height: max(8, 44 * ratio))
+                                    .frame(width: 24, height: max(4, 44 * ratio))
 
                                 Text("R\(round.roundIndex)")
                                     .font(.caption2.weight(.semibold))
@@ -234,19 +242,15 @@ public struct HomeView: View {
         }
     }
 
-    private func sessionSummary(_ config: SessionConfig) -> String {
-        "\(config.rounds) rounds · \(config.breathsPerRound) respirations · cadence \(paceLabel(config.pace))"
-    }
-
     private func formatSessionDate(_ value: String) -> String {
         formatLatestSessionDate(value)
     }
 
     private func paceLabel(_ pace: Pace) -> String {
         switch pace {
-        case .slow: return "lent"
-        case .normal: return "normal"
-        case .fast: return "rapide"
+        case .slow: return "Lente"
+        case .normal: return "Normale"
+        case .fast: return "Rapide"
         }
     }
 }

@@ -8,6 +8,7 @@ import SwiftUI
 /// Le wrapper Xcode ajoute `@main struct EolePhoneApp: App` autour de EoleRootView.
 public struct EoleRootView: View {
     @ObservedObject private var store: SessionStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var activeSession: SessionLaunch?
     @State private var pendingSessionConfig: SessionConfig?
     @State private var showConfigurator = false
@@ -58,17 +59,22 @@ public struct EoleRootView: View {
             // Sur iOS 26, TabView reçoit automatiquement la barre Liquid Glass
             // système : aucun fond opaque n'est ajouté par Eole.
             .tabBarMinimizeBehavior(.onScrollDown)
+            // Quand la séance est présentée, VoiceOver ignore les onglets dessous.
+            .accessibilityHidden(activeSession != nil)
 
             if let launch = activeSession {
                 ActiveSessionView(config: launch.config, store: store, audio: audio, haptics: haptics) {
-                    withAnimation(.easeInOut(duration: 0.35)) {
+                    withAnimation(.easeInOut(duration: EoleMotion.sessionPresent)) {
                         activeSession = nil
                     }
                 }
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 1.03)),
-                    removal: .opacity.combined(with: .scale(scale: 0.97))
-                ))
+                // Reduce Motion : fondu seul, sans zoom 1.03/0.97.
+                .transition(
+                    reduceMotion ? .opacity : .asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 1.03)),
+                        removal: .opacity.combined(with: .scale(scale: 0.97))
+                    )
+                )
                 .zIndex(100)
             }
         }
@@ -100,7 +106,7 @@ public struct EoleRootView: View {
     }
 
     private func beginSession(_ config: SessionConfig) {
-        withAnimation(.easeInOut(duration: 0.35)) {
+        withAnimation(.easeInOut(duration: EoleMotion.sessionPresent)) {
             activeSession = SessionLaunch(config: config)
         }
     }
@@ -108,15 +114,24 @@ public struct EoleRootView: View {
 
 /// Les onglets non visibles ne construisent leur contenu qu'à la première
 /// ouverture : ni Charts ni le décodage des réglages ne pèsent sur le launch.
+/// Un placeholder léger occupe l'onglet jusqu'à son premier affichage.
 private struct LazyTab<Content: View>: View {
     private let build: () -> Content
+    @State private var appeared = false
 
     init(@ViewBuilder build: @escaping () -> Content) {
         self.build = build
     }
 
     var body: some View {
-        build()
+        Group {
+            if appeared {
+                build()
+            } else {
+                Color.clear
+                    .onAppear { appeared = true }
+            }
+        }
     }
 }
 

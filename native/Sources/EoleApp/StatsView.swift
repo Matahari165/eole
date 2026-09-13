@@ -9,7 +9,10 @@ import UniformTypeIdentifiers
 /// détails temporels. Les données restent issues exclusivement de SessionStore.
 public struct StatsView: View {
     @ObservedObject var store: SessionStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var days = 30
+    @State private var showAllHistory = false
+    @State private var selectedDay: String?
     @State private var sessionToDelete: BreathSession?
     private let onPrepare: () -> Void
 
@@ -26,7 +29,7 @@ public struct StatsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Progrès")
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.eoleDisplay)
                     .foregroundStyle(Color.eoleForeground)
                     .accessibilityAddTraits(.isHeader)
                     .padding(.top, 4)
@@ -47,7 +50,7 @@ public struct StatsView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 120)
+            .padding(.bottom, 32)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
@@ -70,7 +73,7 @@ public struct StatsView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            EoleSectionHeader("Ta progression")
+            EoleSectionHeader("Repères")
             periodControl
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -89,7 +92,14 @@ public struct StatsView: View {
     }
 
     private func periodButton(_ value: Int, title: String) -> some View {
-        Button(title) { days = value }
+        Button(title) {
+            if reduceMotion {
+                days = value
+            } else {
+                withAnimation(.easeOut(duration: EoleMotion.controlTransition)) { days = value }
+            }
+            selectedDay = nil
+        }
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(days == value ? Color.eolePrimaryStrong : Color.eoleMuted)
             .frame(minWidth: 92, minHeight: 44)
@@ -116,12 +126,12 @@ public struct StatsView: View {
                         .minimumScaleFactor(0.72)
                         .accessibilityLabel("Rétention moyenne")
                         .accessibilityValue(formatDuration(stats.averageRetention))
-                    Text("/ round")
+                    Text("par round")
                         .font(.subheadline)
                         .foregroundStyle(Color.eoleMuted)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Meilleur repère : \(formatDuration(Double(stats.maxRetention)))")
+                    Text("Record : \(formatDuration(Double(stats.maxRetention)))")
                         .font(.subheadline)
                         .foregroundStyle(Color.eoleMuted)
                     if let progress {
@@ -140,12 +150,11 @@ public struct StatsView: View {
         let breathsTotal = sessions.flatMap { $0.rounds.map(\.breathsCompleted) }.reduce(0, +)
 
         return VStack(alignment: .leading, spacing: 12) {
-            EoleSectionHeader("En un coup d’œil")
             HStack(alignment: .top, spacing: 12) {
                 EoleMetricTile(
                     label: "Séances",
                     value: "\(stats.sessionCount)",
-                    detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : "Pratique régulière"
+                    detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : "Aucune série en cours"
                 )
                 EoleMetricTile(
                     label: "Rounds",
@@ -162,7 +171,7 @@ public struct StatsView: View {
                 EoleMetricTile(
                     label: "Respirations",
                     value: "\(breathsTotal)",
-                    detail: topPaceLabel(sessions).map { "Cadence \($0)" } ?? "Rythmées"
+                    detail: topPaceLabel(sessions).map { "Cadence \($0)" } ?? "Cadence variée"
                 )
             }
         }
@@ -202,7 +211,7 @@ public struct StatsView: View {
             var map: [String: String] = [:]
             for point in series {
                 if let date = parseDate(point.key) {
-                    map[point.key] = df.string(from: date)
+                    map[point.key] = df.string(from: date).capitalized
                 } else {
                     map[point.key] = point.label
                 }
@@ -244,7 +253,7 @@ public struct StatsView: View {
                                     RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
                                 }
                                 .foregroundStyle(Color.eoleSecondary)
-                                Text("Moyenne : \(shortDuration(averageTotal))")
+                                Text("Moyenne : \(shortDuration(averageTotal)) min")
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(Color.eoleSecondary)
                             }
@@ -276,14 +285,14 @@ public struct StatsView: View {
                             .annotation(position: .top, alignment: .center) {
                                 if days == 7 {
                                     Text(shortDuration(Double(total)))
-                                        .font(.system(size: 9, weight: .semibold))
+                                        .font(.caption2.weight(.semibold))
                                         .foregroundStyle(Color.eoleMuted)
                                 }
                             }
                         } else {
                             BarMark(
                                 x: .value("Jour", point.key),
-                                y: .value("Temps total", top * 0.02),
+                                y: .value("Temps total", max(top * 0.025, 4)),
                                 width: days == 30 ? .fixed(3) : .fixed(12)
                             )
                             .foregroundStyle(Color.eoleBorder.opacity(0.35))
@@ -296,8 +305,8 @@ public struct StatsView: View {
                             .foregroundStyle(Color.eoleSecondary)
                             .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                             .annotation(position: .top, alignment: .trailing) {
-                                Text(shortDuration(averageTotal))
-                                    .font(.system(size: 10, weight: .bold))
+                                Text("\(shortDuration(averageTotal)) min")
+                                    .font(.caption.weight(.bold))
                                     .foregroundStyle(Color.eoleSecondary)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
@@ -307,14 +316,33 @@ public struct StatsView: View {
                                     }
                             }
                     }
+
+                    if let key = selectedDay,
+                       let point = series.first(where: { $0.key == key }) {
+                        RuleMark(x: .value("Jour sélectionné", key))
+                            .foregroundStyle(Color.eoleForeground.opacity(0.5))
+                            .lineStyle(StrokeStyle(lineWidth: 1))
+                            .annotation(position: .top, alignment: .center) {
+                                Text(selectedDayDetail(point))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.eoleForeground)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.eoleSurface.opacity(0.96), in: Capsule())
+                                    .overlay {
+                                        Capsule().stroke(Color.eoleBorder.opacity(0.6), lineWidth: 0.5)
+                                    }
+                            }
+                    }
                 }
                 .chartYScale(domain: 0...top)
+                .chartXSelection(value: $selectedDay)
                 .chartYAxis {
                     AxisMarks(position: .leading, values: .stride(by: stepSeconds)) { value in
                         AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.4))
                         AxisValueLabel {
                             if let seconds = value.as(Double.self) {
-                                Text(shortDuration(seconds))
+                                Text("\(Int((seconds / 60).rounded())) min")
                             }
                         }
                         .font(.caption2)
@@ -327,7 +355,7 @@ public struct StatsView: View {
                         AxisValueLabel {
                             if let key = value.as(String.self), let label = labelMap[key] {
                                 Text(label)
-                                    .font(.system(size: 10, weight: .medium))
+                                    .font(.caption.weight(.medium))
                                     .foregroundStyle(Color.eoleMuted)
                             }
                         }
@@ -336,7 +364,7 @@ public struct StatsView: View {
                 .frame(height: 190)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Temps de rétention total par jour sur \(days) jours")
-                .accessibilityValue(Text("Moyenne : \(shortDuration(averageTotal))"))
+                .accessibilityValue(Text(chartAccessibilityValue(series: series, averageTotal: averageTotal)))
             }
         }
     }
@@ -346,33 +374,34 @@ public struct StatsView: View {
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Paliers par round", subtitle: "Moyenne et record selon le tour")
+                EoleSectionHeader("Records par round", subtitle: "Moyenne et record selon le tour")
 
                 VStack(spacing: 12) {
-                    ForEach(Array(roundStats.enumerated()), id: \.element.id) { index, palier in
+                    ForEach(Array(roundStats.enumerated()), id: \.element.id) { index, roundStat in
                         VStack(spacing: 6) {
                             HStack(alignment: .lastTextBaseline) {
                                 HStack(spacing: 8) {
-                                    Text("R\(palier.roundIndex)")
+                                    Text("R\(roundStat.roundIndex)")
                                         .font(.caption.weight(.bold))
                                         .foregroundStyle(Color.eolePrimary)
                                         .frame(width: 30, height: 22)
                                         .background(Color.eoleAccent.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                                    Text(formatDuration(palier.averageSeconds))
+                                    Text(formatDuration(roundStat.averageSeconds))
                                         .font(.subheadline.weight(.semibold))
                                         .monospacedDigit()
                                         .foregroundStyle(Color.eoleForeground)
                                 }
                                 Spacer()
                                 if index > 0 {
-                                    let diff = palier.averageSeconds - roundStats[index - 1].averageSeconds
-                                    let sign = diff >= 0 ? "+" : ""
-                                    Text("\(sign)\(formatDuration(abs(diff)))")
+                                    let diff = roundStat.averageSeconds - roundStats[index - 1].averageSeconds
+                                    let enHausse = diff >= 0
+                                    Text("\(enHausse ? "+" : "−")\(formatDuration(abs(diff)))")
                                         .font(.caption2.weight(.bold))
-                                        .foregroundStyle(diff >= 0 ? Color.eolePrimary : Color.eoleMuted)
+                                        .foregroundStyle(enHausse ? Color.eolePrimary : Color.eoleMuted)
                                         .padding(.trailing, 4)
+                                        .accessibilityLabel("\(enHausse ? "En hausse" : "En baisse") de \(formatDuration(abs(diff))) par rapport au round précédent")
                                 }
-                                Text("Record : \(formatDuration(Double(palier.maxSeconds)))")
+                                Text("Record : \(formatDuration(Double(roundStat.maxSeconds)))")
                                     .font(.caption2)
                                     .foregroundStyle(Color.eoleMuted)
                             }
@@ -390,7 +419,7 @@ public struct StatsView: View {
                                                 endPoint: .trailing
                                             )
                                         )
-                                        .frame(width: max(8, geo.size.width * CGFloat(palier.averageSeconds / maxAvg)), height: 7)
+                                        .frame(width: max(8, geo.size.width * CGFloat(roundStat.averageSeconds / maxAvg)), height: 7)
                                 }
                             }
                             .frame(height: 7)
@@ -408,10 +437,10 @@ public struct StatsView: View {
         let today = calendar.startOfDay(for: Date())
         let weekDays = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0 - 6, to: today) }
 
-        return EolePanel(padding: 16) {
+        return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    EoleSectionHeader("Régularité de la semaine")
+                    EoleSectionHeader("7 derniers jours")
                     Spacer()
                     if stats.currentStreak > 0 {
                         HStack(spacing: 4) {
@@ -476,15 +505,31 @@ public struct StatsView: View {
     }
 
     private var history: some View {
-        let recentSessions = Array(store.sessions.filter { !$0.rounds.isEmpty }.prefix(8))
+        let allSessions = store.sessions.filter { !$0.rounds.isEmpty }
+        let visibleSessions = showAllHistory ? allSessions : Array(allSessions.prefix(8))
 
         return VStack(alignment: .leading, spacing: 12) {
-            EoleSectionHeader("Dernières séances")
+            HStack(alignment: .center) {
+                EoleSectionHeader("Dernières séances")
+                Spacer()
+                if allSessions.count > 8 {
+                    Button(showAllHistory ? "Voir moins" : "Voir tout") {
+                        if reduceMotion {
+                            showAllHistory.toggle()
+                        } else {
+                            withAnimation(.easeOut(duration: EoleMotion.controlTransition)) { showAllHistory.toggle() }
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.eolePrimary)
+                    .frame(minHeight: 44)
+                }
+            }
             EolePanel {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(recentSessions, id: \.id) { session in
+                    ForEach(visibleSessions, id: \.id) { session in
                         historyRow(session)
-                        if session.id != recentSessions.last?.id {
+                        if session.id != visibleSessions.last?.id {
                             Divider().padding(.vertical, 12)
                         }
                     }
@@ -508,17 +553,16 @@ public struct StatsView: View {
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Menu {
-                Button("Supprimer", systemImage: "trash", role: .destructive) {
-                    sessionToDelete = session
-                }
+            Button {
+                sessionToDelete = session
             } label: {
-                Image(systemName: "ellipsis")
+                Image(systemName: "trash")
+                    .font(.body)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .foregroundStyle(Color.eoleMuted)
-            .accessibilityLabel("Actions pour la séance du \(formatSessionDate(session.completedAt))")
+            .accessibilityLabel("Supprimer la séance du \(formatSessionDate(session.completedAt))")
         }
         .accessibilityElement(children: .contain)
     }
@@ -599,9 +643,9 @@ public struct StatsView: View {
         }
         guard let top = counts.max(by: { $0.value < $1.value })?.key else { return nil }
         switch top {
-        case .slow: return "lente"
-        case .normal: return "normale"
-        case .fast: return "rapide"
+        case .slow: return "Lente"
+        case .normal: return "Normale"
+        case .fast: return "Rapide"
         }
     }
 
@@ -628,6 +672,23 @@ public struct StatsView: View {
             }
             return "\(point.label) : aucune séance"
         }.joined(separator: "; ")
+    }
+
+    /// Détail du jour tapé sur le graphique, avec unités explicites.
+    private func selectedDayDetail(_ point: DailyPoint) -> String {
+        if let value = point.totalRetention {
+            return "\(point.label) : \(shortDuration(Double(value))) min"
+        }
+        return "\(point.label) : aucune séance"
+    }
+
+    private func chartAccessibilityValue(series: [DailyPoint], averageTotal: Double) -> String {
+        var parts = ["Moyenne : \(shortDuration(averageTotal))"]
+        if let key = selectedDay,
+           let point = series.first(where: { $0.key == key }) {
+            parts.append(selectedDayDetail(point))
+        }
+        return parts.joined(separator: ". ")
     }
 
     private func weekDotsAccessibility(active: Set<String>, days: [Date], calendar: Calendar) -> String {
