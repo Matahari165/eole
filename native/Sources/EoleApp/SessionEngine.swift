@@ -39,6 +39,7 @@ public final class SessionEngine: ObservableObject {
     public var onPersist: ((BreathSession, Bool) -> Void)?
 
     private var task: Task<Void, Never>?
+    private var audioUnlockTask: Task<Void, Never>?
     private var retentionStart: Date?
     private var retentionContinuation: CheckedContinuation<Void, Never>?
     private var lastRetentionMinute = 0
@@ -64,16 +65,16 @@ public final class SessionEngine: ObservableObject {
         guard !hasStarted, phase == .ready else { return }
         hasStarted = true
         task = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let audioUnlockTask = Task { @MainActor [weak self] in
-                guard let self else { return }
+            guard let self, !Task.isCancelled, !self.hasPersisted else { return }
+            self.audioUnlockTask = Task { @MainActor [weak self] in
+                guard let self, !Task.isCancelled, !self.hasPersisted else { return }
                 await self.audio.unlock(pace: self.config.pace)
-                if !Task.isCancelled {
+                if !Task.isCancelled, !self.hasPersisted {
                     self.audio.startAmbient(track: self.audio.musicTrack)
                 }
             }
             self.haptics.prepare()
-            await self.run(audioUnlockTask: audioUnlockTask)
+            await self.run()
         }
     }
 
@@ -101,6 +102,8 @@ public final class SessionEngine: ObservableObject {
         // d'annuler la tâche, sinon un arrêt depuis l'écran peut la laisser
         // suspendue indéfiniment.
         resumeRetention()
+        audioUnlockTask?.cancel()
+        audioUnlockTask = nil
         task?.cancel()
         persist(status: .stopped)
     }
@@ -113,6 +116,8 @@ public final class SessionEngine: ObservableObject {
             return
         }
         resumeRetention()
+        audioUnlockTask?.cancel()
+        audioUnlockTask = nil
         task?.cancel()
         task = nil
         displayTimer?.invalidate()
@@ -122,7 +127,7 @@ public final class SessionEngine: ObservableObject {
 
     // MARK: - Séquence
 
-    private func run(audioUnlockTask: Task<Void, Never>) async {
+    private func run() async {
         // Compte à rebours de trois secondes avec repères sonores.
         phase = .countdown
         for value in [3, 2, 1] {
@@ -133,7 +138,10 @@ public final class SessionEngine: ObservableObject {
             guard await sleep(seconds: 1) else { return }
         }
 
-        _ = await audioUnlockTask.value
+        if let audioUnlockTask {
+            _ = await audioUnlockTask.value
+        }
+        guard !Task.isCancelled, !hasPersisted else { return }
 
         let timing = paceTimings[config.pace] ?? paceTimings[.normal]!
         for currentRound in 1...config.rounds {
@@ -227,6 +235,8 @@ public final class SessionEngine: ObservableObject {
     private func persist(status: SessionStatus) {
         guard !hasPersisted else { return }
         hasPersisted = true
+        audioUnlockTask?.cancel()
+        audioUnlockTask = nil
         displayTimer?.invalidate()
         let formatter = Self.isoFormatter
         let session = BreathSession(
@@ -281,7 +291,7 @@ public final class SessionEngine: ObservableObject {
 
     private func sleep(seconds: Double) async -> Bool {
         do {
-            try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
+            try await Task.sleep(for: .seconds(max(0, seconds)))
             return true
         } catch {
             return false

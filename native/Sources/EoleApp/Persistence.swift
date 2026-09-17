@@ -79,6 +79,7 @@ public final class SessionImportMarker {
 @MainActor
 public final class SessionStore: ObservableObject {
     @Published public private(set) var sessions: [BreathSession] = []
+    @Published public private(set) var storageErrorMessage: String?
 
     // Version incrémentée pour que les installations qui ont déjà importé les
     // cinq premières séances récupèrent aussi la séance ajoutée ensuite.
@@ -94,8 +95,18 @@ public final class SessionStore: ObservableObject {
     }
 
     public func reload() {
-        sessions = fetchRecords().compactMap { $0.makeSession() }
-            .filter(isValidSession)
+        do {
+            sessions = try fetchRecords().compactMap { $0.makeSession() }
+                .filter(isValidSession)
+            storageErrorMessage = nil
+        } catch {
+            sessions = []
+            presentStorageError()
+        }
+    }
+
+    public func clearStorageError() {
+        storageErrorMessage = nil
     }
 
     /// Le booléen indique si la session a été acceptée et enregistrée localement.
@@ -105,11 +116,15 @@ public final class SessionStore: ObservableObject {
     }
 
     public func deleteSession(id: String) {
-        if let record = fetchRecord(id: id) {
-            modelContext.delete(record)
-            saveContext()
+        do {
+            if let record = try fetchRecord(id: id) {
+                modelContext.delete(record)
+                guard saveContext() else { return }
+            }
+            reload()
+        } catch {
+            presentStorageError()
         }
-        reload()
     }
 
     // MARK: - SwiftData
@@ -124,27 +139,32 @@ public final class SessionStore: ObservableObject {
         }
     }
 
-    private func fetchRecords() -> [StoredBreathSession] {
+    private func fetchRecords() throws -> [StoredBreathSession] {
         let descriptor = FetchDescriptor<StoredBreathSession>(
             sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
         )
-        return (try? modelContext.fetch(descriptor)) ?? []
+        return try modelContext.fetch(descriptor)
     }
 
-    private func fetchRecord(id: String) -> StoredBreathSession? {
+    private func fetchRecord(id: String) throws -> StoredBreathSession? {
         let targetID = id
         let descriptor = FetchDescriptor<StoredBreathSession>(
             predicate: #Predicate { $0.id == targetID }
         )
-        return try? modelContext.fetch(descriptor).first
+        return try modelContext.fetch(descriptor).first
     }
 
     @discardableResult
     private func upsert(_ session: BreathSession) -> Bool {
-        if let existing = fetchRecord(id: session.id) {
-            existing.update(from: session)
-        } else {
-            modelContext.insert(StoredBreathSession(session: session))
+        do {
+            if let existing = try fetchRecord(id: session.id) {
+                existing.update(from: session)
+            } else {
+                modelContext.insert(StoredBreathSession(session: session))
+            }
+        } catch {
+            presentStorageError()
+            return false
         }
         guard saveContext() else { return false }
         reload()
@@ -158,6 +178,7 @@ public final class SessionStore: ObservableObject {
             return true
         } catch {
             modelContext.rollback()
+            presentStorageError()
             assertionFailure("Échec d'enregistrement SwiftData : \(error)")
             return false
         }
@@ -175,7 +196,13 @@ public final class SessionStore: ObservableObject {
               initial.allSatisfy(isValidSession)
         else { return }
 
-        let existingIDs = Set(fetchRecords().map(\.id))
+        let existingIDs: Set<String>
+        do {
+            existingIDs = Set(try fetchRecords().map(\.id))
+        } catch {
+            presentStorageError()
+            return
+        }
         for session in initial where !existingIDs.contains(session.id) {
             modelContext.insert(StoredBreathSession(session: session))
         }
@@ -186,6 +213,7 @@ public final class SessionStore: ObservableObject {
             try modelContext.save()
         } catch {
             modelContext.rollback()
+            presentStorageError()
             assertionFailure("Échec de l'import SwiftData des sessions initiales : \(error)")
             return
         }
@@ -196,6 +224,7 @@ public final class SessionStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
         } catch {
             modelContext.rollback()
+            presentStorageError()
             assertionFailure("Échec de l'écriture du marqueur d'import Eole : \(error)")
         }
     }
@@ -204,22 +233,32 @@ public final class SessionStore: ObservableObject {
         if UserDefaults.standard.bool(forKey: Self.importMarkerKey) {
             return true
         }
-        let exists = fetchMarkers().contains { $0.key == Self.importMarkerKey }
-        if exists {
-            UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
+        do {
+            let exists = try fetchMarkers().contains { $0.key == Self.importMarkerKey }
+            if exists {
+                UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
+            }
+            return exists
+        } catch {
+            presentStorageError()
+            return true
         }
-        return exists
     }
 
-    private func fetchMarkers() -> [SessionImportMarker] {
-        (try? modelContext.fetch(FetchDescriptor<SessionImportMarker>())) ?? []
+    private func fetchMarkers() throws -> [SessionImportMarker] {
+        try modelContext.fetch(FetchDescriptor<SessionImportMarker>())
+    }
+
+    private func presentStorageError() {
+        storageErrorMessage = "L’historique local est momentanément indisponible."
     }
 }
 
 /// Réglages locaux non liés à l'historique des sessions.
 /// L'historique est conservé dans SwiftData ; les préférences légères restent
 /// dans UserDefaults.
-public final class AppDefaults: @unchecked Sendable {
+@MainActor
+public final class AppDefaults {
     public static let shared = AppDefaults()
     private let store: UserDefaults
     private init(store: UserDefaults = .standard) { self.store = store }

@@ -1,4 +1,6 @@
 .DS_Store
 *.log
 ios/**/xcuserdata/
+ios/**/DerivedData/
 native/.build/
+.swiftpm/

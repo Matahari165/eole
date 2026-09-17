@@ -1,43 +1,105 @@
 # Eole
 
-Eole est une application iPhone native de respiration guidée, développée en SwiftUI pour iOS 26. Elle guide chaque phase d'une séance, chronomètre les rétentions et conserve l'historique localement avec SwiftData.
+Application iPhone native de respiration guidée, développée en SwiftUI pour iOS 26.
+Eole accompagne chaque phase d’une séance, mesure les rétentions et conserve
+l’historique localement avec SwiftData.
 
-## Fonctionnement
+## Ce que le projet démontre
 
-- 1 à 8 rounds, 10 à 60 respirations et trois rythmes.
-- Sons respiratoires, ambiances et vibrations réglables.
-- Rétention libre, récupération guidée de 15 secondes et arrêt protégé.
-- Statistiques sur 7 ou 30 jours et export CSV.
-- Données et préférences stockées uniquement sur l'iPhone.
+- Architecture native séparant l’interface (`EoleApp`) de la logique métier
+  vérifiable (`EoleCore`).
+- Gestion d’une séance chronométrée avec reprise après passage en arrière-plan.
+- Audio local avec ambiances, guides respiratoires, repères sonores et haptics.
+- Interface iPhone compacte avec Dynamic Type, VoiceOver, Reduce Motion et
+  orientation portrait pris en compte.
+- Statistiques de pratique sur 7 ou 30 jours et export CSV.
 
-## Structure
+## Périmètre
 
-- `ios/Eole.xcodeproj` : projet et point d'entrée de l'application.
-- `ios/Assets.xcassets` : icône et ressources visuelles.
-- `ios/Resources/Audio` : fichiers audio embarqués et leurs licences.
-- `native/Sources/EoleApp` : vues, moteur de séance, audio et persistance.
-- `native/Sources/EoleCore` : modèles, validation, statistiques et export.
-- `native/Sources/EoleCoreVerify` : vérifications autonomes de la logique métier.
+- iPhone uniquement, format de référence `390 × 844`.
+- iOS 26 et Swift 6 ; aucune compatibilité iOS antérieure n’est visée.
+- Données et préférences conservées sur l’iPhone.
+- Pas d’authentification ni de synchronisation cloud dans cette version.
 
-## Lancer l'application
+## Architecture
 
-1. Ouvrir `ios/Eole.xcodeproj` dans Xcode.
-2. Choisir un simulateur ou un iPhone sous iOS 26.
-3. Lancer le scheme `Eole`.
+```text
+ios/
+  Eole.xcodeproj/       Projet Xcode et cible applicative
+  EolePhoneApp.swift    Point d’entrée de l’application
+  Assets.xcassets/      Icônes
+  Resources/Audio/      Audio embarqué et licences
 
-Le format de référence est l'iPhone `390×844`.
+native/Sources/
+  EoleApp/              Vues SwiftUI, séance, audio et persistance
+  EoleCore/             Modèles, validation, statistiques et export
+  EoleCoreVerify/       Vérification autonome de la logique métier
+native/Tests/
+  EoleCoreTests/        Tests unitaires SwiftPM de la logique métier
+```
 
-## Vérifier la logique métier
+Le projet Xcode compile les sources natives directement afin que l’application
+et la cible SwiftPM partagent la même implémentation.
+
+## Prérequis
+
+- macOS compatible avec Xcode 26
+- Xcode 26 avec un SDK iOS 26
+- Swift 6
+- Un simulateur ou un iPhone sous iOS 26
+- Une équipe de signature Apple sélectionnée dans Xcode pour un lancement sur
+  appareil réel
+
+## Lancer l’application
+
+1. Ouvrir `ios/Eole.xcodeproj` dans Xcode 26.
+2. Sélectionner la cible `Eole` et un simulateur ou iPhone sous iOS 26.
+3. Choisir son équipe Apple dans les réglages de signature si nécessaire.
+4. Lancer l’application.
+
+Pour une compilation de contrôle sans signature :
 
 ```bash
-cd native
+xcodebuild \
+  -project ios/Eole.xcodeproj \
+  -target Eole \
+  -configuration Debug \
+  -sdk iphonesimulator \
+  -destination 'generic/platform=iOS Simulator' \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
+
+## Vérifier
+
+Depuis `native/`, les deux commandes suivantes couvrent respectivement les
+tests XCTest et la vérification autonome utilisée comme contrôle de parité :
+
+```bash
+swift test
 swift run EoleCoreVerify
 ```
 
-Le projet Xcode doit aussi être compilé avant livraison afin de vérifier l'intégration SwiftUI et les ressources embarquées.
+Ces contrôles ne remplacent pas un build Xcode ni une vérification sur iPhone.
+Ils ne prouvent notamment pas le rendu SwiftUI, les routes audio, les haptics,
+le verrouillage de l’écran ou les interruptions système.
 
-## Données et sécurité
+## Données, sécurité et audio
 
-Les séances restent dans SwiftData et les réglages légers dans `UserDefaults`. Aucune synchronisation distante ni authentification applicative n'est active.
+Les séances sont stockées dans SwiftData et les réglages légers dans
+`UserDefaults`. La synchronisation distante reste désactivée. Le détail des
+sources et licences audio se trouve dans
+[`ios/Resources/Audio/SOURCES.md`](ios/Resources/Audio/SOURCES.md).
 
-La respiration rapide suivie d'une apnée peut provoquer vertiges ou malaise. L'application affiche une notice à la première ouverture : pratiquer assis ou allongé, jamais dans l'eau, au volant ou dans une situation dangereuse en cas de malaise.
+La respiration rapide suivie d’une apnée peut provoquer vertiges ou malaise.
+Une notice demande de pratiquer assis ou allongé, jamais dans l’eau, au volant
+ou dans une situation où un malaise serait dangereux. Cette application ne
+remplace pas un avis médical.
+
+## Limites connues
+
+- La cible automatisée couvre la logique métier ; l’interface, l’audio et le
+  comportement matériel nécessitent encore une vérification Xcode/simulateur/
+  iPhone selon le niveau de preuve recherché.
+- Les données restent locales : aucune récupération entre appareils n’est
+  proposée.

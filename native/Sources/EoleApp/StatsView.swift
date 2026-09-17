@@ -281,7 +281,7 @@ public struct StatsView: View {
                                 width: days == 30 ? .fixed(5) : .fixed(24)
                             )
                             .foregroundStyle(Color.eolePrimary)
-                            .cornerRadius(3)
+                            .clipShape(.rect(cornerRadius: 3))
                             .annotation(position: .top, alignment: .center) {
                                 if days == 7 {
                                     Text(shortDuration(Double(total)))
@@ -296,7 +296,7 @@ public struct StatsView: View {
                                 width: days == 30 ? .fixed(3) : .fixed(12)
                             )
                             .foregroundStyle(Color.eoleBorder.opacity(0.35))
-                            .cornerRadius(2)
+                            .clipShape(.rect(cornerRadius: 2))
                         }
                     }
 
@@ -683,7 +683,7 @@ public struct StatsView: View {
     }
 
     private func chartAccessibilityValue(series: [DailyPoint], averageTotal: Double) -> String {
-        var parts = ["Moyenne : \(shortDuration(averageTotal))"]
+        var parts = [retentionAccessibility(series), "Moyenne : \(shortDuration(averageTotal))"]
         if let key = selectedDay,
            let point = series.first(where: { $0.key == key }) {
             parts.append(selectedDayDetail(point))

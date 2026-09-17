@@ -254,7 +254,7 @@ public final class EoleAudioEngine {
         ambientFadeTask = Task { @MainActor [weak player] in
             for step in 1...steps {
                 do {
-                    try await Task.sleep(nanoseconds: UInt64(fadeSeconds * 1_000_000_000 / Double(steps)))
+                    try await Task.sleep(for: .seconds(fadeSeconds / Double(steps)))
                 } catch { return }
                 player?.volume = startVolume * Float(1 - Double(step) / Double(steps))
             }
@@ -278,7 +278,7 @@ public final class EoleAudioEngine {
         ambientFadeTask = Task { @MainActor [weak player] in
             for step in 1...steps {
                 do {
-                    try await Task.sleep(nanoseconds: UInt64(fadeSeconds * 1_000_000_000 / Double(steps)))
+                    try await Task.sleep(for: .seconds(fadeSeconds / Double(steps)))
                 } catch { return }
                 guard !Task.isCancelled else { return }
                 player?.volume = startVolume * Float(1 - Double(step) / Double(steps))
@@ -308,7 +308,7 @@ public final class EoleAudioEngine {
             ambientFadeTask = Task { @MainActor [weak player] in
                 for step in 1...steps {
                     do {
-                        try await Task.sleep(nanoseconds: UInt64(fadeSeconds * 1_000_000_000 / Double(steps)))
+                        try await Task.sleep(for: .seconds(fadeSeconds / Double(steps)))
                     } catch { return }
                     guard !Task.isCancelled else { return }
                     player?.volume = targetVolume * Float(Double(step) / Double(steps))
@@ -352,7 +352,7 @@ public final class EoleAudioEngine {
         duckingTask?.cancel()
         duckingTask = Task { @MainActor [weak self] in
             do {
-                try await Task.sleep(nanoseconds: UInt64(max(0, seconds + 0.15) * 1_000_000_000))
+                try await Task.sleep(for: .seconds(max(0, seconds + 0.15)))
             } catch { return }
             guard !Task.isCancelled else { return }
             self?.restoreAmbient()
@@ -422,6 +422,10 @@ public final class EoleAudioEngine {
 
     /// Joue un extrait de cloche selon le style choisi (Clarté ou Bols tibétains).
     public func previewBell(style: BellStyle? = nil) {
+        guard breathVolume > 0 else {
+            stopPreview()
+            return
+        }
         let chosenStyle = style ?? bellStyle
         #if os(iOS)
         do {
@@ -463,7 +467,7 @@ public final class EoleAudioEngine {
         let frames = Int(format.sampleRate * spec.seconds)
         var samples = [Float](repeating: 0, count: frames)
         let harmonicWeight = max(1.0, spec.harmonics.indices.map { 1.0 / Double($0 + 2) }.reduce(0, +))
-        let effectiveVol = max(0.5, Double(breathVolume) / 100.0)
+        let effectiveVol = min(1.0, Double(breathVolume) / 100.0)
         for index in 0..<frames {
             let t = Double(index) / format.sampleRate
             let attack = min(1.0, t / 0.015)
@@ -495,28 +499,28 @@ public final class EoleAudioEngine {
 
     /// Joue un aperçu d'ambiance de quelques secondes puis s'estompe doucement.
     public func previewAmbient(track: BreathMusicTrack) {
+        stopPreview()
+        guard musicVolume > 0 else { return }
         #if os(iOS)
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
         } catch {}
         #endif
-        stopPreview()
-
         let name = ambientFileName(for: track)
         guard let url = bundleAudioURL(named: name),
               let player = try? AVAudioPlayer(contentsOf: url) else { return }
 
-        let targetVol = max(0.25, Float(musicVolume) / 100.0)
+        let targetVol = min(1.0, Float(musicVolume) / 100.0)
         player.volume = targetVol
-        player.play()
+        guard player.play() else { return }
         previewAmbientPlayer = player
 
         previewStopTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            try? await Task.sleep(for: .seconds(5))
             guard !Task.isCancelled, let self, let p = self.previewAmbientPlayer else { return }
             for step in 1...10 {
-                try? await Task.sleep(nanoseconds: 80_000_000)
+                try? await Task.sleep(for: .milliseconds(80))
                 if Task.isCancelled { break }
                 p.volume = targetVol * Float(10 - step) / 10.0
             }

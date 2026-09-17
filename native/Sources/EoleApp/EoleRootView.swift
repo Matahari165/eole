@@ -30,30 +30,33 @@ public struct EoleRootView: View {
     public var body: some View {
         ZStack {
             TabView {
-                NavigationStack {
-                    HomeView(
-                        store: store,
-                        onStart: { beginSession($0) },
-                        onAdjust: { showConfigurator = true }
-                    )
+                Tab("Accueil", systemImage: "house") {
+                    NavigationStack {
+                        HomeView(
+                            store: store,
+                            onStart: { beginSession($0) },
+                            onAdjust: { showConfigurator = true }
+                        )
+                    }
                 }
-                .tabItem { Label("Accueil", systemImage: "house") }
-                NavigationStack {
-                    StatsView(store: store, onPrepare: { showConfigurator = true })
+                Tab("Progrès", systemImage: "chart.bar") {
+                    NavigationStack {
+                        StatsView(store: store, onPrepare: { showConfigurator = true })
+                            .lazyTab()
+                    }
+                }
+                Tab("Réglages", systemImage: "gearshape") {
+                    NavigationStack {
+                        SettingsView(
+                            audio: audio,
+                            onSettingsChanged: { settings in
+                                audio.apply(settings: settings)
+                                haptics.enabled = settings.hapticsEnabled
+                            }
+                        )
                         .lazyTab()
+                    }
                 }
-                .tabItem { Label("Progrès", systemImage: "chart.bar") }
-                NavigationStack {
-                    SettingsView(
-                        audio: audio,
-                        onSettingsChanged: { settings in
-                            audio.apply(settings: settings)
-                            haptics.enabled = settings.hapticsEnabled
-                        }
-                    )
-                    .lazyTab()
-                }
-                .tabItem { Label("Réglages", systemImage: "gearshape") }
             }
             .tint(Color.eolePrimary)
             // Sur iOS 26, TabView reçoit automatiquement la barre Liquid Glass
@@ -102,6 +105,16 @@ public struct EoleRootView: View {
             }
         } message: {
             Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux.")
+        }
+        .alert("Historique indisponible", isPresented: Binding(
+            get: { store.storageErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented { store.clearStorageError() }
+            }
+        )) {
+            Button("OK", role: .cancel) { store.clearStorageError() }
+        } message: {
+            Text(store.storageErrorMessage ?? "L’historique local est momentanément indisponible.")
         }
     }
 
