@@ -6,6 +6,8 @@ import SwiftUI
 /// Accueil natif : l'action du jour d'abord, puis quelques repères utiles.
 public struct HomeView: View {
     @ObservedObject var store: SessionStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hasAppeared = false
     var onStart: (SessionConfig) -> Void
     var onAdjust: () -> Void
 
@@ -39,11 +41,20 @@ public struct HomeView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
+            .opacity(hasAppeared ? 1 : 0)
+            .offset(y: reduceMotion || hasAppeared ? 0 : 8)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
         .navigationTitle("Aujourd’hui")
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            if !hasAppeared {
+                withAnimation(.eoleCalm(duration: EoleMotion.appEntrance)) {
+                    hasAppeared = true
+                }
+            }
+        }
     }
 
     private func practicePanel(_ defaults: SessionConfig, stats: SessionStats) -> some View {

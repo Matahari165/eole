@@ -96,7 +96,7 @@ public struct StatsView: View {
             if reduceMotion {
                 days = value
             } else {
-                withAnimation(.easeOut(duration: EoleMotion.controlTransition)) { days = value }
+                withAnimation(.eoleCalm(duration: EoleMotion.controlTransition)) { days = value }
             }
             selectedDay = nil
         }
@@ -517,7 +517,7 @@ public struct StatsView: View {
                         if reduceMotion {
                             showAllHistory.toggle()
                         } else {
-                            withAnimation(.easeOut(duration: EoleMotion.controlTransition)) { showAllHistory.toggle() }
+                            withAnimation(.eoleCalm(duration: EoleMotion.controlTransition)) { showAllHistory.toggle() }
                         }
                     }
                     .font(.subheadline.weight(.semibold))

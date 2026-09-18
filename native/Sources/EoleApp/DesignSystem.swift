@@ -75,25 +75,40 @@ public extension Animation {
     static func eoleBreath(duration: Double) -> Animation {
         .timingCurve(0.37, 0, 0.63, 1, duration: duration)
     }
+
+    /// Courbe particulièrement douce et apaisée pour les transitions d'ambiance et d'écrans.
+    static func eoleCalm(duration: Double = EoleMotion.chromeFade) -> Animation {
+        .timingCurve(0.25, 0.1, 0.25, 1.0, duration: duration)
+    }
 }
 
 /// Durées motion centralisées : toute nouvelle animation réutilise ces tokens
 /// au lieu d'une durée magique dispersée.
 public enum EoleMotion {
-    /// Présentation / dismissal de la séance plein écran.
-    public static let sessionPresent: Double = 0.35
-    /// Cross-fade court du chrome (fond de séance au changement de macro-phase).
-    public static let chromeFade: Double = 0.3
-    /// Press du bouton primaire.
-    public static let pressPrimary: Double = 0.18
-    public static let pressPrimaryScale: CGFloat = 0.98
+    /// Présentation de la séance plein écran (immersion calme et profonde).
+    public static let sessionPresent: Double = 0.75
+    /// Fermeture de la séance plein écran (retour apaisé vers l'accueil).
+    public static let sessionDismiss: Double = 0.70
+    /// Cross-fade doux du fond de séance au changement de macro-phase.
+    public static let chromeFade: Double = 0.65
+    /// Moment d'installation préalable (« Installe-toi ») avant le décompte.
+    public static let settleDuration: Double = 1.80
+    /// Dévoilement progressif et paisible de l'écran des scores en fin de séance.
+    public static let completionReveal: Double = 0.85
+    /// Montée fluide et progressive des barres du graphique de rétention.
+    public static let chartBarRise: Double = 0.85
+    /// Entrée en scène douce lors de l'ouverture de l'application.
+    public static let appEntrance: Double = 0.85
+    /// Press du bouton primaire (doux et réactif sans être brusque).
+    public static let pressPrimary: Double = 0.28
+    public static let pressPrimaryScale: CGFloat = 0.985
     /// Press des boutons icônes.
-    public static let pressIcon: Double = 0.16
-    public static let pressIconScale: CGFloat = 0.94
+    public static let pressIcon: Double = 0.24
+    public static let pressIconScale: CGFloat = 0.96
     /// Pas du compte à rebours (1 chiffre / seconde).
     public static let countdown: Double = 1.0
     /// Transition douce des contrôles hors séance (période, historique).
-    public static let controlTransition: Double = 0.2
+    public static let controlTransition: Double = 0.40
 }
 
 /// Fondus audio miroirs des défauts d'EoleAudioEngine, exposés pour rester
@@ -221,7 +236,7 @@ public struct EolePrimaryButton: ButtonStyle {
             .padding(.horizontal, EoleSpacing.lg)
             .glassEffect(.regular.tint(Color.eolePrimary).interactive(), in: Capsule())
             .scaleEffect(!reduceMotion && configuration.isPressed ? EoleMotion.pressPrimaryScale : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: EoleMotion.pressPrimary), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeInOut(duration: EoleMotion.pressPrimary), value: configuration.isPressed)
     }
 }
 
@@ -253,7 +268,7 @@ public struct EoleGlassIconButtonStyle: ButtonStyle {
             .contentShape(Circle())
             .glassEffect(.regular.interactive(), in: Circle())
             .scaleEffect(!reduceMotion && configuration.isPressed ? EoleMotion.pressIconScale : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: EoleMotion.pressIcon), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeInOut(duration: EoleMotion.pressIcon), value: configuration.isPressed)
     }
 }
 

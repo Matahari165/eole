@@ -11,6 +11,7 @@ public struct ActiveSessionView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showStopConfirm = false
+    @State private var showResultsAnimated = false
     private let store: SessionStore
     private let config: SessionConfig
     private let onClose: () -> Void
@@ -36,14 +37,27 @@ public struct ActiveSessionView: View {
             // Le dégradé suit la phase ; les commandes restent au-dessus en verre.
             phaseBackground
             sessionAura
-            VStack {
-                topBar
-                Spacer()
-                centerStage
-                Spacer()
+
+            if engine.phase == .complete {
+                completeStage
+                    .transition(
+                        reduceMotion ? .opacity : .asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 0.99)),
+                            removal: .opacity
+                        )
+                    )
+            } else {
+                VStack {
+                    topBar
+                    Spacer()
+                    centerStage
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+                .transition(.opacity)
             }
-            .contentShape(Rectangle())
         }
+        .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.completionReveal), value: engine.phase == .complete)
         .foregroundStyle(.white)
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled(engine.phase == .saving)
@@ -52,7 +66,6 @@ public struct ActiveSessionView: View {
                 guard let engine else { return }
                 let savedLocally = store.saveSession(session)
                 if savedLocally {
-                    // La copie locale est la fin de la séance. Une éventuelle
                     engine.markSaved()
                 } else {
                     engine.markSaveFailed("La séance n'a pas pu être enregistrée.")
@@ -80,6 +93,7 @@ public struct ActiveSessionView: View {
     private var phaseBackground: some View {
         let colors: [Color]
         switch engine.phase {
+        case .ready, .starting: colors = [Color(hex: 0x1F5D57), Color(hex: 0x0A2B29)]
         case .inhale: colors = [Color(hex: 0x2A756C), Color(hex: 0x103A36)]
         case .exhale, .countdown: colors = [Color(hex: 0x1F5D57), Color(hex: 0x0A2B29)]
         case .retention: colors = [Color(hex: 0x263F3C), Color(hex: 0x0D2422)]
@@ -89,15 +103,14 @@ public struct ActiveSessionView: View {
         return LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom)
             .ignoresSafeArea()
             .allowsHitTesting(false)
-            // Cross-fade court unique au changement de macro-phase :
-            // inspire/expire partagent la même clé pour ne pas animer à chaque souffle.
-            .animation(reduceMotion ? nil : .eoleBreath(duration: EoleMotion.chromeFade), value: backgroundKey)
+            // Cross-fade particulièrement doux et apaisé au changement de macro-phase
+            .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chromeFade), value: backgroundKey)
     }
 
     /// Clé de macro-phase : le fond ne réagit qu'aux vrais changements d'ambiance.
     private var backgroundKey: String {
         switch engine.phase {
-        case .inhale, .exhale: return "breathing"
+        case .ready, .starting, .countdown, .inhale, .exhale: return "breathing"
         default: return engine.phase.rawValue
         }
     }
@@ -106,6 +119,7 @@ public struct ActiveSessionView: View {
     private var auraDuration: Double {
         let timing = paceTimings[config.pace] ?? paceTimings[.normal]!
         switch engine.phase {
+        case .starting: return SessionEngine.settleSeconds
         case .inhale: return timing.inhaleSeconds
         case .exhale: return timing.exhaleSeconds
         case .recoveryInhale: return SessionEngine.recoveryInhaleSeconds
@@ -121,8 +135,8 @@ public struct ActiveSessionView: View {
             startRadius: 20,
             endRadius: 280
         )
-        .scaleEffect(engine.phase == .inhale || engine.phase == .recoveryInhale ? 1.22 : 0.84)
-        .opacity(engine.phase == .retention ? 0.45 : 1)
+        .scaleEffect(engine.phase == .inhale || engine.phase == .recoveryInhale || engine.phase == .starting ? 1.18 : 0.84)
+        .opacity(engine.phase == .retention ? 0.45 : (engine.phase == .complete ? 0.20 : 1))
         .animation(reduceMotion ? nil : .eoleBreath(duration: auraDuration), value: engine.phase)
         .ignoresSafeArea()
         .allowsHitTesting(false)
@@ -165,10 +179,18 @@ public struct ActiveSessionView: View {
     private var centerStage: some View {
         switch engine.phase {
         case .ready, .starting:
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
+                EoleLogo(size: 64)
+                    .scaleEffect(reduceMotion ? 1.0 : 1.04)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: SessionEngine.settleSeconds).repeatForever(autoreverses: true), value: engine.phase)
                 Text("Installe-toi.")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .font(.title2.weight(.medium))
+                    .foregroundStyle(.white)
+                Text("Prends une posture confortable et détends tes épaules.")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 36)
             }
             .transition(.opacity)
         case .countdown:
@@ -180,7 +202,10 @@ public struct ActiveSessionView: View {
                     .contentTransition(.numericText())
                     // Fond mat semi-opaque (pas de verre) : chiffre blanc lisible.
                     .frame(width: 210, height: 210)
-                    .background(Color.black.opacity(0.4), in: Circle())
+                    .background(Color.black.opacity(0.35), in: Circle())
+                    .overlay {
+                        Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    }
                     .animation(reduceMotion ? nil : .easeInOut(duration: EoleMotion.countdown), value: engine.countdownValue)
                     .accessibilityLabel("Compte à rebours : \(engine.countdownValue)")
             }
@@ -247,73 +272,94 @@ public struct ActiveSessionView: View {
             .padding(32)
             .background(.regularMaterial, in: .rect(cornerRadius: EoleRadius.lg))
         case .complete:
-            let priorSessions = store.sessions.filter { $0.id != engine.sessionId }
-            let evaluation = evaluateSessionRecords(sessionRounds: engine.results, priorSessions: priorSessions)
-            let totalRetention = engine.results.map(\.retentionSeconds).reduce(0, +)
-            let isEarlyStop = engine.results.count < config.rounds
+            EmptyView()
+        }
+    }
 
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 22) {
-                    // En-tête sobre et valorisant
-                    VStack(spacing: 8) {
-                        Image(systemName: evaluation.hasOverallRecord ? "trophy.fill" : "checkmark.circle.fill")
-                            .font(.system(size: 46, weight: .semibold))
-                            .foregroundStyle(evaluation.hasOverallRecord ? Color(hex: 0xF5C518) : Color.eoleAccent)
-                            .symbolRenderingMode(.hierarchical)
-                            .accessibilityHidden(true)
+    private var completeStage: some View {
+        let priorSessions = store.sessions.filter { $0.id != engine.sessionId }
+        let evaluation = evaluateSessionRecords(sessionRounds: engine.results, priorSessions: priorSessions)
+        let totalRetention = engine.results.map(\.retentionSeconds).reduce(0, +)
+        let isEarlyStop = engine.results.count < config.rounds
 
-                        Text("Séance terminée")
-                            .font(.largeTitle.weight(.bold))
-                            .multilineTextAlignment(.center)
+        return ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 22) {
+                // En-tête sobre et valorisant
+                VStack(spacing: 8) {
+                    Image(systemName: evaluation.hasOverallRecord ? "trophy.fill" : "checkmark.circle.fill")
+                        .font(.system(size: 46, weight: .semibold))
+                        .foregroundStyle(evaluation.hasOverallRecord ? Color(hex: 0xF5C518) : Color.eoleAccent)
+                        .symbolRenderingMode(.hierarchical)
+                        .accessibilityHidden(true)
 
-                        Text(isEarlyStop
-                             ? "\(engine.results.count) round\(engine.results.count > 1 ? "s" : "") sur \(config.rounds) complété\(engine.results.count > 1 ? "s" : "")"
-                             : "\(config.rounds) rounds complétés • Rythme \(config.pace.rawValue.capitalized)")
-                            .font(.subheadline)
-                            .foregroundStyle(.white.opacity(0.72))
-                    }
+                    Text("Séance terminée")
+                        .font(.largeTitle.weight(.bold))
+                        .multilineTextAlignment(.center)
 
-                    if let message = engine.errorMessage {
-                        VStack(spacing: 12) {
-                            Text(message).font(.footnote).foregroundStyle(.white.opacity(0.9))
-                            Button("Réessayer") { engine.retryPersist() }
-                                .buttonStyle(.glassProminent)
-                                .controlSize(.large)
-                        }
-                    }
-
-                    // Bannière Record si un record (général ou par rang de tour) a été battu
-                    if evaluation.hasAnyRecord {
-                        recordBanner(evaluation: evaluation)
-                    }
-
-                    // Métriques clés : Temps total, Rétention totale, Rounds
-                    keyMetricsGrid(totalRetention: totalRetention)
-
-                    // Graphique visuel en barres de chaque rétention
-                    retentionBarChart(evaluation: evaluation)
-
-                    // Liste détaillée de chaque round
-                    roundDetailsList(evaluation: evaluation)
+                    Text(isEarlyStop
+                         ? "\(engine.results.count) round\(engine.results.count > 1 ? "s" : "") sur \(config.rounds) complété\(engine.results.count > 1 ? "s" : "")"
+                         : "\(config.rounds) rounds complétés • Rythme \(config.pace.rawValue.capitalized)")
+                        .font(.subheadline)
+                        .foregroundStyle(.white.opacity(0.72))
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                // Réserve la place du CTA fixe pour qu'il ne masque pas le récap.
-                .padding(.bottom, 96)
+                .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                .offset(y: reduceMotion || showResultsAnimated ? 0 : 6)
+
+                if let message = engine.errorMessage {
+                    VStack(spacing: 12) {
+                        Text(message).font(.footnote).foregroundStyle(.white.opacity(0.9))
+                        Button("Réessayer") { engine.retryPersist() }
+                            .buttonStyle(.glassProminent)
+                            .controlSize(.large)
+                    }
+                }
+
+                // Bannière Record si un record (général ou par rang de tour) a été battu
+                if evaluation.hasAnyRecord {
+                    recordBanner(evaluation: evaluation)
+                        .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                        .offset(y: reduceMotion || showResultsAnimated ? 0 : 6)
+                }
+
+                // Métriques clés : Temps total, Rétention totale, Rounds
+                keyMetricsGrid(totalRetention: totalRetention)
+                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 8)
+
+                // Graphique visuel en barres de chaque rétention
+                retentionBarChart(evaluation: evaluation)
+                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 10)
+
+                // Liste détaillée de chaque round
+                roundDetailsList(evaluation: evaluation)
+                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 12)
             }
-            .frame(maxHeight: .infinity)
-            // CTA fixe en bas (pattern Configurator)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Button(engine.errorMessage == nil ? "Terminer" : "Fermer sans enregistrer") {
-                    onClose()
+            .padding(.horizontal, 20)
+            .padding(.top, 24)
+            // Réserve la place du CTA fixe pour qu'il ne masque pas le récap.
+            .padding(.bottom, 96)
+        }
+        .frame(maxHeight: .infinity)
+        // CTA fixe en bas (pattern Configurator)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Button(engine.errorMessage == nil ? "Terminer" : "Fermer sans enregistrer") {
+                onClose()
+            }
+            .buttonStyle(.glassProminent)
+            .tint(.white.opacity(0.92))
+            .foregroundStyle(Color(hex: 0x0A5C56))
+            .controlSize(.extraLarge)
+            .padding(.horizontal, 28)
+            .padding(.top, 10)
+            .padding(.bottom, 8)
+        }
+        .onAppear {
+            if !showResultsAnimated {
+                withAnimation(.eoleCalm(duration: EoleMotion.chartBarRise).delay(0.12)) {
+                    showResultsAnimated = true
                 }
-                .buttonStyle(.glassProminent)
-                .tint(.white.opacity(0.92))
-                .foregroundStyle(Color(hex: 0x0A5C56))
-                .controlSize(.extraLarge)
-                .padding(.horizontal, 28)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
             }
         }
     }
@@ -426,7 +472,8 @@ public struct ActiveSessionView: View {
                     let roundEval = evaluation.roundEvaluations.first(where: { $0.roundIndex == round.roundIndex })
                     let isOverall = roundEval?.isOverallRecord == true
                     let isRoundRec = roundEval?.isRoundRecord == true
-                    let barHeight = max(16, chartHeight * CGFloat(round.retentionSeconds) / CGFloat(maxSec))
+                    let targetBarHeight = max(16, chartHeight * CGFloat(round.retentionSeconds) / CGFloat(maxSec))
+                    let barHeight = (showResultsAnimated || reduceMotion) ? targetBarHeight : 4
 
                     VStack(spacing: 6) {
                         // Badge d'icône au-dessus de la valeur
@@ -434,12 +481,12 @@ public struct ActiveSessionView: View {
                             Image(systemName: "trophy.fill")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color(hex: 0xF5C518))
-                                .transition(.scale)
+                                .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                         } else if isRoundRec {
                             Image(systemName: "star.fill")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color.eoleAccent)
-                                .transition(.scale)
+                                .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                         } else {
                             Text("")
                                 .font(.caption2)
@@ -451,6 +498,7 @@ public struct ActiveSessionView: View {
                             .font(.caption.weight(.bold))
                             .monospacedDigit()
                             .foregroundStyle(.white)
+                            .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
 
                         // Barre de graphique visuelle
                         ZStack(alignment: .bottom) {
@@ -495,11 +543,13 @@ public struct ActiveSessionView: View {
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(Color(hex: 0xF5C518))
                                 .lineLimit(1)
+                                .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                         } else if isRoundRec {
                             Text("Tour")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(Color.eoleAccent)
                                 .lineLimit(1)
+                                .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                         } else {
                             Text("")
                                 .font(.system(size: 9))

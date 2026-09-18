@@ -156,7 +156,7 @@ public struct ConfiguratorView: View {
             if reduceMotion {
                 defaultsSaved = true
             } else {
-                withAnimation(.easeOut(duration: EoleMotion.pressPrimary)) { defaultsSaved = true }
+                withAnimation(.eoleCalm(duration: EoleMotion.controlTransition)) { defaultsSaved = true }
             }
         } label: {
             Label(

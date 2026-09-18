@@ -37,6 +37,7 @@ public final class SessionEngine: ObservableObject {
     }
 
     /// Durées de récupération explicites, partagées avec les visuels.
+    public static let settleSeconds: Double = 1.8
     public static let recoveryInhaleSeconds: Double = 2
     public static let recoveryExhaleSeconds: Double = 2
     public static let recoveryHoldSeconds: Int = 15
@@ -155,6 +156,11 @@ public final class SessionEngine: ObservableObject {
     // MARK: - Séquence
 
     private func run() async {
+        // Phase d'installation préalable : permet de s'installer calmement avant le décompte.
+        phase = .starting
+        guard await sleep(seconds: Self.settleSeconds) else { return }
+        guard !Task.isCancelled, !hasPersisted else { return }
+
         // Compte à rebours de trois secondes avec repères sonores.
         phase = .countdown
         for value in [3, 2, 1] {

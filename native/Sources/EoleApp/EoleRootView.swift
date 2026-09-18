@@ -67,15 +67,15 @@ public struct EoleRootView: View {
 
             if let launch = activeSession {
                 ActiveSessionView(config: launch.config, store: store, audio: audio, haptics: haptics) {
-                    withAnimation(.easeInOut(duration: EoleMotion.sessionPresent)) {
+                    withAnimation(.easeInOut(duration: EoleMotion.sessionDismiss)) {
                         activeSession = nil
                     }
                 }
-                // Reduce Motion : fondu seul, sans zoom 1.03/0.97.
+                // Immersion calme et profonde ; en Reduce Motion : fondu pur.
                 .transition(
                     reduceMotion ? .opacity : .asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 1.03)),
-                        removal: .opacity.combined(with: .scale(scale: 0.97))
+                        insertion: .opacity.combined(with: .scale(scale: 1.015)),
+                        removal: .opacity.combined(with: .scale(scale: 0.985))
                     )
                 )
                 .zIndex(100)
