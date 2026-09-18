@@ -7,70 +7,70 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3C672AFEE188A7A1CEA229AF /* Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE1B8D560BBEC4A3D56DB8C /* Analytics.swift */; };
-		2F48AFE15FCAC123F2D74B63 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CCC8E90D84E097495826F1 /* Models.swift */; };
-		116144C3E944A75E91544620 /* RetentionTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7760FB1E397AAB2CD76E5D /* RetentionTiming.swift */; };
-		20B87D4C1B880F9BB0F64AD9 /* SessionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00FE216D88D59930BFC04EC1 /* SessionConfig.swift */; };
-		CEEEC1D349B701D18540B2DA /* SessionExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC46FC093090F1082CBDE07 /* SessionExport.swift */; };
-		9820C4BBD84C4BD6E5A8ACA2 /* Validation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD64A61628B211C8605D4A99 /* Validation.swift */; };
-		1C5325EDE122293B97B90F77 /* ActiveSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032805820BCB605DEC940AE2 /* ActiveSessionView.swift */; };
-		E9851C137BB8A3B90DFABCB5 /* AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC651A7FBB11D15515D38118 /* AudioEngine.swift */; };
-		3F83A2E0A1CE1192B0AF8501 /* BreathVisuals.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8984BA907E55551FA13BBB8 /* BreathVisuals.swift */; };
-		C317D65423F8D3826C73DA3A /* ConfiguratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DEB7DF2B1BAD8240C660397 /* ConfiguratorView.swift */; };
-		CC6FC4EEDC93B4CAC2C37415 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB404E6A7DCF80628C3A9A67 /* DesignSystem.swift */; };
-		66A66BED8855AAF30B7D3CDC /* EoleRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 495F92F3B4E936A7945E982F /* EoleRootView.swift */; };
-		9317FF913C17EA896E92CEA9 /* Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF8FAC944B3D22663A95828 /* Haptics.swift */; };
-		7CBE090AE540848B257AE6F0 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E27E903920E20F00A030F4C /* HomeView.swift */; };
-		024589172C0EDCE2787497B4 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25031D2A270346AF9B2540C3 /* Persistence.swift */; };
-		957228ACC9D3D327CAFDBD42 /* SessionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10331BA5624DEAB3DB16A7F /* SessionEngine.swift */; };
-		72E869CC843A1902A6DE29AF /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B663FC1875FF0B95AB05682A /* SettingsView.swift */; };
-		1F424A1F2242C4B558C45E8B /* StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258CC2494E8D4C12CC9C5599 /* StatsView.swift */; };
+		024589172C0EDCE2787497B4 /* ../native/Sources/EoleApp/Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25031D2A270346AF9B2540C3 /* ../native/Sources/EoleApp/Persistence.swift */; };
+		116144C3E944A75E91544620 /* ../native/Sources/EoleCore/RetentionTiming.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7760FB1E397AAB2CD76E5D /* ../native/Sources/EoleCore/RetentionTiming.swift */; };
+		1C5325EDE122293B97B90F77 /* ../native/Sources/EoleApp/ActiveSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 032805820BCB605DEC940AE2 /* ../native/Sources/EoleApp/ActiveSessionView.swift */; };
+		1F424A1F2242C4B558C45E8B /* ../native/Sources/EoleApp/StatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 258CC2494E8D4C12CC9C5599 /* ../native/Sources/EoleApp/StatsView.swift */; };
+		20B87D4C1B880F9BB0F64AD9 /* ../native/Sources/EoleCore/SessionConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00FE216D88D59930BFC04EC1 /* ../native/Sources/EoleCore/SessionConfig.swift */; };
+		2F48AFE15FCAC123F2D74B63 /* ../native/Sources/EoleCore/Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11CCC8E90D84E097495826F1 /* ../native/Sources/EoleCore/Models.swift */; };
+		3C672AFEE188A7A1CEA229AF /* ../native/Sources/EoleCore/Analytics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CE1B8D560BBEC4A3D56DB8C /* ../native/Sources/EoleCore/Analytics.swift */; };
+		3F83A2E0A1CE1192B0AF8501 /* ../native/Sources/EoleApp/BreathVisuals.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8984BA907E55551FA13BBB8 /* ../native/Sources/EoleApp/BreathVisuals.swift */; };
+		66A66BED8855AAF30B7D3CDC /* ../native/Sources/EoleApp/EoleRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 495F92F3B4E936A7945E982F /* ../native/Sources/EoleApp/EoleRootView.swift */; };
+		72E869CC843A1902A6DE29AF /* ../native/Sources/EoleApp/SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B663FC1875FF0B95AB05682A /* ../native/Sources/EoleApp/SettingsView.swift */; };
+		7CBE090AE540848B257AE6F0 /* ../native/Sources/EoleApp/HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E27E903920E20F00A030F4C /* ../native/Sources/EoleApp/HomeView.swift */; };
+		9317FF913C17EA896E92CEA9 /* ../native/Sources/EoleApp/Haptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF8FAC944B3D22663A95828 /* ../native/Sources/EoleApp/Haptics.swift */; };
+		957228ACC9D3D327CAFDBD42 /* ../native/Sources/EoleApp/SessionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E10331BA5624DEAB3DB16A7F /* ../native/Sources/EoleApp/SessionEngine.swift */; };
+		9820C4BBD84C4BD6E5A8ACA2 /* ../native/Sources/EoleCore/Validation.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD64A61628B211C8605D4A99 /* ../native/Sources/EoleCore/Validation.swift */; };
+		A10100000000000000000001 /* Resources/Audio/eole-bambou.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000001 /* Resources/Audio/eole-bambou.mp3 */; };
+		A10100000000000000000002 /* Resources/Audio/eole-exhale-fast.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000002 /* Resources/Audio/eole-exhale-fast.mp3 */; };
+		A10100000000000000000003 /* Resources/Audio/eole-exhale-normal.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000003 /* Resources/Audio/eole-exhale-normal.mp3 */; };
+		A10100000000000000000004 /* Resources/Audio/eole-exhale-slow.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000004 /* Resources/Audio/eole-exhale-slow.mp3 */; };
+		A10100000000000000000005 /* Resources/Audio/eole-inhale-fast.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000005 /* Resources/Audio/eole-inhale-fast.mp3 */; };
+		A10100000000000000000006 /* Resources/Audio/eole-inhale-normal.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000006 /* Resources/Audio/eole-inhale-normal.mp3 */; };
+		A10100000000000000000007 /* Resources/Audio/eole-inhale-slow.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000007 /* Resources/Audio/eole-inhale-slow.mp3 */; };
+		A10100000000000000000008 /* Resources/Audio/eole-meditation.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000008 /* Resources/Audio/eole-meditation.mp3 */; };
+		A10100000000000000000009 /* Resources/Audio/eole-serenite.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000009 /* Resources/Audio/eole-serenite.mp3 */; };
 		B91FDC7B4F9B2A5A017A153E /* EolePhoneApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B66CD316DDBDDF2A563965 /* EolePhoneApp.swift */; };
-		E2F8AF2EE58D8892A06E7F86 /* initial_sessions.json in Resources */ = {isa = PBXBuildFile; fileRef = E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */; };
 		C10100000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D10100000000000000000001 /* Assets.xcassets */; };
-		A10100000000000000000001 /* eole-bambou.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000001 /* eole-bambou.mp3 */; };
-		A10100000000000000000002 /* eole-exhale-fast.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000002 /* eole-exhale-fast.mp3 */; };
-		A10100000000000000000003 /* eole-exhale-normal.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000003 /* eole-exhale-normal.mp3 */; };
-		A10100000000000000000004 /* eole-exhale-slow.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000004 /* eole-exhale-slow.mp3 */; };
-		A10100000000000000000005 /* eole-inhale-fast.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000005 /* eole-inhale-fast.mp3 */; };
-		A10100000000000000000006 /* eole-inhale-normal.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000006 /* eole-inhale-normal.mp3 */; };
-		A10100000000000000000007 /* eole-inhale-slow.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000007 /* eole-inhale-slow.mp3 */; };
-		A10100000000000000000008 /* eole-meditation.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000008 /* eole-meditation.mp3 */; };
-		A10100000000000000000009 /* eole-serenite.mp3 in Resources */ = {isa = PBXBuildFile; fileRef = B10100000000000000000009 /* eole-serenite.mp3 */; };
+		C317D65423F8D3826C73DA3A /* ../native/Sources/EoleApp/ConfiguratorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DEB7DF2B1BAD8240C660397 /* ../native/Sources/EoleApp/ConfiguratorView.swift */; };
+		CC6FC4EEDC93B4CAC2C37415 /* ../native/Sources/EoleApp/DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB404E6A7DCF80628C3A9A67 /* ../native/Sources/EoleApp/DesignSystem.swift */; };
+		CEEEC1D349B701D18540B2DA /* ../native/Sources/EoleCore/SessionExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC46FC093090F1082CBDE07 /* ../native/Sources/EoleCore/SessionExport.swift */; };
+		E2F8AF2EE58D8892A06E7F86 /* initial_sessions.json in Resources */ = {isa = PBXBuildFile; fileRef = E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */; };
+		E9851C137BB8A3B90DFABCB5 /* ../native/Sources/EoleApp/AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC651A7FBB11D15515D38118 /* ../native/Sources/EoleApp/AudioEngine.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		00FE216D88D59930BFC04EC1 /* ../native/Sources/EoleCore/SessionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleCore/SessionConfig.swift; sourceTree = SOURCE_ROOT; };
+		032805820BCB605DEC940AE2 /* ../native/Sources/EoleApp/ActiveSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/ActiveSessionView.swift; sourceTree = SOURCE_ROOT; };
+		0DEB7DF2B1BAD8240C660397 /* ../native/Sources/EoleApp/ConfiguratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/ConfiguratorView.swift; sourceTree = SOURCE_ROOT; };
+		11CCC8E90D84E097495826F1 /* ../native/Sources/EoleCore/Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleCore/Models.swift; sourceTree = SOURCE_ROOT; };
+		25031D2A270346AF9B2540C3 /* ../native/Sources/EoleApp/Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/Persistence.swift; sourceTree = SOURCE_ROOT; };
+		258CC2494E8D4C12CC9C5599 /* ../native/Sources/EoleApp/StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/StatsView.swift; sourceTree = SOURCE_ROOT; };
+		2E27E903920E20F00A030F4C /* ../native/Sources/EoleApp/HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/HomeView.swift; sourceTree = SOURCE_ROOT; };
+		495F92F3B4E936A7945E982F /* ../native/Sources/EoleApp/EoleRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/EoleRootView.swift; sourceTree = SOURCE_ROOT; };
+		4CF8FAC944B3D22663A95828 /* ../native/Sources/EoleApp/Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/Haptics.swift; sourceTree = SOURCE_ROOT; };
+		6CE1B8D560BBEC4A3D56DB8C /* ../native/Sources/EoleCore/Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleCore/Analytics.swift; sourceTree = SOURCE_ROOT; };
+		6D7760FB1E397AAB2CD76E5D /* ../native/Sources/EoleCore/RetentionTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleCore/RetentionTiming.swift; sourceTree = SOURCE_ROOT; };
+		7EC46FC093090F1082CBDE07 /* ../native/Sources/EoleCore/SessionExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleCore/SessionExport.swift; sourceTree = SOURCE_ROOT; };
 		A8792157CB4F27FB949C035F /* Eole.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Eole.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		6CE1B8D560BBEC4A3D56DB8C /* Analytics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleCore/Analytics.swift"; sourceTree = SOURCE_ROOT; };
-		11CCC8E90D84E097495826F1 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleCore/Models.swift"; sourceTree = SOURCE_ROOT; };
-		6D7760FB1E397AAB2CD76E5D /* RetentionTiming.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleCore/RetentionTiming.swift"; sourceTree = SOURCE_ROOT; };
-		00FE216D88D59930BFC04EC1 /* SessionConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleCore/SessionConfig.swift"; sourceTree = SOURCE_ROOT; };
-		7EC46FC093090F1082CBDE07 /* SessionExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleCore/SessionExport.swift"; sourceTree = SOURCE_ROOT; };
-		AD64A61628B211C8605D4A99 /* Validation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleCore/Validation.swift"; sourceTree = SOURCE_ROOT; };
-		032805820BCB605DEC940AE2 /* ActiveSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/ActiveSessionView.swift"; sourceTree = SOURCE_ROOT; };
-		FC651A7FBB11D15515D38118 /* AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/AudioEngine.swift"; sourceTree = SOURCE_ROOT; };
-		B8984BA907E55551FA13BBB8 /* BreathVisuals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/BreathVisuals.swift"; sourceTree = SOURCE_ROOT; };
-		0DEB7DF2B1BAD8240C660397 /* ConfiguratorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/ConfiguratorView.swift"; sourceTree = SOURCE_ROOT; };
-		CB404E6A7DCF80628C3A9A67 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/DesignSystem.swift"; sourceTree = SOURCE_ROOT; };
-		495F92F3B4E936A7945E982F /* EoleRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/EoleRootView.swift"; sourceTree = SOURCE_ROOT; };
-		4CF8FAC944B3D22663A95828 /* Haptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/Haptics.swift"; sourceTree = SOURCE_ROOT; };
-		2E27E903920E20F00A030F4C /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/HomeView.swift"; sourceTree = SOURCE_ROOT; };
-		25031D2A270346AF9B2540C3 /* Persistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/Persistence.swift"; sourceTree = SOURCE_ROOT; };
-		E10331BA5624DEAB3DB16A7F /* SessionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/SessionEngine.swift"; sourceTree = SOURCE_ROOT; };
-		B663FC1875FF0B95AB05682A /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/SettingsView.swift"; sourceTree = SOURCE_ROOT; };
-		258CC2494E8D4C12CC9C5599 /* StatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "../native/Sources/EoleApp/StatsView.swift"; sourceTree = SOURCE_ROOT; };
-		D6B66CD316DDBDDF2A563965 /* EolePhoneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "EolePhoneApp.swift"; sourceTree = SOURCE_ROOT; };
-		E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "initial_sessions.json"; sourceTree = SOURCE_ROOT; };
-		D10100000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Assets.xcassets"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000001 /* eole-bambou.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-bambou.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000002 /* eole-exhale-fast.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-exhale-fast.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000003 /* eole-exhale-normal.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-exhale-normal.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000004 /* eole-exhale-slow.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-exhale-slow.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000005 /* eole-inhale-fast.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-inhale-fast.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000006 /* eole-inhale-normal.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-inhale-normal.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000007 /* eole-inhale-slow.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-inhale-slow.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000008 /* eole-meditation.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-meditation.mp3"; sourceTree = SOURCE_ROOT; };
-		B10100000000000000000009 /* eole-serenite.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-serenite.mp3"; sourceTree = SOURCE_ROOT; };
+		AD64A61628B211C8605D4A99 /* ../native/Sources/EoleCore/Validation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleCore/Validation.swift; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000001 /* Resources/Audio/eole-bambou.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-bambou.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000002 /* Resources/Audio/eole-exhale-fast.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-exhale-fast.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000003 /* Resources/Audio/eole-exhale-normal.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-exhale-normal.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000004 /* Resources/Audio/eole-exhale-slow.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-exhale-slow.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000005 /* Resources/Audio/eole-inhale-fast.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-inhale-fast.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000006 /* Resources/Audio/eole-inhale-normal.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-inhale-normal.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000007 /* Resources/Audio/eole-inhale-slow.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-inhale-slow.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000008 /* Resources/Audio/eole-meditation.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-meditation.mp3"; sourceTree = SOURCE_ROOT; };
+		B10100000000000000000009 /* Resources/Audio/eole-serenite.mp3 */ = {isa = PBXFileReference; lastKnownFileType = audio.mp3; path = "Resources/Audio/eole-serenite.mp3"; sourceTree = SOURCE_ROOT; };
+		B663FC1875FF0B95AB05682A /* ../native/Sources/EoleApp/SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/SettingsView.swift; sourceTree = SOURCE_ROOT; };
+		B8984BA907E55551FA13BBB8 /* ../native/Sources/EoleApp/BreathVisuals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/BreathVisuals.swift; sourceTree = SOURCE_ROOT; };
+		CB404E6A7DCF80628C3A9A67 /* ../native/Sources/EoleApp/DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/DesignSystem.swift; sourceTree = SOURCE_ROOT; };
+		D10100000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = SOURCE_ROOT; };
+		D6B66CD316DDBDDF2A563965 /* EolePhoneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EolePhoneApp.swift; sourceTree = SOURCE_ROOT; };
+		E10331BA5624DEAB3DB16A7F /* ../native/Sources/EoleApp/SessionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/SessionEngine.swift; sourceTree = SOURCE_ROOT; };
+		E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = initial_sessions.json; sourceTree = SOURCE_ROOT; };
+		FC651A7FBB11D15515D38118 /* ../native/Sources/EoleApp/AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/AudioEngine.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -84,49 +84,49 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		EC6AE75C017423A0C5A951A8 = {
-			isa = PBXGroup;
-			children = (
-				6CE1B8D560BBEC4A3D56DB8C,
-				11CCC8E90D84E097495826F1,
-				6D7760FB1E397AAB2CD76E5D,
-				00FE216D88D59930BFC04EC1,
-				7EC46FC093090F1082CBDE07,
-				AD64A61628B211C8605D4A99,
-				032805820BCB605DEC940AE2,
-				FC651A7FBB11D15515D38118,
-				B8984BA907E55551FA13BBB8,
-				0DEB7DF2B1BAD8240C660397,
-				CB404E6A7DCF80628C3A9A67,
-				495F92F3B4E936A7945E982F,
-				4CF8FAC944B3D22663A95828,
-				2E27E903920E20F00A030F4C,
-				25031D2A270346AF9B2540C3,
-				E10331BA5624DEAB3DB16A7F,
-				B663FC1875FF0B95AB05682A,
-				258CC2494E8D4C12CC9C5599,
-				D6B66CD316DDBDDF2A563965,
-				E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */,
-				D10100000000000000000001 /* Assets.xcassets */,
-				B10100000000000000000001 /* eole-bambou.mp3 */,
-				B10100000000000000000002 /* eole-exhale-fast.mp3 */,
-				B10100000000000000000003 /* eole-exhale-normal.mp3 */,
-				B10100000000000000000004 /* eole-exhale-slow.mp3 */,
-				B10100000000000000000005 /* eole-inhale-fast.mp3 */,
-				B10100000000000000000006 /* eole-inhale-normal.mp3 */,
-				B10100000000000000000007 /* eole-inhale-slow.mp3 */,
-				B10100000000000000000008 /* eole-meditation.mp3 */,
-				B10100000000000000000009 /* eole-serenite.mp3 */,
-				942A9A1A63793D61082FFAA8 /* Products */,
-			);
-			sourceTree = "<group>";
-		};
 		942A9A1A63793D61082FFAA8 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A8792157CB4F27FB949C035F /* Eole.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		EC6AE75C017423A0C5A951A8 = {
+			isa = PBXGroup;
+			children = (
+				6CE1B8D560BBEC4A3D56DB8C /* ../native/Sources/EoleCore/Analytics.swift */,
+				11CCC8E90D84E097495826F1 /* ../native/Sources/EoleCore/Models.swift */,
+				6D7760FB1E397AAB2CD76E5D /* ../native/Sources/EoleCore/RetentionTiming.swift */,
+				00FE216D88D59930BFC04EC1 /* ../native/Sources/EoleCore/SessionConfig.swift */,
+				7EC46FC093090F1082CBDE07 /* ../native/Sources/EoleCore/SessionExport.swift */,
+				AD64A61628B211C8605D4A99 /* ../native/Sources/EoleCore/Validation.swift */,
+				032805820BCB605DEC940AE2 /* ../native/Sources/EoleApp/ActiveSessionView.swift */,
+				FC651A7FBB11D15515D38118 /* ../native/Sources/EoleApp/AudioEngine.swift */,
+				B8984BA907E55551FA13BBB8 /* ../native/Sources/EoleApp/BreathVisuals.swift */,
+				0DEB7DF2B1BAD8240C660397 /* ../native/Sources/EoleApp/ConfiguratorView.swift */,
+				CB404E6A7DCF80628C3A9A67 /* ../native/Sources/EoleApp/DesignSystem.swift */,
+				495F92F3B4E936A7945E982F /* ../native/Sources/EoleApp/EoleRootView.swift */,
+				4CF8FAC944B3D22663A95828 /* ../native/Sources/EoleApp/Haptics.swift */,
+				2E27E903920E20F00A030F4C /* ../native/Sources/EoleApp/HomeView.swift */,
+				25031D2A270346AF9B2540C3 /* ../native/Sources/EoleApp/Persistence.swift */,
+				E10331BA5624DEAB3DB16A7F /* ../native/Sources/EoleApp/SessionEngine.swift */,
+				B663FC1875FF0B95AB05682A /* ../native/Sources/EoleApp/SettingsView.swift */,
+				258CC2494E8D4C12CC9C5599 /* ../native/Sources/EoleApp/StatsView.swift */,
+				D6B66CD316DDBDDF2A563965 /* EolePhoneApp.swift */,
+				E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */,
+				D10100000000000000000001 /* Assets.xcassets */,
+				B10100000000000000000001 /* Resources/Audio/eole-bambou.mp3 */,
+				B10100000000000000000002 /* Resources/Audio/eole-exhale-fast.mp3 */,
+				B10100000000000000000003 /* Resources/Audio/eole-exhale-normal.mp3 */,
+				B10100000000000000000004 /* Resources/Audio/eole-exhale-slow.mp3 */,
+				B10100000000000000000005 /* Resources/Audio/eole-inhale-fast.mp3 */,
+				B10100000000000000000006 /* Resources/Audio/eole-inhale-normal.mp3 */,
+				B10100000000000000000007 /* Resources/Audio/eole-inhale-slow.mp3 */,
+				B10100000000000000000008 /* Resources/Audio/eole-meditation.mp3 */,
+				B10100000000000000000009 /* Resources/Audio/eole-serenite.mp3 */,
+				942A9A1A63793D61082FFAA8 /* Products */,
+			);
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -163,7 +163,6 @@
 				};
 			};
 			buildConfigurationList = E218C3791B52AB5D30EEDBEF /* Build configuration list for PBXProject "Eole" */;
-			compatibilityVersion = "Xcode 26.0";
 			developmentRegion = fr;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -172,6 +171,7 @@
 				Base,
 			);
 			mainGroup = EC6AE75C017423A0C5A951A8;
+			preferredProjectObjectVersion = 77;
 			productRefGroup = 942A9A1A63793D61082FFAA8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -186,17 +186,17 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				E2F8AF2EE58D8892A06E7F86,
-				C10100000000000000000001,
-				A10100000000000000000001,
-				A10100000000000000000002,
-				A10100000000000000000003,
-				A10100000000000000000004,
-				A10100000000000000000005,
-				A10100000000000000000006,
-				A10100000000000000000007,
-				A10100000000000000000008,
-				A10100000000000000000009
+				E2F8AF2EE58D8892A06E7F86 /* initial_sessions.json in Resources */,
+				C10100000000000000000001 /* Assets.xcassets in Resources */,
+				A10100000000000000000001 /* Resources/Audio/eole-bambou.mp3 in Resources */,
+				A10100000000000000000002 /* Resources/Audio/eole-exhale-fast.mp3 in Resources */,
+				A10100000000000000000003 /* Resources/Audio/eole-exhale-normal.mp3 in Resources */,
+				A10100000000000000000004 /* Resources/Audio/eole-exhale-slow.mp3 in Resources */,
+				A10100000000000000000005 /* Resources/Audio/eole-inhale-fast.mp3 in Resources */,
+				A10100000000000000000006 /* Resources/Audio/eole-inhale-normal.mp3 in Resources */,
+				A10100000000000000000007 /* Resources/Audio/eole-inhale-slow.mp3 in Resources */,
+				A10100000000000000000008 /* Resources/Audio/eole-meditation.mp3 in Resources */,
+				A10100000000000000000009 /* Resources/Audio/eole-serenite.mp3 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -207,47 +207,31 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3C672AFEE188A7A1CEA229AF,
-				2F48AFE15FCAC123F2D74B63,
-				116144C3E944A75E91544620,
-				20B87D4C1B880F9BB0F64AD9,
-				CEEEC1D349B701D18540B2DA,
-				9820C4BBD84C4BD6E5A8ACA2,
-				1C5325EDE122293B97B90F77,
-				E9851C137BB8A3B90DFABCB5,
-				3F83A2E0A1CE1192B0AF8501,
-				C317D65423F8D3826C73DA3A,
-				CC6FC4EEDC93B4CAC2C37415,
-				66A66BED8855AAF30B7D3CDC,
-				9317FF913C17EA896E92CEA9,
-				7CBE090AE540848B257AE6F0,
-				024589172C0EDCE2787497B4,
-				957228ACC9D3D327CAFDBD42,
-				72E869CC843A1902A6DE29AF,
-				1F424A1F2242C4B558C45E8B,
-				B91FDC7B4F9B2A5A017A153E,
+				3C672AFEE188A7A1CEA229AF /* ../native/Sources/EoleCore/Analytics.swift in Sources */,
+				2F48AFE15FCAC123F2D74B63 /* ../native/Sources/EoleCore/Models.swift in Sources */,
+				116144C3E944A75E91544620 /* ../native/Sources/EoleCore/RetentionTiming.swift in Sources */,
+				20B87D4C1B880F9BB0F64AD9 /* ../native/Sources/EoleCore/SessionConfig.swift in Sources */,
+				CEEEC1D349B701D18540B2DA /* ../native/Sources/EoleCore/SessionExport.swift in Sources */,
+				9820C4BBD84C4BD6E5A8ACA2 /* ../native/Sources/EoleCore/Validation.swift in Sources */,
+				1C5325EDE122293B97B90F77 /* ../native/Sources/EoleApp/ActiveSessionView.swift in Sources */,
+				E9851C137BB8A3B90DFABCB5 /* ../native/Sources/EoleApp/AudioEngine.swift in Sources */,
+				3F83A2E0A1CE1192B0AF8501 /* ../native/Sources/EoleApp/BreathVisuals.swift in Sources */,
+				C317D65423F8D3826C73DA3A /* ../native/Sources/EoleApp/ConfiguratorView.swift in Sources */,
+				CC6FC4EEDC93B4CAC2C37415 /* ../native/Sources/EoleApp/DesignSystem.swift in Sources */,
+				66A66BED8855AAF30B7D3CDC /* ../native/Sources/EoleApp/EoleRootView.swift in Sources */,
+				9317FF913C17EA896E92CEA9 /* ../native/Sources/EoleApp/Haptics.swift in Sources */,
+				7CBE090AE540848B257AE6F0 /* ../native/Sources/EoleApp/HomeView.swift in Sources */,
+				024589172C0EDCE2787497B4 /* ../native/Sources/EoleApp/Persistence.swift in Sources */,
+				957228ACC9D3D327CAFDBD42 /* ../native/Sources/EoleApp/SessionEngine.swift in Sources */,
+				72E869CC843A1902A6DE29AF /* ../native/Sources/EoleApp/SettingsView.swift in Sources */,
+				1F424A1F2242C4B558C45E8B /* ../native/Sources/EoleApp/StatsView.swift in Sources */,
+				B91FDC7B4F9B2A5A017A153E /* EolePhoneApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		3D45766170DCCA05AF05902A /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = dwarf;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				MTL_ENABLE_DEBUG_INFO = YES;
-				SDKROOT = iphoneos;
-				ONLY_ACTIVE_ARCH = YES;
-			};
-			name = Debug;
-		};
 		006ADE022EFDAFC62B873232 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -264,75 +248,93 @@
 			};
 			name = Release;
 		};
-		1C53906361974CA5B8809A9B /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_STYLE = Automatic;
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CURRENT_PROJECT_VERSION = 2;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Eole;
-				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
-				INFOPLIST_KEY_UIBackgroundModes = (audio,);
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = (UIInterfaceOrientationPortrait,);
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jeremydelloume.eole;
-				PRODUCT_NAME = Eole;
-				SWIFT_VERSION = 6.0;
-				TARGETED_DEVICE_FAMILY = 1;
-				ONLY_ACTIVE_ARCH = YES;
-			};
-			name = Debug;
-		};
 		0635ECAEB5777D4584B68897 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_STYLE = Automatic;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 4J7BXN697F;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Eole;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
-				INFOPLIST_KEY_UIBackgroundModes = (audio,);
+				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = (UIInterfaceOrientationPortrait,);
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jeremydelloume.eole;
 				PRODUCT_NAME = Eole;
+				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = 1;
-				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
+		};
+		1C53906361974CA5B8809A9B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 4J7BXN697F;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Eole;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSRequiresIPhoneOS = YES;
+				INFOPLIST_KEY_UIBackgroundModes = audio;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jeremydelloume.eole;
+				PRODUCT_NAME = Eole;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		3D45766170DCCA05AF05902A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+			};
+			name = Debug;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		E218C3791B52AB5D30EEDBEF /* Build configuration list for PBXProject "Eole" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				3D45766170DCCA05AF05902A /* Debug */,
-				006ADE022EFDAFC62B873232 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		249E4D84703C93450927DBB4 /* Build configuration list for PBXNativeTarget "Eole" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1C53906361974CA5B8809A9B /* Debug */,
 				0635ECAEB5777D4584B68897 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E218C3791B52AB5D30EEDBEF /* Build configuration list for PBXProject "Eole" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3D45766170DCCA05AF05902A /* Debug */,
+				006ADE022EFDAFC62B873232 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
