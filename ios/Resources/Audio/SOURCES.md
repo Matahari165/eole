@@ -52,9 +52,11 @@ de six secondes entre leur fin et leur début. Les trois fichiers sont encodés 
 MP3 stéréo 44,1 kHz à `96 kb/s`, sans métadonnées personnelles.
 
 Toutes les pistes livrées avec l'application sont rééquilibrées localement pour
-éviter les écarts brusques de volume : les respirations visent `-34 LUFS` et les
-musiques environ `-30 LUFS`. Mesures finales : bambou `-30,2 LUFS`, méditation
-`-30,5 LUFS`, sérénité `-30,3 LUFS`; crêtes vraies inférieures à `-16 dBFS`.
+éviter les écarts brusques de volume et garantir une écoute confortable au casque :
+les respirations et les musiques sont normalisées autour de `-17 dBFS` moyen avec
+des crêtes vraies sécurisées autour de `-1 dBFS` pour éviter tout écrêtage.
+Mesures finales : musiques `-17 à -18 dBFS` moyen, respirations `-16,5 à -17,4 dBFS`
+moyen ; crêtes vraies inférieures ou égales à `-0,7 dBFS`.
 
 La source BigSoundBank précédemment utilisée reste une référence de comparaison :
 **Man Breathing**, son `#2195`, Joseph SARDIN, également sous licence CC0 :

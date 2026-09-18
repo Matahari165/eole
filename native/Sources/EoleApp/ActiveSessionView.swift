@@ -68,10 +68,12 @@ public struct ActiveSessionView: View {
             Button("Continuer", role: .cancel) {}
             Button("Arrêter", role: .destructive) {
                 engine.stop()
-                if engine.errorMessage == nil { onClose() }
+                if engine.results.isEmpty && engine.errorMessage == nil {
+                    onClose()
+                }
             }
         } message: {
-            Text("Seuls les rounds entièrement terminés seront enregistrés.")
+            Text("Les rounds accomplis seront enregistrés et résumés.")
         }
     }
 
@@ -144,13 +146,15 @@ public struct ActiveSessionView: View {
             .frame(maxWidth: .infinity, alignment: .center)
             HStack {
                 Spacer()
-                Button { showStopConfirm = true } label: {
-                    Image(systemName: "xmark")
-                        .foregroundStyle(.white)
+                if engine.phase != .complete && engine.phase != .saving {
+                    Button { showStopConfirm = true } label: {
+                        Image(systemName: "xmark")
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(EoleGlassIconButtonStyle())
+                    .tint(.white.opacity(0.84))
+                    .accessibilityLabel("Arrêter la séance")
                 }
-                .buttonStyle(EoleGlassIconButtonStyle())
-                .tint(.white.opacity(0.84))
-                .accessibilityLabel("Arrêter la séance")
             }
         }
         .padding(.horizontal, 18)
@@ -243,57 +247,68 @@ public struct ActiveSessionView: View {
             .padding(32)
             .background(.regularMaterial, in: .rect(cornerRadius: EoleRadius.lg))
         case .complete:
+            let priorSessions = store.sessions.filter { $0.id != engine.sessionId }
+            let evaluation = evaluateSessionRecords(sessionRounds: engine.results, priorSessions: priorSessions)
+            let totalRetention = engine.results.map(\.retentionSeconds).reduce(0, +)
+            let isEarlyStop = engine.results.count < config.rounds
+
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 20) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(.largeTitle, design: .rounded, weight: .medium))
-                        .symbolRenderingMode(.hierarchical)
-                    Text("Séance terminée")
-                        .font(.largeTitle.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                    if let message = engine.errorMessage {
-                        Text(message).font(.footnote).foregroundStyle(.white.opacity(0.9))
-                        Button("Réessayer") { engine.retryPersist() }
-                            .buttonStyle(.glassProminent)
-                            .controlSize(.extraLarge)
-                    } else {
-                        Text("Tes progrès sont enregistrés sur cet iPhone.")
+                VStack(spacing: 22) {
+                    // En-tête sobre et valorisant
+                    VStack(spacing: 8) {
+                        Image(systemName: evaluation.hasOverallRecord ? "trophy.fill" : "checkmark.circle.fill")
+                            .font(.system(size: 46, weight: .semibold))
+                            .foregroundStyle(evaluation.hasOverallRecord ? Color(hex: 0xF5C518) : Color.eoleAccent)
+                            .symbolRenderingMode(.hierarchical)
+                            .accessibilityHidden(true)
+
+                        Text("Séance terminée")
+                            .font(.largeTitle.weight(.bold))
+                            .multilineTextAlignment(.center)
+
+                        Text(isEarlyStop
+                             ? "\(engine.results.count) round\(engine.results.count > 1 ? "s" : "") sur \(config.rounds) complété\(engine.results.count > 1 ? "s" : "")"
+                             : "\(config.rounds) rounds complétés • Rythme \(config.pace.rawValue.capitalized)")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.72))
-                            .multilineTextAlignment(.center)
                     }
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 0) {
-                            ForEach(Array(engine.results.enumerated()), id: \.offset) { _, round in
-                                VStack(spacing: 5) {
-                                    Text("R\(round.roundIndex)").font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.white.opacity(0.62))
-                                    Text(formatDuration(Double(round.retentionSeconds)))
-                                        .font(.headline.weight(.semibold))
-                                        .monospacedDigit()
-                                }
-                                .frame(minWidth: 92)
-                            }
+
+                    if let message = engine.errorMessage {
+                        VStack(spacing: 12) {
+                            Text(message).font(.footnote).foregroundStyle(.white.opacity(0.9))
+                            Button("Réessayer") { engine.retryPersist() }
+                                .buttonStyle(.glassProminent)
+                                .controlSize(.large)
                         }
                     }
-                    .padding(.vertical, 18)
-                    .padding(.horizontal, 12)
-                    .background(.white.opacity(0.08), in: .rect(cornerRadius: EoleRadius.md))
+
+                    // Bannière Record si un record (général ou par rang de tour) a été battu
+                    if evaluation.hasAnyRecord {
+                        recordBanner(evaluation: evaluation)
+                    }
+
+                    // Métriques clés : Temps total, Rétention totale, Rounds
+                    keyMetricsGrid(totalRetention: totalRetention)
+
+                    // Graphique visuel en barres de chaque rétention
+                    retentionBarChart(evaluation: evaluation)
+
+                    // Liste détaillée de chaque round
+                    roundDetailsList(evaluation: evaluation)
                 }
-                .padding(28)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
                 // Réserve la place du CTA fixe pour qu'il ne masque pas le récap.
                 .padding(.bottom, 96)
             }
             .frame(maxHeight: .infinity)
-            // CTA fixe en bas (pattern Configurator), sans fond .bar pour
-            // conserver l'immersion sombre de la séance.
+            // CTA fixe en bas (pattern Configurator)
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Button(engine.errorMessage == nil ? "Terminer" : "Fermer sans enregistrer") {
                     onClose()
                 }
                 .buttonStyle(.glassProminent)
                 .tint(.white.opacity(0.92))
-                // Sombre fixe : contraste sur pastille blanche en light comme en dark.
                 .foregroundStyle(Color(hex: 0x0A5C56))
                 .controlSize(.extraLarge)
                 .padding(.horizontal, 28)
@@ -301,6 +316,262 @@ public struct ActiveSessionView: View {
                 .padding(.bottom, 8)
             }
         }
+    }
+
+    // MARK: - Éléments du récapitulatif de fin de séance
+
+    private func recordBanner(evaluation: SessionRecordEvaluation) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: evaluation.hasOverallRecord ? "trophy.fill" : "star.circle.fill")
+                .font(.title2)
+                .foregroundStyle(evaluation.hasOverallRecord ? Color(hex: 0xF5C518) : Color.eoleAccent)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(evaluation.hasOverallRecord ? "Nouveau record personnel !" : "Nouveau record de tour !")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+
+                if evaluation.hasOverallRecord,
+                   let bestRoundIdx = evaluation.overallRecordRoundIndex,
+                   let round = engine.results.first(where: { $0.roundIndex == bestRoundIdx }) {
+                    Text("Meilleure rétention : \(formatDuration(Double(round.retentionSeconds))) (Tour \(bestRoundIdx))")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                } else {
+                    let recordRounds = evaluation.roundEvaluations
+                        .filter(\.isRoundRecord)
+                        .map { "Tour \($0.roundIndex) (\(formatDuration(Double($0.retentionSeconds))))" }
+                        .joined(separator: ", ")
+                    Text("Record battu : \(recordRounds)")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous)
+                .stroke(
+                    evaluation.hasOverallRecord ? Color(hex: 0xF5C518).opacity(0.4) : Color.eoleSecondary.opacity(0.4),
+                    lineWidth: 1
+                )
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func keyMetricsGrid(totalRetention: Int) -> some View {
+        HStack(spacing: 10) {
+            metricCard(
+                title: "Temps total",
+                value: formatDuration(engine.totalDurationSeconds),
+                icon: "clock"
+            )
+            metricCard(
+                title: "Rétention totale",
+                value: formatDuration(Double(totalRetention)),
+                icon: "lungs.fill"
+            )
+            metricCard(
+                title: "Rounds",
+                value: "\(engine.results.count) / \(config.rounds)",
+                icon: "arrow.triangle.2.circlepath"
+            )
+        }
+    }
+
+    private func metricCard(title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.caption2)
+                    .foregroundStyle(Color.eoleAccent)
+                Text(title)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.white.opacity(0.72))
+                    .lineLimit(1)
+            }
+            Text(value)
+                .font(.callout.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func retentionBarChart(evaluation: SessionRecordEvaluation) -> some View {
+        let maxSec = max(1, engine.results.map(\.retentionSeconds).max() ?? 1)
+        let chartHeight: CGFloat = 130
+
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("Rétentions")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Text("Temps par tour")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.65))
+            }
+
+            HStack(alignment: .bottom, spacing: 12) {
+                ForEach(engine.results, id: \.roundIndex) { round in
+                    let roundEval = evaluation.roundEvaluations.first(where: { $0.roundIndex == round.roundIndex })
+                    let isOverall = roundEval?.isOverallRecord == true
+                    let isRoundRec = roundEval?.isRoundRecord == true
+                    let barHeight = max(16, chartHeight * CGFloat(round.retentionSeconds) / CGFloat(maxSec))
+
+                    VStack(spacing: 6) {
+                        // Badge d'icône au-dessus de la valeur
+                        if isOverall {
+                            Image(systemName: "trophy.fill")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Color(hex: 0xF5C518))
+                                .transition(.scale)
+                        } else if isRoundRec {
+                            Image(systemName: "star.fill")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Color.eoleAccent)
+                                .transition(.scale)
+                        } else {
+                            Text("")
+                                .font(.caption2)
+                                .frame(height: 12)
+                        }
+
+                        // Durée au-dessus de la barre
+                        Text(formatShortDuration(round.retentionSeconds))
+                            .font(.caption.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+
+                        // Barre de graphique visuelle
+                        ZStack(alignment: .bottom) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.12))
+                                .frame(width: 36, height: chartHeight)
+
+                            Capsule()
+                                .fill(
+                                    isOverall
+                                        ? LinearGradient(
+                                            colors: [Color(hex: 0xF5C518), Color.eolePrimary],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                        : LinearGradient(
+                                            colors: [Color(hex: 0x48D1CC), Color(hex: 0x1F5D57)],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                )
+                                .frame(width: 36, height: barHeight)
+                                .overlay {
+                                    if isOverall || isRoundRec {
+                                        Capsule()
+                                            .stroke(
+                                                isOverall ? Color(hex: 0xF5C518).opacity(0.8) : Color.eoleAccent.opacity(0.8),
+                                                lineWidth: 1.5
+                                            )
+                                    }
+                                }
+                        }
+
+                        // Libellé du round
+                        Text("R\(round.roundIndex)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.75))
+
+                        // Étiquette de record sous la barre
+                        if isOverall {
+                            Text("Général")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Color(hex: 0xF5C518))
+                                .lineLimit(1)
+                        } else if isRoundRec {
+                            Text("Tour")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Color.eoleAccent)
+                                .lineLimit(1)
+                        } else {
+                            Text("")
+                                .font(.system(size: 9))
+                                .frame(height: 11)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Round \(round.roundIndex) : \(formatDuration(Double(round.retentionSeconds)))\(isOverall ? ", Nouveau record personnel" : (isRoundRec ? ", Nouveau record pour le tour \(round.roundIndex)" : ""))")
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous))
+    }
+
+    private func roundDetailsList(evaluation: SessionRecordEvaluation) -> some View {
+        VStack(spacing: 8) {
+            ForEach(engine.results, id: \.roundIndex) { round in
+                let roundEval = evaluation.roundEvaluations.first(where: { $0.roundIndex == round.roundIndex })
+                let isOverall = roundEval?.isOverallRecord == true
+                let isRoundRec = roundEval?.isRoundRecord == true
+
+                HStack {
+                    HStack(spacing: 10) {
+                        Text("R\(round.roundIndex)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 28, height: 24)
+                            .background(Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+
+                        Text("\(round.breathsCompleted) respirations")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.72))
+                    }
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        if isOverall {
+                            Label("Record général", systemImage: "trophy.fill")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Color(hex: 0xF5C518))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color(hex: 0xF5C518).opacity(0.15), in: Capsule())
+                        } else if isRoundRec {
+                            Label("Record Tour \(round.roundIndex)", systemImage: "star.fill")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(Color.eoleAccent)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.eoleAccent.opacity(0.15), in: Capsule())
+                        }
+
+                        Text(formatDuration(Double(round.retentionSeconds)))
+                            .font(.subheadline.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(.white)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: EoleRadius.sm, style: .continuous))
+            }
+        }
+    }
+
+    private func formatShortDuration(_ seconds: Int) -> String {
+        let m = seconds / 60
+        let s = seconds % 60
+        return String(format: "%d:%02d", m, s)
     }
 
     private var retentionLabel: String {

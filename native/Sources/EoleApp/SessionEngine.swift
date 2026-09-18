@@ -30,6 +30,11 @@ public final class SessionEngine: ObservableObject {
     public let config: SessionConfig
     public let audio: EoleAudioEngine
     public let haptics: EoleHaptics
+    public let sessionId = UUID().uuidString
+
+    public var totalDurationSeconds: Double {
+        max(1, Date().timeIntervalSince(startedAt))
+    }
 
     /// Durées de récupération explicites, partagées avec les visuels.
     public static let recoveryInhaleSeconds: Double = 2
@@ -98,6 +103,28 @@ public final class SessionEngine: ObservableObject {
 
     public func stop() {
         guard !hasPersisted else { return }
+        // Si l'arrêt intervient pendant la rétention ou la récupération d'un tour,
+        // on capture la rétention accomplie pour ne pas perdre l'effort de l'utilisateur.
+        if phase == .retention {
+            if let start = retentionStart {
+                retentionSeconds = max(1, Int(Date().timeIntervalSince(start)))
+            }
+            if !results.contains(where: { $0.roundIndex == round }) {
+                results.append(RoundResult(
+                    roundIndex: round,
+                    breathsCompleted: config.breathsPerRound,
+                    retentionSeconds: max(1, retentionSeconds)
+                ))
+            }
+        } else if (phase == .recoveryInhale || phase == .recoveryHold || phase == .recoveryExhale),
+                  !results.contains(where: { $0.roundIndex == round }) {
+            results.append(RoundResult(
+                roundIndex: round,
+                breathsCompleted: config.breathsPerRound,
+                retentionSeconds: max(1, retentionSeconds)
+            ))
+        }
+
         // La rétention attend une continuation, qui doit être réveillée avant
         // d'annuler la tâche, sinon un arrêt depuis l'écran peut la laisser
         // suspendue indéfiniment.
@@ -240,7 +267,7 @@ public final class SessionEngine: ObservableObject {
         displayTimer?.invalidate()
         let formatter = Self.isoFormatter
         let session = BreathSession(
-            id: UUID().uuidString,
+            id: sessionId,
             status: status,
             plannedRounds: config.rounds,
             breathsPerRound: config.breathsPerRound,

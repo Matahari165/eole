@@ -333,7 +333,7 @@ public final class EoleAudioEngine {
     }
 
     private func ambientLevel() -> Float {
-        Float(musicVolume) / 100 * 0.5
+        Float(musicVolume) / 100 * 0.85
     }
 
     // MARK: - Guides respiratoires
@@ -449,7 +449,7 @@ public final class EoleAudioEngine {
                 key: "preview-tibetan",
                 frequency: 174,
                 seconds: 3.2,
-                level: 0.34,
+                level: 0.52,
                 harmonics: [1, 2.78, 5.42, 8.16],
                 decayRate: 0.8
             )
@@ -458,7 +458,7 @@ public final class EoleAudioEngine {
                 key: "preview-clarte",
                 frequency: 216,
                 seconds: 2.8,
-                level: 0.30,
+                level: 0.48,
                 harmonics: [1, 2.4, 3.9],
                 decayRate: 1.2
             )
@@ -630,15 +630,15 @@ public final class EoleAudioEngine {
         guard let format = currentNodeFormat(), !urls.isEmpty else { return }
         let volume = Double(breathVolume) / 100
         let specs = [
-            ToneSpec(key: toneKey(frequency: 480, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 480, seconds: 0.62, level: 0.25, harmonics: [1], decayRate: 1.8),
-            ToneSpec(key: toneKey(frequency: 540, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 540, seconds: 0.62, level: 0.25, harmonics: [1], decayRate: 1.8),
-            ToneSpec(key: toneKey(frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1]), frequency: 620, seconds: 0.62, level: 0.25, harmonics: [1], decayRate: 1.8),
-            ToneSpec(key: toneKey(frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9]), frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9], decayRate: 0.8),
-            ToneSpec(key: toneKey(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4]), frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4], decayRate: 3.2),
-            ToneSpec(key: toneKey(frequency: 396, seconds: 0.95, level: 0.26, harmonics: [1, 2.05]), frequency: 396, seconds: 0.95, level: 0.26, harmonics: [1, 2.05], decayRate: 1.4),
-            ToneSpec(key: toneKey(frequency: 432, seconds: 0.95, level: 0.26, harmonics: [1, 2.05]), frequency: 432, seconds: 0.95, level: 0.26, harmonics: [1, 2.05], decayRate: 1.4),
-            ToneSpec(key: toneKey(frequency: 174, seconds: 7.5, level: 0.34, harmonics: [1, 2.78, 5.42, 8.16]), frequency: 174, seconds: 7.5, level: 0.34, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.42),
-            ToneSpec(key: toneKey(frequency: 704, seconds: 1.6, level: 0.24, harmonics: [1, 2.02, 3.15]), frequency: 704, seconds: 1.6, level: 0.24, harmonics: [1, 2.02, 3.15], decayRate: 1.6),
+            ToneSpec(key: toneKey(frequency: 480, seconds: 0.62, level: 0.42, harmonics: [1]), frequency: 480, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8),
+            ToneSpec(key: toneKey(frequency: 540, seconds: 0.62, level: 0.42, harmonics: [1]), frequency: 540, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8),
+            ToneSpec(key: toneKey(frequency: 620, seconds: 0.62, level: 0.42, harmonics: [1]), frequency: 620, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8),
+            ToneSpec(key: toneKey(frequency: 216, seconds: 6.5, level: 0.48, harmonics: [1, 2.4, 3.9]), frequency: 216, seconds: 6.5, level: 0.48, harmonics: [1, 2.4, 3.9], decayRate: 0.8),
+            ToneSpec(key: toneKey(frequency: 528, seconds: 0.85, level: 0.38, harmonics: [1, 2.76, 5.4]), frequency: 528, seconds: 0.85, level: 0.38, harmonics: [1, 2.76, 5.4], decayRate: 3.2),
+            ToneSpec(key: toneKey(frequency: 396, seconds: 0.95, level: 0.42, harmonics: [1, 2.05]), frequency: 396, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4),
+            ToneSpec(key: toneKey(frequency: 432, seconds: 0.95, level: 0.42, harmonics: [1, 2.05]), frequency: 432, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4),
+            ToneSpec(key: toneKey(frequency: 174, seconds: 7.5, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16]), frequency: 174, seconds: 7.5, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.42),
+            ToneSpec(key: toneKey(frequency: 704, seconds: 1.6, level: 0.40, harmonics: [1, 2.02, 3.15]), frequency: 704, seconds: 1.6, level: 0.40, harmonics: [1, 2.02, 3.15], decayRate: 1.6),
         ]
         assetPreparationTask?.cancel()
         playerPreparationTask?.cancel()

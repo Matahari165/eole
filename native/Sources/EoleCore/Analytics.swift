@@ -183,3 +183,111 @@ public func formatLatestSessionDate(
     formatter.timeStyle = .none
     return formatter.string(from: date)
 }
+
+// MARK: - Évaluation des records de rétention
+
+public struct RoundRecordEvaluation: Sendable, Equatable {
+    public var roundIndex: Int
+    public var retentionSeconds: Int
+    public var isOverallRecord: Bool
+    public var isRoundRecord: Bool
+    public var previousOverallMax: Int?
+    public var previousRoundMax: Int?
+
+    public init(
+        roundIndex: Int,
+        retentionSeconds: Int,
+        isOverallRecord: Bool,
+        isRoundRecord: Bool,
+        previousOverallMax: Int?,
+        previousRoundMax: Int?
+    ) {
+        self.roundIndex = roundIndex
+        self.retentionSeconds = retentionSeconds
+        self.isOverallRecord = isOverallRecord
+        self.isRoundRecord = isRoundRecord
+        self.previousOverallMax = previousOverallMax
+        self.previousRoundMax = previousRoundMax
+    }
+}
+
+public struct SessionRecordEvaluation: Sendable, Equatable {
+    public var roundEvaluations: [RoundRecordEvaluation]
+    public var hasAnyRecord: Bool
+    public var hasOverallRecord: Bool
+    public var overallRecordRoundIndex: Int?
+
+    public init(
+        roundEvaluations: [RoundRecordEvaluation],
+        hasAnyRecord: Bool,
+        hasOverallRecord: Bool,
+        overallRecordRoundIndex: Int?
+    ) {
+        self.roundEvaluations = roundEvaluations
+        self.hasAnyRecord = hasAnyRecord
+        self.hasOverallRecord = hasOverallRecord
+        self.overallRecordRoundIndex = overallRecordRoundIndex
+    }
+}
+
+/// Évalue les records d'une séance par rapport à l'historique antérieur.
+/// Détecte les records pour un rang donné (ex. meilleur round 1 ou round 2)
+/// ainsi que les records généraux (meilleur temps absolu).
+public func evaluateSessionRecords(
+    sessionRounds: [RoundResult],
+    priorSessions: [BreathSession]
+) -> SessionRecordEvaluation {
+    let validPrior = priorSessions.filter { !$0.rounds.isEmpty }
+    let priorAllRetentions = validPrior.flatMap { $0.rounds.map(\.retentionSeconds) }
+    let previousOverallMax = priorAllRetentions.max()
+
+    var priorByRound: [Int: [Int]] = [:]
+    for session in validPrior {
+        for round in session.rounds {
+            priorByRound[round.roundIndex, default: []].append(round.retentionSeconds)
+        }
+    }
+
+    var evaluations: [RoundRecordEvaluation] = []
+    for round in sessionRounds {
+        let prevRoundMax = priorByRound[round.roundIndex]?.max()
+
+        let isOverallRecord: Bool
+        if let prevOverall = previousOverallMax {
+            isOverallRecord = round.retentionSeconds > prevOverall
+        } else {
+            isOverallRecord = false
+        }
+
+        let isRoundRecord: Bool
+        if let prevRoundMax {
+            isRoundRecord = round.retentionSeconds > prevRoundMax
+        } else if !validPrior.isEmpty {
+            isRoundRecord = true
+        } else {
+            isRoundRecord = false
+        }
+
+        evaluations.append(RoundRecordEvaluation(
+            roundIndex: round.roundIndex,
+            retentionSeconds: round.retentionSeconds,
+            isOverallRecord: isOverallRecord,
+            isRoundRecord: isRoundRecord,
+            previousOverallMax: previousOverallMax,
+            previousRoundMax: prevRoundMax
+        ))
+    }
+
+    let hasOverall = evaluations.contains { $0.isOverallRecord }
+    let hasAny = evaluations.contains { $0.isOverallRecord || $0.isRoundRecord }
+    let overallRound = evaluations.filter { $0.isOverallRecord }
+        .max(by: { $0.retentionSeconds < $1.retentionSeconds })?.roundIndex
+
+    return SessionRecordEvaluation(
+        roundEvaluations: evaluations,
+        hasAnyRecord: hasAny,
+        hasOverallRecord: hasOverall,
+        overallRecordRoundIndex: overallRound
+    )
+}
+

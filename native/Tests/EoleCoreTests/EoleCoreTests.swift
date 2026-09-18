@@ -341,4 +341,101 @@ final class EoleCoreTests: XCTestCase {
             bellStyle: .tibetan
         ))
     }
+
+    func testEvaluateSessionRecordsDetectsRoundRecordAndOverallRecord() {
+        // Historique avec 2 séances passées :
+        // Séance 1: R1=60s, R2=90s, R3=120s
+        // Séance 2: R1=70s, R2=85s, R3=110s
+        // Max R1 = 70s, Max R2 = 90s, Max R3 = 120s, Max Overall = 120s
+        let session1 = makeSession(
+            id: "11111111-1111-4111-8111-111111111111",
+            completedDay: 1,
+            rounds: [
+                RoundResult(roundIndex: 1, breathsCompleted: 35, retentionSeconds: 60),
+                RoundResult(roundIndex: 2, breathsCompleted: 35, retentionSeconds: 90),
+                RoundResult(roundIndex: 3, breathsCompleted: 35, retentionSeconds: 120),
+            ]
+        )
+        let session2 = makeSession(
+            id: "22222222-2222-4222-8222-222222222222",
+            completedDay: 2,
+            rounds: [
+                RoundResult(roundIndex: 1, breathsCompleted: 35, retentionSeconds: 70),
+                RoundResult(roundIndex: 2, breathsCompleted: 35, retentionSeconds: 85),
+                RoundResult(roundIndex: 3, breathsCompleted: 35, retentionSeconds: 110),
+            ]
+        )
+        let priorSessions = [session1, session2]
+
+        // Cas A : Nouvelle séance avec un record sur le tour 1 (75s > 70s)
+        // mais pas de record général (75s < 120s)
+        let currentRoundsA = [
+            RoundResult(roundIndex: 1, breathsCompleted: 35, retentionSeconds: 75),
+            RoundResult(roundIndex: 2, breathsCompleted: 35, retentionSeconds: 80),
+        ]
+        let evalA = evaluateSessionRecords(sessionRounds: currentRoundsA, priorSessions: priorSessions)
+
+        XCTAssertTrue(evalA.hasAnyRecord)
+        XCTAssertFalse(evalA.hasOverallRecord)
+        XCTAssertNil(evalA.overallRecordRoundIndex)
+        XCTAssertEqual(evalA.roundEvaluations.count, 2)
+
+        // Round 1 : record de tour (75 > 70), pas record général (75 <= 120)
+        XCTAssertTrue(evalA.roundEvaluations[0].isRoundRecord)
+        XCTAssertFalse(evalA.roundEvaluations[0].isOverallRecord)
+        XCTAssertEqual(evalA.roundEvaluations[0].previousRoundMax, 70)
+        XCTAssertEqual(evalA.roundEvaluations[0].previousOverallMax, 120)
+
+        // Round 2 : pas de record (80 <= 90)
+        XCTAssertFalse(evalA.roundEvaluations[1].isRoundRecord)
+        XCTAssertFalse(evalA.roundEvaluations[1].isOverallRecord)
+
+        // Cas B : Nouvelle séance avec un record général au tour 3 (135s > 120s)
+        let currentRoundsB = [
+            RoundResult(roundIndex: 1, breathsCompleted: 35, retentionSeconds: 65),
+            RoundResult(roundIndex: 2, breathsCompleted: 35, retentionSeconds: 95),  // Record R2 (95 > 90)
+            RoundResult(roundIndex: 3, breathsCompleted: 35, retentionSeconds: 135), // Record R3 et Overall
+        ]
+        let evalB = evaluateSessionRecords(sessionRounds: currentRoundsB, priorSessions: priorSessions)
+
+        XCTAssertTrue(evalB.hasAnyRecord)
+        XCTAssertTrue(evalB.hasOverallRecord)
+        XCTAssertEqual(evalB.overallRecordRoundIndex, 3)
+
+        XCTAssertFalse(evalB.roundEvaluations[0].isRoundRecord)
+        XCTAssertFalse(evalB.roundEvaluations[0].isOverallRecord)
+
+        XCTAssertTrue(evalB.roundEvaluations[1].isRoundRecord)
+        XCTAssertFalse(evalB.roundEvaluations[1].isOverallRecord)
+
+        XCTAssertTrue(evalB.roundEvaluations[2].isRoundRecord)
+        XCTAssertTrue(evalB.roundEvaluations[2].isOverallRecord)
+
+        // Cas C : Sans historique (première séance jamais enregistrée)
+        let evalEmpty = evaluateSessionRecords(sessionRounds: currentRoundsA, priorSessions: [])
+        XCTAssertFalse(evalEmpty.hasAnyRecord)
+        XCTAssertFalse(evalEmpty.hasOverallRecord)
+
+        // Cas D : Round inédit dans l'historique (Tour 4 alors qu'il n'y avait que 3 tours)
+        let currentRoundsD = [
+            RoundResult(roundIndex: 4, breathsCompleted: 35, retentionSeconds: 100),
+        ]
+        let evalD = evaluateSessionRecords(sessionRounds: currentRoundsD, priorSessions: priorSessions)
+        XCTAssertTrue(evalD.hasAnyRecord)
+        XCTAssertTrue(evalD.roundEvaluations[0].isRoundRecord)
+        XCTAssertFalse(evalD.roundEvaluations[0].isOverallRecord)
+
+        // Cas E : Plusieurs tours battent le record général (ex: R2=130s, R3=150s, les deux > 120s)
+        let currentRoundsE = [
+            RoundResult(roundIndex: 1, breathsCompleted: 35, retentionSeconds: 65),
+            RoundResult(roundIndex: 2, breathsCompleted: 35, retentionSeconds: 130),
+            RoundResult(roundIndex: 3, breathsCompleted: 35, retentionSeconds: 150),
+        ]
+        let evalE = evaluateSessionRecords(sessionRounds: currentRoundsE, priorSessions: priorSessions)
+        XCTAssertTrue(evalE.hasOverallRecord)
+        XCTAssertEqual(evalE.overallRecordRoundIndex, 3) // Le meilleur tour global (150s)
+        XCTAssertTrue(evalE.roundEvaluations[1].isOverallRecord)
+        XCTAssertTrue(evalE.roundEvaluations[2].isOverallRecord)
+    }
 }
+
