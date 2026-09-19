@@ -8,6 +8,7 @@ public struct HomeView: View {
     @ObservedObject var store: SessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hasAppeared = false
+    @State private var barsAppeared = false
     var onStart: (SessionConfig) -> Void
     var onAdjust: () -> Void
 
@@ -43,6 +44,7 @@ public struct HomeView: View {
             .padding(.bottom, 32)
             .opacity(hasAppeared ? 1 : 0)
             .offset(y: reduceMotion || hasAppeared ? 0 : 8)
+            .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.appEntrance), value: hasAppeared)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
@@ -52,6 +54,15 @@ public struct HomeView: View {
             if !hasAppeared {
                 withAnimation(.eoleCalm(duration: EoleMotion.appEntrance)) {
                     hasAppeared = true
+                }
+            }
+            if !barsAppeared {
+                if reduceMotion {
+                    barsAppeared = true
+                } else {
+                    withAnimation(.eoleCalm(duration: EoleMotion.chartReveal).delay(0.15)) {
+                        barsAppeared = true
+                    }
                 }
             }
         }
@@ -225,12 +236,13 @@ public struct HomeView: View {
                     }
 
                     HStack(alignment: .bottom, spacing: 10) {
-                        ForEach(session.rounds, id: \.roundIndex) { round in
+                        ForEach(Array(session.rounds.enumerated()), id: \.element.roundIndex) { index, round in
                             VStack(spacing: 6) {
                                 let ratio = CGFloat(round.retentionSeconds) / CGFloat(maxRetention)
                                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                                     .fill(Color.eolePrimary.opacity(0.85))
-                                    .frame(width: 24, height: max(4, 44 * ratio))
+                                    .frame(width: 24, height: (reduceMotion || barsAppeared) ? max(4, 44 * ratio) : 4)
+                                    .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(Double(index) * EoleMotion.chartStagger), value: barsAppeared)
 
                                 Text("R\(round.roundIndex)")
                                     .font(.caption2.weight(.semibold))

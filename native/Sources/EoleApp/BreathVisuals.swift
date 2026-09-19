@@ -36,7 +36,8 @@ public struct BreathContoursView: View {
                         .stroke(Color.white.opacity(index == 7 ? 0.92 : 0.55), lineWidth: 2)
                         .frame(width: side - inset * 2, height: side - inset * 2)
                         .scaleEffect(motion == .inhale ? 1 : Self.closedScales[index])
-                        .opacity(motion == .inhale ? (0.54 + CGFloat(index) * 0.04) : 0.28)
+                        .opacity(motion == .inhale ? (0.54 + CGFloat(index) * 0.04) : 0.30)
+                        .blur(radius: motion == .inhale ? 0 : 0.4)
                         .animation(
                             reduceMotion ? nil : .eoleBreath(duration: duration),
                             value: motion
@@ -46,7 +47,7 @@ public struct BreathContoursView: View {
                     .stroke(Color.white.opacity(0.84), lineWidth: 1.5)
                     .fill(Color.white.opacity(motion == .inhale ? 0.2 : 0.1))
                     .frame(width: 8, height: 8)
-                    .scaleEffect(motion == .inhale ? 1.06 : 0.94)
+                    .scaleEffect(motion == .inhale ? 1.05 : 0.95)
                     .animation(
                         reduceMotion ? nil : .eoleBreath(duration: duration),
                         value: motion

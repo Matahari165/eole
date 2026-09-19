@@ -90,7 +90,7 @@ public final class SessionEngine: ObservableObject {
         retentionSeconds = Int(Date().timeIntervalSince(start))
     }
 
-    /// Fin de rétention via le bouton explicite « Terminer la rétention ».
+    /// Fin de rétention via le double-toucher « Double-touchez pour terminer ».
     public func endRetention() {
         guard phase == .retention else { return }
         if let start = retentionStart {

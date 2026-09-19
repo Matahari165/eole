@@ -80,6 +80,16 @@ public extension Animation {
     static func eoleCalm(duration: Double = EoleMotion.chromeFade) -> Animation {
         .timingCurve(0.25, 0.1, 0.25, 1.0, duration: duration)
     }
+
+    /// Courbe très délicate pour micro-transitions apaisées (halos, labels).
+    static func eoleSoft(duration: Double) -> Animation {
+        .timingCurve(0.22, 1, 0.36, 1, duration: duration)
+    }
+
+    /// Cross-fades de phases sans à-coup (fond, labels de phase).
+    static func eolePhase(duration: Double) -> Animation {
+        .timingCurve(0.33, 0, 0.2, 1, duration: duration)
+    }
 }
 
 /// Durées motion centralisées : toute nouvelle animation réutilise ces tokens
@@ -109,6 +119,18 @@ public enum EoleMotion {
     public static let countdown: Double = 1.0
     /// Transition douce des contrôles hors séance (période, historique).
     public static let controlTransition: Double = 0.40
+    /// Cross-fade de phase respiratoire sans à-coup.
+    public static let phaseTransition: Double = 0.9
+    /// Fondu du label de phase (inhale/exhale).
+    public static let breathLabelFade: Double = 0.5
+    /// Halo de rétention, pulsation très lente.
+    public static let retentionHalo: Double = 2.4
+    /// Décalage en cascade des barres du graphique.
+    public static let chartStagger: Double = 0.08
+    /// Révélation du graphique, calme et progressive.
+    public static let chartReveal: Double = 0.9
+    /// Flou de transition d'ouverture/fermeture de séance.
+    public static let sessionBlur: Double = 0.75
 }
 
 /// Fondus audio miroirs des défauts d'EoleAudioEngine, exposés pour rester

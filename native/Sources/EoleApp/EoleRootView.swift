@@ -67,15 +67,15 @@ public struct EoleRootView: View {
 
             if let launch = activeSession {
                 ActiveSessionView(config: launch.config, store: store, audio: audio, haptics: haptics) {
-                    withAnimation(.easeInOut(duration: EoleMotion.sessionDismiss)) {
+                    withAnimation(.eoleCalm(duration: EoleMotion.sessionDismiss)) {
                         activeSession = nil
                     }
                 }
                 // Immersion calme et profonde ; en Reduce Motion : fondu pur.
                 .transition(
                     reduceMotion ? .opacity : .asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 1.015)),
-                        removal: .opacity.combined(with: .scale(scale: 0.985))
+                        insertion: .opacity.combined(with: .scale(scale: 1.006)),
+                        removal: .opacity.combined(with: .scale(scale: 0.994))
                     )
                 )
                 .zIndex(100)
@@ -119,7 +119,7 @@ public struct EoleRootView: View {
     }
 
     private func beginSession(_ config: SessionConfig) {
-        withAnimation(.easeInOut(duration: EoleMotion.sessionPresent)) {
+        withAnimation(.eoleCalm(duration: EoleMotion.sessionPresent)) {
             activeSession = SessionLaunch(config: config)
         }
     }

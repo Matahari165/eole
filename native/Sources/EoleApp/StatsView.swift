@@ -14,6 +14,7 @@ public struct StatsView: View {
     @State private var showAllHistory = false
     @State private var selectedDay: String?
     @State private var sessionToDelete: BreathSession?
+    @State private var hasAppeared = false
     private let onPrepare: () -> Void
 
     public init(store: SessionStore, onPrepare: @escaping () -> Void = {}) {
@@ -56,6 +57,15 @@ public struct StatsView: View {
         .background(EoleAmbientBackground())
         .navigationTitle("Progrès")
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            if !hasAppeared {
+                if reduceMotion {
+                    hasAppeared = true
+                } else {
+                    withAnimation(.eoleCalm(duration: EoleMotion.chartReveal)) { hasAppeared = true }
+                }
+            }
+        }
         .alert("Supprimer cette séance ?", isPresented: Binding(
             get: { sessionToDelete != nil },
             set: { if !$0 { sessionToDelete = nil } }
@@ -96,7 +106,7 @@ public struct StatsView: View {
             if reduceMotion {
                 days = value
             } else {
-                withAnimation(.eoleCalm(duration: EoleMotion.controlTransition)) { days = value }
+                withAnimation(.eoleCalm(duration: 0.5)) { days = value }
             }
             selectedDay = nil
         }
@@ -256,6 +266,7 @@ public struct StatsView: View {
                                 Text("Moyenne : \(shortDuration(averageTotal)) min")
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(Color.eoleSecondary)
+                                    .contentTransition(.opacity)
                             }
                         } else {
                             Text("Cumul quotidien (\(days) j)")
@@ -362,6 +373,9 @@ public struct StatsView: View {
                     }
                 }
                 .frame(height: 190)
+                .opacity((hasAppeared || reduceMotion) ? 1 : 0)
+                .offset(y: (hasAppeared || reduceMotion) ? 0 : 10)
+                .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal), value: hasAppeared)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Temps de rétention total par jour sur \(days) jours")
                 .accessibilityValue(Text(chartAccessibilityValue(series: series, averageTotal: averageTotal)))
@@ -419,7 +433,8 @@ public struct StatsView: View {
                                                 endPoint: .trailing
                                             )
                                         )
-                                        .frame(width: max(8, geo.size.width * CGFloat(roundStat.averageSeconds / maxAvg)), height: 7)
+                                        .frame(width: (reduceMotion || hasAppeared) ? max(8, geo.size.width * CGFloat(roundStat.averageSeconds / maxAvg)) : 8, height: 7)
+                                        .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(Double(index) * EoleMotion.chartStagger), value: hasAppeared)
                                 }
                             }
                             .frame(height: 7)
@@ -457,7 +472,7 @@ public struct StatsView: View {
                 }
 
                 HStack(spacing: 0) {
-                    ForEach(Array(weekDays.enumerated()), id: \.offset) { _, date in
+                    ForEach(Array(weekDays.enumerated()), id: \.offset) { index, date in
                         let isPracticed = active.contains(localDateKey(date, calendar: calendar))
                         let isToday = calendar.isDateInToday(date)
                         let dayLabel = weekDayLabel(date, calendar: calendar)
@@ -488,6 +503,9 @@ public struct StatsView: View {
                             }
                         }
                         .frame(maxWidth: .infinity)
+                        .opacity((hasAppeared || reduceMotion) ? 1 : 0)
+                        .scaleEffect((hasAppeared || reduceMotion) ? 1 : 0.85)
+                        .animation(reduceMotion ? nil : .eoleCalm(duration: 0.6).delay(Double(index) * 0.06), value: hasAppeared)
                     }
                 }
                 .accessibilityElement(children: .ignore)
@@ -529,6 +547,7 @@ public struct StatsView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(visibleSessions, id: \.id) { session in
                         historyRow(session)
+                            .transition(.opacity)
                         if session.id != visibleSessions.last?.id {
                             Divider().padding(.vertical, 12)
                         }
