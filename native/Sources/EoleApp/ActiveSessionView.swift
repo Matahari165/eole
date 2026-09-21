@@ -68,16 +68,17 @@ public struct ActiveSessionView: View {
         .navigationBarBackButtonHidden(true)
         .interactiveDismissDisabled(engine.phase == .saving)
         .onAppear {
-            engine.onPersist = { [store, weak engine] session, _ in
-                guard let engine else { return }
+            let sessionEngine = engine
+            sessionEngine.onPersist = { [store, weak sessionEngine] session, _ in
+                guard let sessionEngine else { return }
                 let savedLocally = store.saveSession(session)
                 if savedLocally {
-                    engine.markSaved()
+                    sessionEngine.markSaved()
                 } else {
-                    engine.markSaveFailed("La séance n'a pas pu être enregistrée.")
+                    sessionEngine.markSaveFailed("La séance n'a pas pu être enregistrée.")
                 }
             }
-            engine.start()
+            sessionEngine.start()
         }
         .onDisappear { engine.discard() }
         .onChange(of: scenePhase) { _, newPhase in
@@ -613,7 +614,7 @@ public struct ActiveSessionView: View {
                         }
 
                         // Durée au-dessus de la barre
-                        Text(formatShortDuration(round.retentionSeconds))
+                        Text(formatClockDuration(round.retentionSeconds))
                             .font(.caption.weight(.bold))
                             .monospacedDigit()
                             .foregroundStyle(.white)
@@ -739,15 +740,7 @@ public struct ActiveSessionView: View {
         }
     }
 
-    private func formatShortDuration(_ seconds: Int) -> String {
-        let m = seconds / 60
-        let s = seconds % 60
-        return String(format: "%d:%02d", m, s)
-    }
-
     private var retentionLabel: String {
-        let minutes = engine.retentionSeconds / 60
-        let seconds = engine.retentionSeconds % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        formatClockDuration(engine.retentionSeconds)
     }
 }

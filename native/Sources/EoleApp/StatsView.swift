@@ -17,6 +17,20 @@ public struct StatsView: View {
     @State private var hasAppeared = false
     private let onPrepare: () -> Void
 
+    private static let shortDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        return formatter
+    }()
+
+    private static let dayMonthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        return formatter
+    }()
+
     public init(store: SessionStore, onPrepare: @escaping () -> Void = {}) {
         self.store = store
         self.onPrepare = onPrepare
@@ -211,13 +225,7 @@ public struct StatsView: View {
         let stepSeconds: Double = top <= 240 ? 60 : (top <= 600 ? 120 : 180)
 
         let labelMap: [String: String] = {
-            let df = DateFormatter()
-            df.locale = Locale(identifier: "fr_FR")
-            if days <= 7 {
-                df.setLocalizedDateFormatFromTemplate("EEE")
-            } else {
-                df.setLocalizedDateFormatFromTemplate("d MMM")
-            }
+            let df = days <= 7 ? Self.shortDayFormatter : Self.dayMonthFormatter
             var map: [String: String] = [:]
             for point in series {
                 if let date = parseDate(point.key) {
@@ -263,7 +271,7 @@ public struct StatsView: View {
                                     RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
                                 }
                                 .foregroundStyle(Color.eoleSecondary)
-                                Text("Moyenne : \(shortDuration(averageTotal)) min")
+                                Text("Moyenne : \(formatClockDuration(averageTotal)) min")
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(Color.eoleSecondary)
                                     .contentTransition(.opacity)
@@ -295,7 +303,7 @@ public struct StatsView: View {
                             .clipShape(.rect(cornerRadius: 3))
                             .annotation(position: .top, alignment: .center) {
                                 if days == 7 {
-                                    Text(shortDuration(Double(total)))
+                                    Text(formatClockDuration(total))
                                         .font(.caption2.weight(.semibold))
                                         .foregroundStyle(Color.eoleMuted)
                                 }
@@ -316,7 +324,7 @@ public struct StatsView: View {
                             .foregroundStyle(Color.eoleSecondary)
                             .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                             .annotation(position: .top, alignment: .trailing) {
-                                Text("\(shortDuration(averageTotal)) min")
+                                Text("\(formatClockDuration(averageTotal)) min")
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(Color.eoleSecondary)
                                     .padding(.horizontal, 6)
@@ -516,10 +524,7 @@ public struct StatsView: View {
     }
 
     private func weekDayLabel(_ date: Date, calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
-        formatter.setLocalizedDateFormatFromTemplate("EEE")
-        return formatter.string(from: date).capitalized
+        Self.shortDayFormatter.string(from: date).capitalized
     }
 
     private var history: some View {
@@ -597,11 +602,6 @@ public struct StatsView: View {
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(Color.eolePrimary)
         .accessibilityHint("Ouvre les options de partage de l’historique")
-    }
-
-    private func shortDuration(_ seconds: Double) -> String {
-        let total = Int(seconds.rounded())
-        return "\(total / 60):\(String(format: "%02d", total % 60))"
     }
 
     private func oneDecimal(_ value: Double) -> String {
@@ -696,13 +696,13 @@ public struct StatsView: View {
     /// Détail du jour tapé sur le graphique, avec unités explicites.
     private func selectedDayDetail(_ point: DailyPoint) -> String {
         if let value = point.totalRetention {
-            return "\(point.label) : \(shortDuration(Double(value))) min"
+            return "\(point.label) : \(formatClockDuration(value)) min"
         }
         return "\(point.label) : aucune séance"
     }
 
     private func chartAccessibilityValue(series: [DailyPoint], averageTotal: Double) -> String {
-        var parts = [retentionAccessibility(series), "Moyenne : \(shortDuration(averageTotal))"]
+        var parts = [retentionAccessibility(series), "Moyenne : \(formatClockDuration(averageTotal))"]
         if let key = selectedDay,
            let point = series.first(where: { $0.key == key }) {
             parts.append(selectedDayDetail(point))
@@ -711,9 +711,7 @@ public struct StatsView: View {
     }
 
     private func weekDotsAccessibility(active: Set<String>, days: [Date], calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
-        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        let formatter = Self.shortDayFormatter
         return days.map { date in
             let mark = active.contains(localDateKey(date, calendar: calendar)) ? "pratiqué" : "repos"
             return "\(formatter.string(from: date)) : \(mark)"

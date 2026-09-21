@@ -1,6 +1,20 @@
+# macOS
 .DS_Store
+*.swp
+*~
+
+# Logs
 *.log
+
+# Xcode
 ios/**/xcuserdata/
 ios/**/DerivedData/
+ios/build/
+build/
+DerivedData/
+*.xcuserstate
+
+# SwiftPM
 native/.build/
+.build/
 .swiftpm/

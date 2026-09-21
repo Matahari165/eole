@@ -92,6 +92,9 @@ struct EoleCoreVerify {
         // Formatage des durées
         check(formatDuration(42) == "42 s", "formatDuration(42)")
         check(formatDuration(92) == "1 min 32 s", "formatDuration(92)")
+        check(formatClockDuration(42) == "0:42", "formatClockDuration(42)")
+        check(formatClockDuration(65) == "1:05", "formatClockDuration(65)")
+        check(formatClockDuration(120) == "2:00", "formatClockDuration(120)")
 
         // Date de dernière séance ("Aujourd’hui" si jour même)
         var utcCalendar = Calendar(identifier: .gregorian)
@@ -191,6 +194,6 @@ struct EoleCoreVerify {
             print("\(failures) ÉCHEC(S)")
             exit(1)
         }
-        print("PARITÉ EoleCore : TOUT PASSE")
+        print("VÉRIFICATION EoleCore : TOUT PASSE")
     }
 }

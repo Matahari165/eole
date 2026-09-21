@@ -22,9 +22,13 @@ public final class EoleAudioEngine {
     private var ambientTrack: BreathMusicTrack?
     private var ambientFadeTask: Task<Void, Never>?
     private var duckingTask: Task<Void, Never>?
+    private struct PreparedPlayers: @unchecked Sendable {
+        let items: [String: AVAudioPlayer]
+    }
+
     private var cuePlayer: AVAudioPlayerNode?
     private var assetPreparationTask: Task<Void, Never>?
-    private var playerPreparationTask: Task<[String: AVAudioPlayer], Never>?
+    private var playerPreparationTask: Task<PreparedPlayers, Never>?
     private var tonePreparationTask: Task<[String: [Float]], Never>?
     private var preparedBreathPlayers: [String: AVAudioPlayer] = [:]
     private var preparedAmbientPlayers: [String: AVAudioPlayer] = [:]
@@ -646,17 +650,17 @@ public final class EoleAudioEngine {
         tonePreparationTask?.cancel()
         tonePreparationTask = nil
         assetPreparationTask = Task { @MainActor [weak self] in
-            let playerTask = Task.detached(priority: .utility) { () -> [String: AVAudioPlayer] in
+            let playerTask = Task.detached(priority: .utility) { () -> PreparedPlayers in
                 var players: [String: AVAudioPlayer] = [:]
                 for (index, entry) in urls.enumerated() {
-                    if index & 3 == 0, Task.isCancelled { return [:] }
+                    if index & 3 == 0, Task.isCancelled { return PreparedPlayers(items: [:]) }
                     let (name, url) = entry
                     if let player = try? AVAudioPlayer(contentsOf: url) {
                         player.prepareToPlay()
                         players[name] = player
                     }
                 }
-                return players
+                return PreparedPlayers(items: players)
             }
             let toneTask = Task.detached(priority: .utility) { () -> [String: [Float]] in
                 var tones: [String: [Float]] = [:]
@@ -683,7 +687,8 @@ public final class EoleAudioEngine {
             }
             self?.playerPreparationTask = playerTask
             self?.tonePreparationTask = toneTask
-            let loadedPlayers = await playerTask.value
+            let loaded = await playerTask.value
+            let loadedPlayers = loaded.items
             let generatedTones = await toneTask.value
             guard !Task.isCancelled, let self else { return }
             self.playerPreparationTask = nil

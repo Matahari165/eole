@@ -110,20 +110,9 @@ public final class SessionEngine: ObservableObject {
             if let start = retentionStart {
                 retentionSeconds = max(1, Int(Date().timeIntervalSince(start)))
             }
-            if !results.contains(where: { $0.roundIndex == round }) {
-                results.append(RoundResult(
-                    roundIndex: round,
-                    breathsCompleted: config.breathsPerRound,
-                    retentionSeconds: max(1, retentionSeconds)
-                ))
-            }
-        } else if (phase == .recoveryInhale || phase == .recoveryHold || phase == .recoveryExhale),
-                  !results.contains(where: { $0.roundIndex == round }) {
-            results.append(RoundResult(
-                roundIndex: round,
-                breathsCompleted: config.breathsPerRound,
-                retentionSeconds: max(1, retentionSeconds)
-            ))
+            recordCurrentRoundResultIfNeeded()
+        } else if phase == .recoveryInhale || phase == .recoveryHold || phase == .recoveryExhale {
+            recordCurrentRoundResultIfNeeded()
         }
 
         // La rétention attend une continuation, qui doit être réveillée avant
@@ -134,6 +123,15 @@ public final class SessionEngine: ObservableObject {
         audioUnlockTask = nil
         task?.cancel()
         persist(status: .stopped)
+    }
+
+    private func recordCurrentRoundResultIfNeeded() {
+        guard !results.contains(where: { $0.roundIndex == round }) else { return }
+        results.append(RoundResult(
+            roundIndex: round,
+            breathsCompleted: config.breathsPerRound,
+            retentionSeconds: max(1, retentionSeconds)
+        ))
     }
 
     public func discard() {

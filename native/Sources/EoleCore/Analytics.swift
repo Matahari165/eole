@@ -158,6 +158,17 @@ public func formatDuration(_ seconds: Double) -> String {
     return "\(remainder) s"
 }
 
+/// Format horloge concis (ex. "1:05" ou "0:42") pour les chronomètres, barres et axes.
+public func formatClockDuration(_ seconds: Int) -> String {
+    let minutes = seconds / 60
+    let remainder = seconds % 60
+    return String(format: "%d:%02d", minutes, remainder)
+}
+
+public func formatClockDuration(_ seconds: Double) -> String {
+    formatClockDuration(Int(seconds.rounded()))
+}
+
 /// Repère motivant du tableau de bord : ceil((max+1)/15)*15.
 public func nextMilestone(after maxRetention: Int) -> Int {
     ((maxRetention + 1 + 14) / 15) * 15

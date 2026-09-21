@@ -73,7 +73,7 @@ xcodebuild \
 ## Vérifier
 
 Depuis `native/`, les deux commandes suivantes couvrent respectivement les
-tests XCTest et la vérification autonome utilisée comme contrôle de parité :
+tests XCTest et la vérification autonome de la logique métier :
 
 ```bash
 swift test

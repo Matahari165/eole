@@ -207,6 +207,10 @@ final class EoleCoreTests: XCTestCase {
 
         XCTAssertEqual(formatDuration(42), "42 s")
         XCTAssertEqual(formatDuration(92), "1 min 32 s")
+        XCTAssertEqual(formatClockDuration(42), "0:42")
+        XCTAssertEqual(formatClockDuration(65), "1:05")
+        XCTAssertEqual(formatClockDuration(65.4), "1:05")
+        XCTAssertEqual(formatClockDuration(120), "2:00")
         XCTAssertEqual(nextMilestone(after: 0), 15)
         XCTAssertEqual(nextMilestone(after: 15), 30)
     }
