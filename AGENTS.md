@@ -30,3 +30,12 @@
   Une compilation ne prouve pas une séance complète, l’audio ou les haptics.
 - Tester les parcours normal, vide, erreur, interruption, arrière-plan, reprise
   et migration lorsqu’ils sont concernés.
+
+## Collaboration avec des sous-agents
+
+- Utiliser au moins un sous-agent pour chaque tâche effectuée sur ce projet ;
+  lui confier une sous-tâche ciblée ou une revue indépendante.
+- Par défaut, utiliser GPT-6 Luna avec un effort de raisonnement extra high
+  (`xhigh`) pour les sous-agents.
+- Pour une tâche vraiment complexe, les sous-agents peuvent utiliser GPT-6 Sol
+  avec un effort de raisonnement léger (`low`).
