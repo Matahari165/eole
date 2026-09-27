@@ -72,6 +72,9 @@ public final class SessionEngine: ObservableObject {
         hasStarted = true
         task = Task { @MainActor [weak self] in
             guard let self, !Task.isCancelled, !self.hasPersisted else { return }
+            let soundSettings = AppDefaults.shared.soundSettings
+            self.audio.apply(settings: soundSettings)
+            self.haptics.enabled = soundSettings.hapticsEnabled
             self.audioUnlockTask = Task { @MainActor [weak self] in
                 guard let self, !Task.isCancelled, !self.hasPersisted else { return }
                 await self.audio.unlock(pace: self.config.pace)
@@ -157,6 +160,9 @@ public final class SessionEngine: ObservableObject {
         // Phase d'installation préalable : permet de s'installer calmement avant le décompte.
         phase = .starting
         guard await sleep(seconds: Self.settleSeconds) else { return }
+        if let audioUnlockTask {
+            _ = await audioUnlockTask.value
+        }
         guard !Task.isCancelled, !hasPersisted else { return }
 
         // Compte à rebours de trois secondes avec repères sonores.
@@ -169,9 +175,6 @@ public final class SessionEngine: ObservableObject {
             guard await sleep(seconds: 1) else { return }
         }
 
-        if let audioUnlockTask {
-            _ = await audioUnlockTask.value
-        }
         guard !Task.isCancelled, !hasPersisted else { return }
 
         let timing = paceTimings[config.pace] ?? paceTimings[.normal]!
@@ -218,8 +221,9 @@ public final class SessionEngine: ObservableObject {
             for remaining in stride(from: Self.recoveryHoldSeconds, through: 1, by: -1) {
                 guard !Task.isCancelled else { return }
                 recoveryCountdown = remaining
-                if currentRound < config.rounds, remaining <= 3 {
+                if remaining <= 3 {
                     audio.playSoftDing()
+                    haptics.tap()
                 }
                 guard await sleep(seconds: 1) else { return }
             }
@@ -246,7 +250,7 @@ public final class SessionEngine: ObservableObject {
 
     private func startDisplayTimer() {
         displayTimer?.invalidate()
-        displayTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.phase == .retention, let start = self.retentionStart else { return }
                 let elapsed = Date().timeIntervalSince(start)
@@ -261,6 +265,8 @@ public final class SessionEngine: ObservableObject {
                 }
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        displayTimer = timer
     }
 
     private func persist(status: SessionStatus) {
