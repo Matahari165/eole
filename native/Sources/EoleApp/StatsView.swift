@@ -4,17 +4,25 @@ import EoleCore
 #endif
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#endif
 
 /// Lecture native de la pratique : une mesure principale, ses repères, puis les
 /// détails temporels. Les données restent issues exclusivement de SessionStore.
 public struct StatsView: View {
     @ObservedObject var store: SessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.sizeCategory) private var sizeCategory
     @State private var days = 30
     @State private var showAllHistory = false
     @State private var selectedDay: String?
     @State private var sessionToDelete: BreathSession?
     @State private var hasAppeared = false
+    /// CSV mis en cache : reconstruit uniquement quand l'historique change,
+    /// pas à chaque body (days, sélection, toggles).
+    @State private var cachedCSV = ""
     private let onPrepare: () -> Void
 
     private static let shortDayFormatter: DateFormatter = {
@@ -48,6 +56,10 @@ public struct StatsView: View {
                     .foregroundStyle(Color.eoleForeground)
                     .accessibilityAddTraits(.isHeader)
                     .padding(.top, 4)
+                    // Même entrée calme que l'accueil, scopée au titre seul.
+                    .opacity(hasAppeared ? 1 : 0)
+                    .offset(y: reduceMotion || hasAppeared ? 0 : 8)
+                    .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.appEntrance), value: hasAppeared)
 
                 header
                 if stats.sessionCount == 0 {
@@ -69,7 +81,7 @@ public struct StatsView: View {
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
-        .navigationTitle("Progrès")
+        // Pas de navigationTitle : le header visible porte déjà isHeader.
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             if !hasAppeared {
@@ -87,11 +99,20 @@ public struct StatsView: View {
             Button("Annuler", role: .cancel) {}
             Button("Supprimer", role: .destructive) {
                 if let sessionToDelete {
+                    let label = formatSessionDate(sessionToDelete.completedAt)
                     store.deleteSession(id: sessionToDelete.id)
+                    // VoiceOver : le focus perd sa ligne, annonce explicite.
+                    #if os(iOS)
+                    UIAccessibility.post(notification: .announcement, argument: "Séance du \(label) supprimée.")
+                    #endif
                 }
             }
         } message: {
-            Text("Elle sera retirée des statistiques.")
+            if let sessionToDelete {
+                Text("La séance du \(formatSessionDate(sessionToDelete.completedAt)) sera retirée des statistiques.")
+            } else {
+                Text("Elle sera retirée des statistiques.")
+            }
         }
     }
 
@@ -120,7 +141,7 @@ public struct StatsView: View {
             if reduceMotion {
                 days = value
             } else {
-                withAnimation(.eoleCalm(duration: 0.5)) { days = value }
+                withAnimation(.eoleCalm(duration: EoleMotion.controlTransition)) { days = value }
             }
             selectedDay = nil
         }
@@ -150,7 +171,7 @@ public struct StatsView: View {
                         .minimumScaleFactor(0.72)
                         .accessibilityLabel("Rétention moyenne")
                         .accessibilityValue(formatDuration(stats.averageRetention))
-                    Text("par round")
+                    Text("par tour")
                         .font(.subheadline)
                         .foregroundStyle(Color.eoleMuted)
                 }
@@ -181,7 +202,7 @@ public struct StatsView: View {
                     detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : "Aucune série en cours"
                 )
                 EoleMetricTile(
-                    label: "Rounds",
+                    label: "Tours",
                     value: "\(stats.totalRounds)",
                     detail: "Ø \(oneDecimal(stats.averageRounds)) / séance"
                 )
@@ -211,8 +232,11 @@ public struct StatsView: View {
                     .background(Color.eoleSurfaceSoft, in: Circle())
                     .accessibilityHidden(true)
                 EoleSectionHeader("Ta première séance t’attend", subtitle: "Lance une pratique pour voir apparaître tes repères ici.")
+                // Secondaire comme sur l'accueil : une seule hiérarchie.
                 Button("Préparer une séance", action: onPrepare)
-                    .buttonStyle(EolePrimaryButton())
+                    .buttonStyle(.bordered)
+                    .tint(Color.eolePrimary)
+                    .controlSize(.large)
                     .padding(.top, 2)
             }
         }
@@ -229,7 +253,10 @@ public struct StatsView: View {
             var map: [String: String] = [:]
             for point in series {
                 if let date = parseDate(point.key) {
-                    map[point.key] = df.string(from: date).capitalized
+                    let raw = df.string(from: date)
+                    // Jours ("Lun.") avec capitale, mois FR en minuscule
+                    // ("12 sept.", pas "12 Sept.").
+                    map[point.key] = days <= 7 ? raw.capitalized : raw
                 } else {
                     map[point.key] = point.label
                 }
@@ -242,7 +269,10 @@ public struct StatsView: View {
             if days <= 7 {
                 return series.map(\.key)
             }
-            let step = max(1, (series.count - 1) / 5)
+            // En tailles d'accessibilité, 7 libellés "12 sept." se
+            // chevauchent sur 302 pt : on n'en garde que 3-4.
+            let targetTicks = sizeCategory.isAccessibilityCategory ? 3 : 6
+            let step = max(1, (series.count - 1) / (targetTicks - 1))
             var ticks: [String] = []
             var i = 0
             while i < series.count {
@@ -264,18 +294,18 @@ public struct StatsView: View {
                             .foregroundStyle(Color.eoleForeground)
 
                         if averageTotal > 0 {
-                            HStack(spacing: 6) {
-                                HStack(spacing: 3) {
-                                    RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
-                                    RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
-                                    RoundedRectangle(cornerRadius: 1).frame(width: 6, height: 2.5)
-                                }
-                                .foregroundStyle(Color.eoleSecondary)
-                                Text("Moyenne : \(formatClockDuration(averageTotal)) min")
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(Color.eoleSecondary)
-                                    .contentTransition(.opacity)
-                            }
+                            // Rappel discret : la valeur exacte vit sur
+                            // l'annotation du RuleMark, pas de doublon.
+                            Text("Moyenne \(formatClockDuration(averageTotal))")
+                                .font(.caption)
+                                .foregroundStyle(Color.eoleMuted)
+                                .contentTransition(.opacity)
+                        } else if values.isEmpty {
+                            // Séances existantes mais hors période : le chart
+                            // fantôme seul ne l'explique pas.
+                            Text("Aucune séance sur cette période")
+                                .font(.caption)
+                                .foregroundStyle(Color.eoleMuted)
                         } else {
                             Text("Cumul quotidien (\(days) j)")
                                 .font(.caption)
@@ -297,7 +327,9 @@ public struct StatsView: View {
                             BarMark(
                                 x: .value("Jour", point.key),
                                 y: .value("Temps total", Double(total)),
-                                width: days == 30 ? .fixed(5) : .fixed(24)
+                                // 8 pt mini en 30 j : sélection au doigt
+                                // possible, plus de filiforme 5 pt.
+                                width: days == 30 ? .fixed(8) : .fixed(24)
                             )
                             .foregroundStyle(Color.eolePrimary)
                             .clipShape(.rect(cornerRadius: 3))
@@ -312,7 +344,7 @@ public struct StatsView: View {
                             BarMark(
                                 x: .value("Jour", point.key),
                                 y: .value("Temps total", max(top * 0.025, 4)),
-                                width: days == 30 ? .fixed(3) : .fixed(12)
+                                width: days == 30 ? .fixed(8) : .fixed(12)
                             )
                             .foregroundStyle(Color.eoleBorder.opacity(0.35))
                             .clipShape(.rect(cornerRadius: 2))
@@ -324,7 +356,7 @@ public struct StatsView: View {
                             .foregroundStyle(Color.eoleSecondary)
                             .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                             .annotation(position: .top, alignment: .trailing) {
-                                Text("\(formatClockDuration(averageTotal)) min")
+                                Text(formatClockDuration(averageTotal))
                                     .font(.caption.weight(.bold))
                                     .foregroundStyle(Color.eoleSecondary)
                                     .padding(.horizontal, 6)
@@ -347,7 +379,8 @@ public struct StatsView: View {
                                     .foregroundStyle(Color.eoleForeground)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 3)
-                                    .background(Color.eoleSurface.opacity(0.96), in: Capsule())
+                                    // Fond système : lisible sur panel eoleSurface.
+                                    .background(Color(uiColor: .systemBackground).opacity(0.96), in: Capsule())
                                     .overlay {
                                         Capsule().stroke(Color.eoleBorder.opacity(0.6), lineWidth: 0.5)
                                     }
@@ -370,7 +403,8 @@ public struct StatsView: View {
                 }
                 .chartXAxis {
                     AxisMarks(values: xTickKeys) { value in
-                        AxisGridLine().foregroundStyle(Color.eoleBorder.opacity(0.35))
+                        // Pas de grille verticale : l'axe Y suffit, le
+                        // quadrillage complet alourdit le calme visuel.
                         AxisValueLabel {
                             if let key = value.as(String.self), let label = labelMap[key] {
                                 Text(label)
@@ -383,7 +417,9 @@ public struct StatsView: View {
                 .frame(height: 190)
                 .opacity((hasAppeared || reduceMotion) ? 1 : 0)
                 .offset(y: (hasAppeared || reduceMotion) ? 0 : 10)
+                .contentTransition(.opacity)
                 .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal), value: hasAppeared)
+                .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.controlTransition), value: days)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Temps de rétention total par jour sur \(days) jours")
                 .accessibilityValue(Text(chartAccessibilityValue(series: series, averageTotal: averageTotal)))
@@ -396,7 +432,7 @@ public struct StatsView: View {
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Records par round", subtitle: "Moyenne et record selon le tour")
+                EoleSectionHeader("Records par tour", subtitle: "Moyenne et record selon le tour")
 
                 VStack(spacing: 12) {
                     ForEach(Array(roundStats.enumerated()), id: \.element.id) { index, roundStat in
@@ -408,6 +444,10 @@ public struct StatsView: View {
                                         .foregroundStyle(Color.eolePrimary)
                                         .frame(width: 30, height: 22)
                                         .background(Color.eoleAccent.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                                .stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
+                                        }
                                     Text(formatDuration(roundStat.averageSeconds))
                                         .font(.subheadline.weight(.semibold))
                                         .monospacedDigit()
@@ -420,30 +460,43 @@ public struct StatsView: View {
                                     Text("\(enHausse ? "+" : "−")\(formatDuration(abs(diff)))")
                                         .font(.caption2.weight(.bold))
                                         .foregroundStyle(enHausse ? Color.eolePrimary : Color.eoleMuted)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                         .padding(.trailing, 4)
-                                        .accessibilityLabel("\(enHausse ? "En hausse" : "En baisse") de \(formatDuration(abs(diff))) par rapport au round précédent")
+                                        .accessibilityLabel("\(enHausse ? "En hausse" : "En baisse") de \(formatDuration(abs(diff))) par rapport au tour précédent")
                                 }
                                 Text("Record : \(formatDuration(Double(roundStat.maxSeconds)))")
                                     .font(.caption2)
                                     .foregroundStyle(Color.eoleMuted)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
                             }
 
-                            GeometryReader { geo in
-                                ZStack(alignment: .leading) {
-                                    Capsule()
-                                        .fill(Color.eoleSurfaceSoft)
-                                        .frame(height: 7)
-                                    Capsule()
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color.eoleSecondary, Color.eolePrimary],
-                                                startPoint: .leading,
-                                                endPoint: .trailing
-                                            )
+                            // Barre pleine largeur + montée en scaleX ancrée à gauche :
+                            // transform GPU, pas de lecture GeometryReader ni de
+                            // relayout par frame pendant l'animation.
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    // Piste visible sur panel : eoleSurfaceSoft
+                                    // est ton-sur-ton, eoleBorder accroche.
+                                    .fill(Color.eoleBorder.opacity(0.35))
+                                    .frame(height: 7)
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [Color.eoleSecondary, Color.eolePrimary],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
                                         )
-                                        .frame(width: (reduceMotion || hasAppeared) ? max(8, geo.size.width * CGFloat(roundStat.averageSeconds / maxAvg)) : 8, height: 7)
-                                        .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(Double(index) * EoleMotion.chartStagger), value: hasAppeared)
-                                }
+                                    )
+                                    .frame(height: 7)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .scaleEffect(
+                                        x: (reduceMotion || hasAppeared) ? max(0.02, CGFloat(roundStat.averageSeconds / maxAvg)) : 0.02,
+                                        anchor: .leading
+                                    )
+                                    .opacity((reduceMotion || hasAppeared) ? 1 : 0.4)
+                                    .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(Double(index) * EoleMotion.chartStagger), value: hasAppeared)
                             }
                             .frame(height: 7)
                         }
@@ -467,7 +520,7 @@ public struct StatsView: View {
                     Spacer()
                     if stats.currentStreak > 0 {
                         HStack(spacing: 4) {
-                            Image(systemName: "flame.fill")
+                            Image(systemName: "drop.fill")
                                 .font(.caption.weight(.semibold))
                             Text("Série : \(stats.currentStreak) j")
                                 .font(.caption.weight(.bold))
@@ -476,6 +529,9 @@ public struct StatsView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(Color.eoleAccent.opacity(0.6), in: Capsule())
+                        .overlay {
+                            Capsule().stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
+                        }
                     }
                 }
 
@@ -502,10 +558,13 @@ public struct StatsView: View {
                                 if isPracticed {
                                     Image(systemName: "checkmark")
                                         .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(.white)
+                                        // Pastille eolePrimary adaptative (teal sombre
+                                        // en light, clair en dark) : coche
+                                        // inversée comme EolePrimaryButton.
+                                        .foregroundStyle(colorScheme == .dark ? Color(hex: 0x07332F) : .white)
                                 } else {
                                     Circle()
-                                        .fill(Color.eoleBorder.opacity(0.35))
+                                        .fill(Color.eoleMuted.opacity(0.5))
                                         .frame(width: 6, height: 6)
                                 }
                             }
@@ -513,7 +572,7 @@ public struct StatsView: View {
                         .frame(maxWidth: .infinity)
                         .opacity((hasAppeared || reduceMotion) ? 1 : 0)
                         .scaleEffect((hasAppeared || reduceMotion) ? 1 : 0.85)
-                        .animation(reduceMotion ? nil : .eoleCalm(duration: 0.6).delay(Double(index) * 0.06), value: hasAppeared)
+                        .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(Double(index) * EoleMotion.chartStagger), value: hasAppeared)
                     }
                 }
                 .accessibilityElement(children: .ignore)
@@ -532,8 +591,11 @@ public struct StatsView: View {
         let visibleSessions = showAllHistory ? allSessions : Array(allSessions.prefix(8))
 
         return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 8) {
                 EoleSectionHeader("Dernières séances")
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .layoutPriority(1)
                 Spacer()
                 if allSessions.count > 8 {
                     Button(showAllHistory ? "Voir moins" : "Voir tout") {
@@ -545,6 +607,7 @@ public struct StatsView: View {
                     }
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.eolePrimary)
+                    .lineLimit(1)
                     .frame(minHeight: 44)
                 }
             }
@@ -552,7 +615,7 @@ public struct StatsView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(visibleSessions, id: \.id) { session in
                         historyRow(session)
-                            .transition(.opacity)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         if session.id != visibleSessions.last?.id {
                             Divider().padding(.vertical, 12)
                         }
@@ -568,13 +631,13 @@ public struct StatsView: View {
                 Text(formatSessionDate(session.completedAt))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.eoleForeground)
-                Text("\(session.rounds.count) / \(session.plannedRounds) rounds · \(formatSessionDuration(session))")
+                Text("\(session.rounds.count) / \(session.plannedRounds) tours · \(formatSessionDuration(session))")
                     .font(.caption)
                     .foregroundStyle(Color.eoleMuted)
                 Text("Rétentions : \(retentionSummary(session))")
                     .font(.caption)
                     .foregroundStyle(Color.eoleMuted)
-                    .lineLimit(2)
+                    .lineLimit(3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Button {
@@ -593,7 +656,7 @@ public struct StatsView: View {
 
     private var exportAction: some View {
         ShareLink(
-            item: SessionsCSVExport(csv: buildSessionsCsv(store.sessions)),
+            item: SessionsCSVExport(csv: cachedCSV),
             preview: SharePreview("Historique Eole")
         ) {
             Label("Exporter l’historique CSV", systemImage: "square.and.arrow.up")
@@ -602,6 +665,10 @@ public struct StatsView: View {
         .font(.subheadline.weight(.semibold))
         .foregroundStyle(Color.eolePrimary)
         .accessibilityHint("Ouvre les options de partage de l’historique")
+        .onAppear { cachedCSV = buildSessionsCsv(store.sessions) }
+        .onChange(of: store.sessions.count) { _, _ in
+            cachedCSV = buildSessionsCsv(store.sessions)
+        }
     }
 
     private func oneDecimal(_ value: Double) -> String {
@@ -684,25 +751,25 @@ public struct StatsView: View {
         return formatDuration(max(0, end.timeIntervalSince(start)))
     }
 
-    private func retentionAccessibility(_ series: [DailyPoint]) -> String {
-        series.map { point in
-            if let value = point.totalRetention {
-                return "\(point.label) : \(formatDuration(Double(value)))"
-            }
-            return "\(point.label) : aucune séance"
-        }.joined(separator: "; ")
-    }
-
     /// Détail du jour tapé sur le graphique, avec unités explicites.
     private func selectedDayDetail(_ point: DailyPoint) -> String {
         if let value = point.totalRetention {
-            return "\(point.label) : \(formatClockDuration(value)) min"
+            return "\(point.label) : \(formatClockDuration(value))"
         }
         return "\(point.label) : aucune séance"
     }
 
+    /// Résumé VoiceOver : total, moyenne, max — pas l'énumération verbeuse
+    /// des 30 jours qui noyait l'utilisateur.
     private func chartAccessibilityValue(series: [DailyPoint], averageTotal: Double) -> String {
-        var parts = [retentionAccessibility(series), "Moyenne : \(formatClockDuration(averageTotal))"]
+        let values = series.compactMap(\.totalRetention)
+        let total = values.reduce(0, +)
+        let maxValue = values.max() ?? 0
+        var parts = [
+            "Total : \(formatDuration(Double(total)))",
+            "Moyenne : \(formatClockDuration(averageTotal))",
+            "Max : \(formatDuration(Double(maxValue)))",
+        ]
         if let key = selectedDay,
            let point = series.first(where: { $0.key == key }) {
             parts.append(selectedDayDetail(point))

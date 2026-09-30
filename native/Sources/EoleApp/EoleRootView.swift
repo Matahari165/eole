@@ -61,23 +61,23 @@ public struct EoleRootView: View {
             .tint(Color.eolePrimary)
             // Sur iOS 26, TabView reçoit automatiquement la barre Liquid Glass
             // système : aucun fond opaque n'est ajouté par Eole.
-            .tabBarMinimizeBehavior(.onScrollDown)
+            // Minimize désactivé quand la séance recouvre tout (zIndex 100),
+            // sinon la barre reste minimisée au retour.
+            .tabBarMinimizeBehavior(activeSession == nil ? .onScrollDown : .never)
             // Quand la séance est présentée, VoiceOver ignore les onglets dessous.
             .accessibilityHidden(activeSession != nil)
 
             if let launch = activeSession {
                 ActiveSessionView(config: launch.config, store: store, audio: audio, haptics: haptics) {
-                    withAnimation(.eoleCalm(duration: EoleMotion.sessionDismiss)) {
+                    // Reduce Motion : fermeture instantanée, sans fondu 0,70 s.
+                    withAnimation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.sessionDismiss)) {
                         activeSession = nil
                     }
                 }
-                // Immersion calme et profonde ; en Reduce Motion : fondu pur.
-                .transition(
-                    reduceMotion ? .opacity : .asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 1.006)),
-                        removal: .opacity.combined(with: .scale(scale: 0.994))
-                    )
-                )
+                // Immersion calme : fondu pur plein écran. Pas de scale
+                // 1.006/0.994 : 2-5 px invisibles mais raster plein écran
+                // coûteux sur 390×844. Reduce Motion identique.
+                .transition(.opacity)
                 .zIndex(100)
             }
         }
@@ -88,7 +88,12 @@ public struct EoleRootView: View {
         .sheet(isPresented: $showConfigurator, onDismiss: {
             guard let config = pendingSessionConfig else { return }
             pendingSessionConfig = nil
-            beginSession(config)
+            // Laisse la sheet descendre avant d'immerger, sinon séance +
+            // dismiss se chevauchent avec flash de l'accueil. Délai réduit
+            // en Reduce Motion (dismiss système instantané).
+            DispatchQueue.main.asyncAfter(deadline: .now() + (reduceMotion ? 0.1 : EoleMotion.controlTransition)) {
+                beginSession(config)
+            }
         }) {
             NavigationStack {
                 ConfiguratorView(onStart: {
@@ -96,7 +101,8 @@ public struct EoleRootView: View {
                     showConfigurator = false
                 })
             }
-            .presentationDetents([.large])
+            // 3 réglages sur 844 pt : medium suffit, large en option.
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
         .alert("Pratique en sécurité", isPresented: $showSafety) {
@@ -119,7 +125,11 @@ public struct EoleRootView: View {
     }
 
     private func beginSession(_ config: SessionConfig) {
-        withAnimation(.eoleCalm(duration: EoleMotion.sessionPresent)) {
+        // Pré-chauffe le bon pace : le prewarm du launch est périmé dès que
+        // l'utilisateur change de cadence ou d'ambiance dans les réglages.
+        audio.prewarm(pace: config.pace)
+        // Reduce Motion : immersion instantanée, sans fondu 0,75 s plein écran.
+        withAnimation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.sessionPresent)) {
             activeSession = SessionLaunch(config: config)
         }
     }
@@ -142,6 +152,7 @@ private struct LazyTab<Content: View>: View {
                 build()
             } else {
                 Color.clear
+                    .accessibilityHidden(true)
                     .onAppear { appeared = true }
             }
         }

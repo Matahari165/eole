@@ -356,7 +356,7 @@ public struct EoleLogo: View {
                 .stroke(Color.eoleSecondary, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
                 .padding(size * 0.25)
                 .rotationEffect(.degrees(122))
-            Circle().fill(Color.eolePrimary).frame(width: 4.5, height: 4.5)
+            Circle().fill(Color.eolePrimary).frame(width: size * 0.08, height: size * 0.08)
                 .offset(x: size * 0.26, y: -size * 0.17)
         }
         .frame(width: size, height: size)

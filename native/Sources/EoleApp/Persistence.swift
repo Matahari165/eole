@@ -87,11 +87,16 @@ public final class SessionStore: ObservableObject {
     private let modelContainer: ModelContainer
     private let modelContext: ModelContext
     public init(modelContainer: ModelContainer? = nil) {
-        let container = modelContainer ?? Self.makePersistentContainer()
+        let (container, didFallback) = modelContainer.map { ($0, false) } ?? Self.makeContainer()
         self.modelContainer = container
         self.modelContext = ModelContext(container)
         importInitialSessionsIfNeeded()
         reload()
+        // Base mémoire de secours : l'app démarre avec un historique vide
+        // plutôt que de crasher, et le bandeau d'erreur reste visible.
+        if didFallback {
+            presentStorageError()
+        }
     }
 
     public func reload() {
@@ -129,14 +134,29 @@ public final class SessionStore: ObservableObject {
 
     // MARK: - SwiftData
 
-    private static func makePersistentContainer() -> ModelContainer {
-        do {
-            return try ModelContainer(for: StoredBreathSession.self, SessionImportMarker.self)
-        } catch {
-            // Une base indisponible ne doit pas être remplacée silencieusement
-            // par une base mémoire qui ferait perdre les sessions au redémarrage.
-            fatalError("Impossible d'ouvrir la base SwiftData d'Eole : \(error)")
+    /// Conteneur persistant, avec repli mémoire si la base est corrompue ou
+    /// le disque plein : jamais de crash au launch en Release.
+    private static func makeContainer() -> (ModelContainer, Bool) {
+        if let persistent = try? ModelContainer(for: StoredBreathSession.self, SessionImportMarker.self) {
+            return (persistent, false)
         }
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        if let memory = try? ModelContainer(
+            for: StoredBreathSession.self, SessionImportMarker.self,
+            configurations: config
+        ) {
+            return (memory, true)
+        }
+        // Ultime repli : conteneur vide en mémoire. La création mémoire avec
+        // un modèle valide ne fait aucune I/O et ne peut pas échouer en
+        // pratique ; ce try! ne couvre qu'une impossibilité théorique (le
+        // history restera vide et le bandeau d'erreur affiché dans ce cas).
+        assertionFailure("Base SwiftData indisponible, repli mémoire.")
+        let empty = try! ModelContainer(
+            for: StoredBreathSession.self, SessionImportMarker.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return (empty, true)
     }
 
     private func fetchRecords() throws -> [StoredBreathSession] {
@@ -156,6 +176,12 @@ public final class SessionStore: ObservableObject {
 
     @discardableResult
     private func upsert(_ session: BreathSession) -> Bool {
+        // Échec d'encodage = ne rien insérer plutôt qu'un roundsData vide qui
+        // rendrait la séance invisible sans erreur (fail-fast vers Réessayer).
+        guard (try? JSONEncoder().encode(session.rounds)) != nil else {
+            presentStorageError()
+            return false
+        }
         do {
             if let existing = try fetchRecord(id: session.id) {
                 existing.update(from: session)
@@ -191,10 +217,25 @@ public final class SessionStore: ObservableObject {
         guard let url = Bundle.main.url(forResource: "initial_sessions", withExtension: "json"),
               let data = try? Data(contentsOf: url),
               let initial = try? JSONDecoder().decode([BreathSession].self, from: data),
-              initial.count == 6,
-              Set(initial.map(\.id)).count == 6,
-              initial.allSatisfy(isValidSession)
-        else { return }
+              !initial.isEmpty
+        else {
+            // Bundle absent ou illisible : statique, rejouer à chaque launch
+            // ne servirait à rien. Marque pour ne pas repayer le décodage.
+            markImported()
+            return
+        }
+
+        // Tolérant : déduplique par UUID, filtre les invalides. Un bundle
+        // élargi (7 sessions) ou partiellement invalide n'importe que le bon.
+        var seen = Set<String>()
+        let valid = initial.filter { session in
+            guard isValidSession(session), seen.insert(session.id).inserted else { return false }
+            return true
+        }
+        guard !valid.isEmpty else {
+            markImported()
+            return
+        }
 
         let existingIDs: Set<String>
         do {
@@ -203,7 +244,7 @@ public final class SessionStore: ObservableObject {
             presentStorageError()
             return
         }
-        for session in initial where !existingIDs.contains(session.id) {
+        for session in valid where !existingIDs.contains(session.id) {
             modelContext.insert(StoredBreathSession(session: session))
         }
 
@@ -226,6 +267,19 @@ public final class SessionStore: ObservableObject {
             modelContext.rollback()
             presentStorageError()
             assertionFailure("Échec de l'écriture du marqueur d'import Eole : \(error)")
+        }
+    }
+
+    /// Marqueur posé même quand il n'y a rien à importer : le bundle est
+    /// statique, rejouer le décodage à chaque launch serait du travail perdu.
+    private func markImported() {
+        modelContext.insert(SessionImportMarker(key: Self.importMarkerKey))
+        do {
+            try modelContext.save()
+            UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
+        } catch {
+            modelContext.rollback()
+            UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
         }
     }
 

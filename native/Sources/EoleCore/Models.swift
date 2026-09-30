@@ -138,3 +138,9 @@ public extension PaceTiming {
     var inhaleSeconds: Double { Double(inhale) / 1000 }
     var exhaleSeconds: Double { Double(exhale) / 1000 }
 }
+
+/// Accès sans force-unwrap : le repli normal est garanti par le littéral
+/// ci-dessus, le dernier repli évite tout crash si le tableau évolue.
+public func paceTiming(for pace: Pace) -> PaceTiming {
+    paceTimings[pace] ?? paceTimings[.normal] ?? PaceTiming(inhale: 2000, exhale: 2000)
+}

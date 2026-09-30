@@ -35,6 +35,9 @@ public final class EoleAudioEngine {
     private var preparedTones: [String: [Float]] = [:]
     private var previewAmbientPlayer: AVAudioPlayer?
     private var previewStopTask: Task<Void, Never>?
+    /// Relance d'ambiance après reconstruction du graphe : stockée pour
+    /// être annulable par release(), sinon réveil après arrêt.
+    private var rebuildAmbientTask: Task<Void, Never>?
 
     private struct ToneSpec: Sendable {
         let key: String
@@ -114,6 +117,9 @@ public final class EoleAudioEngine {
 
     /// Prépare la session audio et les ressources de la séance.
     public func unlock(pace: Pace) async {
+        // Coupe tout aperçu des Réglages : sinon 2 lecteurs superposés
+        // quand on démarre une séance juste après une écoute.
+        stopPreview()
         #if os(iOS)
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
@@ -174,6 +180,8 @@ public final class EoleAudioEngine {
         ambientFadeTask = nil
         assetPreparationTask?.cancel()
         assetPreparationTask = nil
+        rebuildAmbientTask?.cancel()
+        rebuildAmbientTask = nil
         playerPreparationTask?.cancel()
         playerPreparationTask = nil
         tonePreparationTask?.cancel()
@@ -226,6 +234,8 @@ public final class EoleAudioEngine {
     // MARK: - Ambiance (boucle, ducking sous les guides)
 
     public func startAmbient(track: BreathMusicTrack) {
+        // Un aperçu des Réglages ne doit jamais continuer sous la séance.
+        stopPreview()
         guard musicVolume > 0 else { return }
         if ambientTrack == track, ambientPlayer?.isPlaying == true { return }
         stopAmbient(fadeSeconds: 0)
@@ -426,8 +436,9 @@ public final class EoleAudioEngine {
 
     /// Joue un extrait de cloche selon le style choisi (Clarté ou Bols tibétains).
     public func previewBell(style: BellStyle? = nil) {
+        // Coupe un aperçu d'ambiance en cours : sinon cloche + fond superposés.
+        stopPreview()
         guard breathVolume > 0 else {
-            stopPreview()
             return
         }
         let chosenStyle = style ?? bellStyle
@@ -439,6 +450,10 @@ public final class EoleAudioEngine {
         #endif
 
         if !engine.isRunning {
+            // Même garde que startEngineIfPossible : sortie sans canaux
+            // (BT en transition, appel) = retour silencieux, pas d'assertion.
+            let outputFormat = engine.outputNode.outputFormat(forBus: 0)
+            guard outputFormat.channelCount > 0, outputFormat.sampleRate > 0 else { return }
             do {
                 engine.prepare()
                 try engine.start()
@@ -758,7 +773,8 @@ public final class EoleAudioEngine {
         startEngineIfPossible()
         preparedTones.removeAll(keepingCapacity: false)
         assetPreparationTask?.cancel()
-        Task { @MainActor [weak self] in
+        rebuildAmbientTask?.cancel()
+        rebuildAmbientTask = Task { @MainActor [weak self] in
             guard let self else { return }
             self.prepareAudioAssetsAndCues()
             await self.assetPreparationTask?.value

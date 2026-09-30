@@ -48,14 +48,15 @@ public struct ConfiguratorView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 Divider()
-                EoleGlassContainer(spacing: 8) {
-                    Button {
-                        onStart(SessionConfig(rounds: rounds, breathsPerRound: breaths, pace: pace))
-                    } label: {
-                        Label("Démarrer", systemImage: "play.fill")
-                    }
-                    .buttonStyle(EolePrimaryButton())
+                // Fond .bar seul : le bouton porte déjà son propre verre,
+                // pas de triple superposition GlassContainer + bar.
+                Button {
+                    onStart(SessionConfig(rounds: rounds, breathsPerRound: breaths, pace: pace))
+                } label: {
+                    // Même verbe que l'accueil ("Commencer"), une seule action.
+                    Label("Commencer", systemImage: "play.fill")
                 }
+                .buttonStyle(EolePrimaryButton())
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 .padding(.bottom, 8)
@@ -78,7 +79,7 @@ public struct ConfiguratorView: View {
         EolePanel {
             VStack(alignment: .leading, spacing: 0) {
                 parameterRow(
-                    title: "Rounds",
+                    title: "Tours",
                     hint: "De 1 à 8",
                     value: rounds,
                     stepper: Stepper(value: $rounds, in: 1...8, step: 1) { EmptyView() }
@@ -105,10 +106,17 @@ public struct ConfiguratorView: View {
                 Text(title)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.eoleForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Text(hint)
                     .font(.footnote)
                     .foregroundStyle(Color.eoleMuted)
+                    // AX5 : le hint s'enroule au lieu de pousser le stepper
+                    // hors écran sur 302 pt utiles.
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .layoutPriority(1)
             Spacer(minLength: 8)
             Text("\(value)")
                 .font(.body.weight(.semibold))
@@ -138,6 +146,8 @@ public struct ConfiguratorView: View {
                 }
                 .pickerStyle(.segmented)
                 .tint(Color.eolePrimary)
+                // Hauteur tactile 44 pt : le segmenté natif (~32 pt) vise mal.
+                .frame(minHeight: 44)
 
                 Text(paceDescription(pace))
                     .font(.footnote)

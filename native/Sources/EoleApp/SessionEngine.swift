@@ -154,6 +154,13 @@ public final class SessionEngine: ObservableObject {
     // MARK: - Séquence
 
     private func run() async {
+        // Garde anti-crash : SessionConfig est public, un rounds/breaths à 0
+        // ferait lever 1...0 en Release. On persiste vide et on laisse
+        // l'auto-fermeture du récap vide prendre le relais.
+        guard config.rounds >= 1, config.breathsPerRound >= 1 else {
+            persist(status: .stopped)
+            return
+        }
         // Phase d'installation préalable : permet de s'installer calmement avant le décompte.
         phase = .starting
         guard await sleep(seconds: Self.settleSeconds) else { return }
@@ -169,12 +176,12 @@ public final class SessionEngine: ObservableObject {
             guard await sleep(seconds: 1) else { return }
         }
 
-        if let audioUnlockTask {
-            _ = await audioUnlockTask.value
-        }
+        // L'audio a eu ~5 s d'avance (installation + décompte) et
+        // prepareAudioAssetsAndCues relance l'ambiance à la fin du
+        // chargement : pas d'attente bloquante qui figerait le "1".
         guard !Task.isCancelled, !hasPersisted else { return }
 
-        let timing = paceTimings[config.pace] ?? paceTimings[.normal]!
+        let timing = paceTiming(for: config.pace)
         for currentRound in 1...config.rounds {
             guard !Task.isCancelled else { return }
             round = currentRound
@@ -203,8 +210,17 @@ public final class SessionEngine: ObservableObject {
             audio.playDing()
             haptics.ding()
             startDisplayTimer()
-            await withCheckedContinuation { continuation in
-                retentionContinuation = continuation
+            // Annulation livrée à la continuation : sans ce handler, une
+            // annulation hors stop()/discard() laisserait la Task suspendue
+            // à vie (withCheckedContinuation n'est pas annulable seule).
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    retentionContinuation = continuation
+                }
+            } onCancel: {
+                Task { @MainActor [weak self] in
+                    self?.resumeRetention()
+                }
             }
             guard !Task.isCancelled else { return }
             displayTimer?.invalidate()
@@ -246,7 +262,11 @@ public final class SessionEngine: ObservableObject {
 
     private func startDisplayTimer() {
         displayTimer?.invalidate()
-        displayTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        displayTimer = nil
+        // Mode .common : le chrono reste fluide même pendant un scroll ou un
+        // tracking. Structure de closure identique à l'origine (hop MainActor
+        // via Task) : aucun changement de modèle de concurrence.
+        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.phase == .retention, let start = self.retentionStart else { return }
                 let elapsed = Date().timeIntervalSince(start)
@@ -261,6 +281,8 @@ public final class SessionEngine: ObservableObject {
                 }
             }
         }
+        RunLoop.main.add(timer, forMode: .common)
+        displayTimer = timer
     }
 
     private func persist(status: SessionStatus) {
@@ -269,6 +291,7 @@ public final class SessionEngine: ObservableObject {
         audioUnlockTask?.cancel()
         audioUnlockTask = nil
         displayTimer?.invalidate()
+        displayTimer = nil
         let formatter = Self.isoFormatter
         let session = BreathSession(
             id: sessionId,

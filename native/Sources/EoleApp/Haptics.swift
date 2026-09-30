@@ -11,6 +11,8 @@ public final class EoleHaptics {
     public var enabled = false
     #if os(iOS)
     private var engine: CHHapticEngine?
+    /// Générateur réutilisé : jusqu'à ~480 taps par séance, pas d'alloc par tick.
+    private var impactGenerator: UIImpactFeedbackGenerator?
     #endif
 
     public init() {}
@@ -58,7 +60,16 @@ public final class EoleHaptics {
             )
             try? engine.makePlayer(with: CHHapticPattern(events: [event], parameters: [])).start(atTime: 0)
         } else {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            let generator: UIImpactFeedbackGenerator
+            if let cached = impactGenerator {
+                generator = cached
+            } else {
+                let created = UIImpactFeedbackGenerator(style: .light)
+                created.prepare()
+                impactGenerator = created
+                generator = created
+            }
+            generator.impactOccurred()
         }
         #endif
     }
@@ -98,6 +109,7 @@ public final class EoleHaptics {
         #if os(iOS)
         engine?.stop(completionHandler: nil)
         engine = nil
+        impactGenerator = nil
         #endif
     }
 }

@@ -10,6 +10,9 @@ public struct SettingsView: View {
     @State private var settings = AppDefaults.shared.soundSettings
     @State private var showSafety = false
     @State private var isPlayingAmbientPreview = false
+    /// Écriture UserDefaults différée : le drag d'un Slider émet à 60 Hz,
+    /// l'audio suit en direct mais le disque attend la fin du geste.
+    @State private var persistTask: Task<Void, Never>?
     private let audio: EoleAudioEngine?
     private let onSettingsChanged: (SoundSettings) -> Void
 
@@ -45,7 +48,8 @@ public struct SettingsView: View {
                     }
                     .buttonStyle(.borderless)
                     .frame(minHeight: 44)
-                    .accessibilityLabel(isPlayingAmbientPreview ? "Arrêter l'extrait musical" : "Écouter un extrait de \(settings.musicTrack.rawValue)")
+                    .contentShape(Rectangle())
+                    .accessibilityLabel(isPlayingAmbientPreview ? "Arrêter l'extrait musical" : "Écouter un extrait de \(trackLabel(settings.musicTrack))")
                 }
 
                 Picker("Repères sonores", selection: $settings.bellStyle) {
@@ -68,6 +72,7 @@ public struct SettingsView: View {
                     }
                     .buttonStyle(.borderless)
                     .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                     .accessibilityLabel("Tester le son de cloche")
                 }
             } header: {
@@ -124,10 +129,20 @@ public struct SettingsView: View {
         .scrollContentBackground(.hidden)
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .tint(Color.eolePrimary)
-        .navigationTitle("Réglages")
+        // Pas de navigationTitle : le header "Réglages" porte déjà isHeader.
         .toolbar(.hidden, for: .navigationBar)
         .onChange(of: settings) { oldSettings, newSettings in
-            persist(newSettings)
+            // Retour immédiat (volumes audibles en direct), persistance
+            // différée pour ne pas écrire en UserDefaults à 60 Hz.
+            onSettingsChanged(newSettings)
+            persistTask?.cancel()
+            persistTask = Task {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    AppDefaults.shared.soundSettings = newSettings
+                }
+            }
             if oldSettings.bellStyle != newSettings.bellStyle {
                 audio?.previewBell(style: newSettings.bellStyle)
             }
@@ -136,13 +151,19 @@ public struct SettingsView: View {
             }
         }
         .onDisappear {
+            persistTask?.cancel()
+            // Écriture finale garantie même si l'utilisateur quitte <250 ms
+            // après le dernier tick.
+            AppDefaults.shared.soundSettings = settings
+            onSettingsChanged(settings)
             audio?.stopPreview()
             isPlayingAmbientPreview = false
         }
         .alert("Pratique en sécurité", isPresented: $showSafety) {
             Button("Compris", role: .cancel) {}
         } message: {
-            Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise : pratique assis ou allongé, jamais dans l'eau, au volant ou quand un malaise serait dangereux.")
+            // Texte unique partagé avec l'alerte d'accueil (EoleRootView).
+            Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux.")
         }
     }
 
@@ -181,13 +202,23 @@ public struct SettingsView: View {
                 set: { value.wrappedValue = Int($0.rounded()) }
             ), in: 0...100)
             .tint(Color.eolePrimary)
+            // Zone tactile 44 pt : le pouce attrape le curseur sans viser.
+            .frame(minHeight: 44)
             .accessibilityLabel(title)
             .accessibilityValue("\(value.wrappedValue) pour cent")
         }
     }
 
-    private func trackDescription(_ track: BreathMusicTrack) -> String {
+    /// Libellé visible du paysage (le rawValue est un identifiant technique).
+    private func trackLabel(_ track: BreathMusicTrack) -> String {
         switch track {
+        case .bambou: return "Bambou"
+        case .meditation: return "Méditation"
+        case .serenite: return "Sérénité"
+        }
+    }
+
+    private func trackDescription(_ track: BreathMusicTrack) -> String {        switch track {
         case .bambou: return "Pluie douce et régulière."
         case .meditation: return "Un fond d'océan calme."
         case .serenite: return "Une forêt paisible."
@@ -199,11 +230,6 @@ public struct SettingsView: View {
         case .clarte: return "Cloches méditatives pures et cristallines."
         case .tibetan: return "Bols chantants martelés et cloches traditionnelles à résonance profonde."
         }
-    }
-
-    private func persist(_ newSettings: SoundSettings) {
-        AppDefaults.shared.soundSettings = newSettings
-        onSettingsChanged(newSettings)
     }
 
     private func toggleAmbientPreview() {

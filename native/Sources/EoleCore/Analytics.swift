@@ -150,8 +150,12 @@ public func buildDailySeries(_ sessions: [BreathSession], days: Int, today: Date
 
 public func formatDuration(_ seconds: Double) -> String {
     let rounded = Int(seconds.rounded())
-    let minutes = rounded / 60
+    let hours = rounded / 3600
+    let minutes = (rounded % 3600) / 60
     let remainder = rounded % 60
+    if hours > 0 {
+        return "\(hours) h \(String(format: "%02d", minutes)) min"
+    }
     if minutes > 0 {
         return "\(minutes) min \(String(format: "%02d", remainder)) s"
     }

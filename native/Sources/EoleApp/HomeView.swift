@@ -29,39 +29,53 @@ public struct HomeView: View {
                     .foregroundStyle(Color.eoleForeground)
                     .accessibilityAddTraits(.isHeader)
                     .padding(.top, 4)
+                    .opacity(hasAppeared ? 1 : 0)
+                    .offset(y: reduceMotion || hasAppeared ? 0 : 8)
+                    // Animation scopée au header seul : le conteneur ne rejoue
+                    // pas de fondu pour ses futurs enfants.
+                    .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.appEntrance), value: hasAppeared)
 
                 practicePanel(defaults, stats: stats)
+                    // CTA toujours visible et tappable : pas de fondu bloquant,
+                    // pas de tap fantôme pendant l'entrée.
                 if stats.sessionCount == 0 {
                     firstPracticePanel
                 } else {
                     metrics(stats)
                     if let last = store.sessions.first, !last.rounds.isEmpty {
                         latestSession(last)
+                            .onAppear {
+                                // Déclenche les barres quand elles entrent vraiment
+                                // à l'écran, pas au launch quand elles sont hors champ.
+                                if !barsAppeared {
+                                    if reduceMotion {
+                                        barsAppeared = true
+                                    } else {
+                                        withAnimation(.eoleCalm(duration: EoleMotion.chartReveal).delay(0.15)) {
+                                            barsAppeared = true
+                                        }
+                                    }
+                                }
+                            }
                     }
                 }
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 32)
-            .opacity(hasAppeared ? 1 : 0)
-            .offset(y: reduceMotion || hasAppeared ? 0 : 8)
-            .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.appEntrance), value: hasAppeared)
         }
         .scrollIndicators(.hidden)
         .background(EoleAmbientBackground())
-        .navigationTitle("Aujourd’hui")
+        // Pas de navigationTitle : le header visible porte déjà isHeader,
+        // sinon VoiceOver annonce le titre en double.
         .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             if !hasAppeared {
-                withAnimation(.eoleCalm(duration: EoleMotion.appEntrance)) {
-                    hasAppeared = true
-                }
-            }
-            if !barsAppeared {
+                // Reduce Motion : apparition instantanée, sans fondu 0,85 s.
                 if reduceMotion {
-                    barsAppeared = true
+                    hasAppeared = true
                 } else {
-                    withAnimation(.eoleCalm(duration: EoleMotion.chartReveal).delay(0.15)) {
-                        barsAppeared = true
+                    withAnimation(.eoleCalm(duration: EoleMotion.appEntrance)) {
+                        hasAppeared = true
                     }
                 }
             }
@@ -78,6 +92,9 @@ public struct HomeView: View {
                             .foregroundStyle(Color.eolePrimary)
                             .frame(width: 44, height: 44)
                             .background(Color.eoleAccent, in: Circle())
+                            .overlay {
+                                Circle().stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
+                            }
                             .accessibilityHidden(true)
                         Text("Ta prochaine séance")
                             .font(.headline.weight(.semibold))
@@ -86,7 +103,7 @@ public struct HomeView: View {
                     Spacer()
                     if stats.currentStreak > 0 {
                         HStack(spacing: 4) {
-                            Image(systemName: "flame.fill")
+                            Image(systemName: "drop.fill")
                                 .font(.caption.weight(.semibold))
                             Text("\(stats.currentStreak) j")
                                 .font(.caption.weight(.bold))
@@ -95,13 +112,16 @@ public struct HomeView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
                         .background(Color.eoleAccent.opacity(0.6), in: Capsule())
+                        .overlay {
+                            Capsule().stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
+                        }
                         .accessibilityLabel("Série en cours : \(stats.currentStreak) jours")
                     }
                 }
 
                 HStack(spacing: 8) {
-                    configTag("\(defaults.rounds) rounds", icon: "arrow.triangle.2.circlepath")
-                    configTag("\(defaults.breathsPerRound) resp.", icon: "lungs.fill")
+                    configTag("\(defaults.rounds) tours", icon: "arrow.triangle.2.circlepath")
+                    configTag("\(defaults.breathsPerRound) respirations", icon: "lungs.fill")
                     configTag(paceLabel(defaults.pace), icon: "metronome.fill")
                 }
                 .accessibilityElement(children: .combine)
@@ -134,7 +154,7 @@ public struct HomeView: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Color.eoleForeground)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 7)
@@ -152,8 +172,11 @@ public struct HomeView: View {
                     subtitle: "Après ta première séance, tu retrouveras ta rétention, ta régularité et ton historique.",
                     systemImage: "chart.line.uptrend.xyaxis"
                 )
+                // Secondaire : "Commencer" reste l'action primaire unique.
                 Button("Préparer une séance") { onAdjust() }
-                    .buttonStyle(EolePrimaryButton())
+                    .buttonStyle(.bordered)
+                    .tint(Color.eolePrimary)
+                    .controlSize(.large)
                     .padding(.top, 2)
             }
         }
@@ -162,7 +185,8 @@ public struct HomeView: View {
     private func metrics(_ stats: SessionStats) -> some View {
         VStack(alignment: .leading, spacing: EoleSpacing.md) {
             EoleSectionHeader("Tes repères")
-            HStack(spacing: 12) {
+            // Alignement haut : en AX5 une tuile à 2 lignes ne tasse pas l'autre.
+            HStack(alignment: .top, spacing: 12) {
                 EolePanel(padding: 16) {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(spacing: 6) {
@@ -184,7 +208,8 @@ public struct HomeView: View {
                         Text("Prochain palier : \(formatDuration(Double(next)))")
                             .font(.caption2)
                             .foregroundStyle(Color.eolePrimary)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
                     .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
                 }
@@ -206,10 +231,11 @@ public struct HomeView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
 
-                        Text("\(stats.totalRounds) rounds au total")
+                        Text("\(stats.totalRounds) tours au total")
                             .font(.caption2)
                             .foregroundStyle(Color.eoleMuted)
-                            .lineLimit(1)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
                     }
                     .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
                 }
@@ -226,33 +252,47 @@ public struct HomeView: View {
             EolePanel {
                 VStack(alignment: .leading, spacing: EoleSpacing.md) {
                     HStack {
-                        Text("\(session.rounds.count) rounds")
+                        Text("\(session.rounds.count) tours")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(Color.eoleMuted)
+                            .lineLimit(1)
                         Spacer()
                         Text("Rétention cumulée : \(formatDuration(Double(totalRetention)))")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Color.eolePrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
                     }
 
                     HStack(alignment: .bottom, spacing: 10) {
                         ForEach(Array(session.rounds.enumerated()), id: \.element.roundIndex) { index, round in
                             VStack(spacing: 6) {
                                 let ratio = CGFloat(round.retentionSeconds) / CGFloat(maxRetention)
+                                // Hauteur finale fixe + montée scaleY : pas de
+                                // relayout du HStack à 60 img/s pendant 0,9 s.
                                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                                     .fill(Color.eolePrimary.opacity(0.85))
-                                    .frame(width: 24, height: (reduceMotion || barsAppeared) ? max(4, 44 * ratio) : 4)
+                                    .frame(width: 24, height: max(8, 68 * ratio))
+                                    .scaleEffect(
+                                        y: (reduceMotion || barsAppeared) ? 1 : 0.05,
+                                        anchor: .bottom
+                                    )
+                                    .opacity((reduceMotion || barsAppeared) ? 1 : 0.4)
                                     .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(Double(index) * EoleMotion.chartStagger), value: barsAppeared)
 
                                 Text("R\(round.roundIndex)")
                                     .font(.caption2.weight(.semibold))
                                     .foregroundStyle(Color.eoleMuted)
 
-                                Text(formatDuration(Double(round.retentionSeconds)))
-                                    .font(.caption.weight(.semibold))
-                                    .monospacedDigit()
-                                    .minimumScaleFactor(0.72)
-                                    .lineLimit(1)
+                                // Durées masquées au-delà de 5 tours : sinon
+                                // troncature garantie sur 390 px à 6-8 tours.
+                                if session.rounds.count <= 5 {
+                                    Text(formatDuration(Double(round.retentionSeconds)))
+                                        .font(.caption.weight(.semibold))
+                                        .monospacedDigit()
+                                        .minimumScaleFactor(0.72)
+                                        .lineLimit(1)
+                                }
                             }
                             .frame(maxWidth: .infinity)
                         }
@@ -260,7 +300,7 @@ public struct HomeView: View {
                     .padding(.top, 4)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Dernière séance : \(session.rounds.count) rounds, rétention cumulée \(formatDuration(Double(totalRetention)))")
+                .accessibilityLabel("Dernière séance : \(session.rounds.count) tours, rétention cumulée \(formatDuration(Double(totalRetention)))")
             }
         }
     }
