@@ -46,6 +46,27 @@ public final class EoleAudioEngine {
         let level: Double
         let harmonics: [Double]
         let decayRate: Double
+
+        // Clarté
+        static let cueClarte480 = ToneSpec(key: "cue-clarte-480", frequency: 480, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8)
+        static let cueClarte540 = ToneSpec(key: "cue-clarte-540", frequency: 540, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8)
+        static let cueClarte620 = ToneSpec(key: "cue-clarte-620", frequency: 620, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8)
+        static let dingClarte = ToneSpec(key: "ding-clarte", frequency: 216, seconds: 6.5, level: 0.48, harmonics: [1, 2.4, 3.9], decayRate: 0.8)
+        static let softDingClarte = ToneSpec(key: "softding-clarte", frequency: 528, seconds: 0.85, level: 0.38, harmonics: [1, 2.76, 5.4], decayRate: 3.2)
+        static let previewClarte = ToneSpec(key: "preview-clarte", frequency: 216, seconds: 2.8, level: 0.48, harmonics: [1, 2.4, 3.9], decayRate: 1.2)
+
+        // Bols tibétains
+        static let cueTibetan396 = ToneSpec(key: "cue-tibetan-396", frequency: 396, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4)
+        static let cueTibetan432 = ToneSpec(key: "cue-tibetan-432", frequency: 432, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4)
+        static let cueTibetan528 = ToneSpec(key: "cue-tibetan-528", frequency: 528, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4)
+        static let dingTibetan = ToneSpec(key: "ding-tibetan", frequency: 174, seconds: 7.5, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.42)
+        static let softDingTibetan = ToneSpec(key: "softding-tibetan", frequency: 704, seconds: 0.85, level: 0.40, harmonics: [1, 2.02, 3.15], decayRate: 2.6)
+        static let previewTibetan = ToneSpec(key: "preview-tibetan", frequency: 174, seconds: 3.2, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.8)
+
+        static let allSpecs: [ToneSpec] = [
+            cueClarte480, cueClarte540, cueClarte620, dingClarte, softDingClarte, previewClarte,
+            cueTibetan396, cueTibetan432, cueTibetan528, dingTibetan, softDingTibetan, previewTibetan
+        ]
     }
     private var engineReady = false
     private var isUnlocked = false
@@ -102,10 +123,14 @@ public final class EoleAudioEngine {
 
     /// Applique les réglages locaux avant le lancement d'une séance.
     public func apply(settings: SoundSettings) {
+        let volumeChanged = (breathVolume != settings.breathVolume)
         musicVolume = settings.musicVolume
         breathVolume = settings.breathVolume
         musicTrack = settings.musicTrack
         bellStyle = settings.bellStyle
+        if volumeChanged {
+            preparedTones.removeAll(keepingCapacity: true)
+        }
     }
 
     deinit {
@@ -396,40 +421,44 @@ public final class EoleAudioEngine {
     public func playCue(frequency: Double = 520) {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.58)
+        let spec: ToneSpec
         if bellStyle == .tibetan {
-            let tibetanFreq = frequency <= 480 ? 396.0 : (frequency <= 540 ? 432.0 : 528.0)
-            playTone(frequency: tibetanFreq, seconds: 0.95, level: 0.26, harmonics: [1, 2.05])
-            restoreAfter(0.95)
+            if frequency <= 480 {
+                spec = .cueTibetan396
+            } else if frequency <= 540 {
+                spec = .cueTibetan432
+            } else {
+                spec = .cueTibetan528
+            }
         } else {
-            playTone(frequency: frequency, seconds: 0.62, level: 0.25)
-            restoreAfter(0.62)
+            if frequency <= 480 {
+                spec = .cueClarte480
+            } else if frequency <= 540 {
+                spec = .cueClarte540
+            } else {
+                spec = .cueClarte620
+            }
         }
+        playTone(spec: spec)
+        restoreAfter(spec.seconds)
     }
 
-    /// Son de fin de rétention avec partiels, jusqu'à 6 secondes.
+    /// Son de fin de rétention ou jalon de minute avec résonance profonde.
     public func playDing() {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.48)
-        if bellStyle == .tibetan {
-            playTone(frequency: 174, seconds: 7.5, level: 0.34, harmonics: [1, 2.78, 5.42, 8.16])
-            restoreAfter(7.5)
-        } else {
-            playTone(frequency: 216, seconds: 6.5, level: 0.3, harmonics: [1, 2.4, 3.9])
-            restoreAfter(6.5)
-        }
+        let spec = (bellStyle == .tibetan) ? ToneSpec.dingTibetan : ToneSpec.dingClarte
+        playTone(spec: spec)
+        restoreAfter(spec.seconds)
     }
 
-    /// Indication sonore méditative pour le compte à rebours de récupération.
+    /// Indication sonore méditative pour le compte à rebours de récupération (3, 2, 1).
     public func playSoftDing() {
         guard breathVolume > 0 else { return }
         duckAmbient(depth: 0.78)
-        if bellStyle == .tibetan {
-            playTone(frequency: 704, seconds: 1.6, level: 0.24, harmonics: [1, 2.02, 3.15])
-            restoreAfter(1.6)
-        } else {
-            playTone(frequency: 528, seconds: 0.85, level: 0.22, harmonics: [1, 2.76, 5.4])
-            restoreAfter(0.85)
-        }
+        let spec = (bellStyle == .tibetan) ? ToneSpec.softDingTibetan : ToneSpec.softDingClarte
+        playTone(spec: spec)
+        restoreAfter(spec.seconds)
     }
 
     // MARK: - Aperçus sonores (Réglages)
@@ -449,71 +478,8 @@ public final class EoleAudioEngine {
         } catch {}
         #endif
 
-        if !engine.isRunning {
-            // Même garde que startEngineIfPossible : sortie sans canaux
-            // (BT en transition, appel) = retour silencieux, pas d'assertion.
-            let outputFormat = engine.outputNode.outputFormat(forBus: 0)
-            guard outputFormat.channelCount > 0, outputFormat.sampleRate > 0 else { return }
-            do {
-                engine.prepare()
-                try engine.start()
-                engineReady = engine.isRunning && currentNodeFormat() != nil
-            } catch {}
-        }
-        guard let format = currentNodeFormat() else { return }
-
-        let spec: ToneSpec
-        if chosenStyle == .tibetan {
-            spec = ToneSpec(
-                key: "preview-tibetan",
-                frequency: 174,
-                seconds: 3.2,
-                level: 0.52,
-                harmonics: [1, 2.78, 5.42, 8.16],
-                decayRate: 0.8
-            )
-        } else {
-            spec = ToneSpec(
-                key: "preview-clarte",
-                frequency: 216,
-                seconds: 2.8,
-                level: 0.48,
-                harmonics: [1, 2.4, 3.9],
-                decayRate: 1.2
-            )
-        }
-
-        let frames = Int(format.sampleRate * spec.seconds)
-        var samples = [Float](repeating: 0, count: frames)
-        let harmonicWeight = max(1.0, spec.harmonics.indices.map { 1.0 / Double($0 + 2) }.reduce(0, +))
-        let effectiveVol = min(1.0, Double(breathVolume) / 100.0)
-        for index in 0..<frames {
-            let t = Double(index) / format.sampleRate
-            let attack = min(1.0, t / 0.015)
-            let release = min(1.0, max(0.0, (spec.seconds - t) / 0.05))
-            let envelope = attack * release * exp(-t * spec.decayRate)
-            var sample = 0.0
-            for (hIdx, ratio) in spec.harmonics.enumerated() {
-                let damping = exp(-t * spec.decayRate * Double(hIdx) * 0.5)
-                sample += (sin(2 * .pi * spec.frequency * ratio * t) / Double(hIdx + 2)) * damping
-            }
-            samples[index] = Float((sample / harmonicWeight) * envelope * spec.level * effectiveVol)
-        }
-
-        guard let buffer = makeBuffer(samples: samples, format: format) else { return }
-        let player: AVAudioPlayerNode
-        if let cuePlayer {
-            player = cuePlayer
-            player.stop()
-        } else {
-            let newPlayer = AVAudioPlayerNode()
-            engine.attach(newPlayer)
-            engine.connect(newPlayer, to: engine.mainMixerNode, format: format)
-            cuePlayer = newPlayer
-            player = newPlayer
-        }
-        player.scheduleBuffer(buffer, at: nil, options: .interrupts)
-        player.play()
+        let spec = (chosenStyle == .tibetan) ? ToneSpec.previewTibetan : ToneSpec.previewClarte
+        playTone(spec: spec)
     }
 
     /// Joue un aperçu d'ambiance de quelques secondes puis s'estompe doucement.
@@ -562,11 +528,57 @@ public final class EoleAudioEngine {
         previewAmbientPlayer?.isPlaying == true
     }
 
-    private func playTone(frequency: Double, seconds: Double, level: Double, harmonics: [Double] = [1]) {
-        guard engineReady, let format = currentNodeFormat(),
-              let samples = preparedTones[toneKey(frequency: frequency, seconds: seconds, level: level, harmonics: harmonics)],
-              !samples.isEmpty,
-              let buffer = makeBuffer(samples: samples, format: format) else { return }
+    nonisolated private static func generateToneSamples(spec: ToneSpec, sampleRate: Double, volume: Double) -> [Float] {
+        let frames = Int(sampleRate * spec.seconds)
+        var samples = [Float](repeating: 0, count: frames)
+        let harmonicWeight = max(1.0, spec.harmonics.indices.map { 1.0 / Double($0 + 2) }.reduce(0, +))
+        for index in 0..<frames {
+            let t = Double(index) / sampleRate
+            let attack = min(1.0, t / 0.015)
+            let release = min(1.0, max(0.0, (spec.seconds - t) / 0.05))
+            let envelope = attack * release * exp(-t * spec.decayRate)
+            var sample = 0.0
+            for (harmonicIndex, ratio) in spec.harmonics.enumerated() {
+                let damping = exp(-t * spec.decayRate * Double(harmonicIndex) * 0.5)
+                sample += (sin(2 * .pi * spec.frequency * ratio * t) / Double(harmonicIndex + 2)) * damping
+            }
+            samples[index] = Float((sample / harmonicWeight) * envelope * spec.level * volume)
+        }
+        return samples
+    }
+
+    private func playTone(spec: ToneSpec) {
+        guard breathVolume > 0 else { return }
+        if !engine.isRunning {
+            if isUnlocked {
+                startEngineIfPossible()
+            } else {
+                // Sortie sans canaux (BT en transition, appel) : retour
+                // silencieux plutôt qu'assertion native au démarrage.
+                let outputFormat = engine.outputNode.outputFormat(forBus: 0)
+                guard outputFormat.channelCount > 0, outputFormat.sampleRate > 0 else { return }
+                do {
+                    engine.prepare()
+                    try engine.start()
+                    engineReady = engine.isRunning && currentNodeFormat() != nil
+                } catch {
+                    engineReady = false
+                }
+            }
+        }
+        guard let format = currentNodeFormat() else { return }
+
+        let samples: [Float]
+        if let cached = preparedTones[spec.key], !cached.isEmpty {
+            samples = cached
+        } else {
+            let volume = Double(breathVolume) / 100
+            let generated = Self.generateToneSamples(spec: spec, sampleRate: format.sampleRate, volume: volume)
+            preparedTones[spec.key] = generated
+            samples = generated
+        }
+
+        guard let buffer = makeBuffer(samples: samples, format: format) else { return }
         let player: AVAudioPlayerNode
         if let cuePlayer {
             player = cuePlayer
@@ -626,14 +638,9 @@ public final class EoleAudioEngine {
             .first
     }
 
-    private func toneKey(frequency: Double, seconds: Double, level: Double, harmonics: [Double]) -> String {
-        let harmonicKey = harmonics.map { String(format: "%.3f", $0) }.joined(separator: ",")
-        return "\(Int(frequency * 1000)):\(Int(seconds * 1000)):\(Int(level * 1000)):\(harmonicKey)"
-    }
-
-    /// Prépare en arrière-plan uniquement les trois fichiers utiles et les cues.
-    /// La séance visuelle démarre sans attendre : si l'audio n'est pas encore
-    /// prêt, le premier cue est simplement omis au lieu de bloquer l'interface.
+    /// Prépare en arrière-plan uniquement les trois fichiers utiles et les repères sonores.
+    /// La séance visuelle démarre sans attendre : si un repère sonore est demandé
+    /// avant la fin du calcul, la synthèse à la volée prend le relais de façon transparente.
     private func prepareAudioAssetsAndCues() {
         let variant: String
         switch preparedPace {
@@ -646,25 +653,30 @@ public final class EoleAudioEngine {
         let urls = (breathNames + ambientNames).compactMap { name in
             bundleAudioURL(named: name).map { (name, $0) }
         }
-        guard let format = currentNodeFormat(), !urls.isEmpty else { return }
+        guard let format = currentNodeFormat() else { return }
         let volume = Double(breathVolume) / 100
-        let specs = [
-            ToneSpec(key: toneKey(frequency: 480, seconds: 0.62, level: 0.42, harmonics: [1]), frequency: 480, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8),
-            ToneSpec(key: toneKey(frequency: 540, seconds: 0.62, level: 0.42, harmonics: [1]), frequency: 540, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8),
-            ToneSpec(key: toneKey(frequency: 620, seconds: 0.62, level: 0.42, harmonics: [1]), frequency: 620, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8),
-            ToneSpec(key: toneKey(frequency: 216, seconds: 6.5, level: 0.48, harmonics: [1, 2.4, 3.9]), frequency: 216, seconds: 6.5, level: 0.48, harmonics: [1, 2.4, 3.9], decayRate: 0.8),
-            ToneSpec(key: toneKey(frequency: 528, seconds: 0.85, level: 0.38, harmonics: [1, 2.76, 5.4]), frequency: 528, seconds: 0.85, level: 0.38, harmonics: [1, 2.76, 5.4], decayRate: 3.2),
-            ToneSpec(key: toneKey(frequency: 396, seconds: 0.95, level: 0.42, harmonics: [1, 2.05]), frequency: 396, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4),
-            ToneSpec(key: toneKey(frequency: 432, seconds: 0.95, level: 0.42, harmonics: [1, 2.05]), frequency: 432, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4),
-            ToneSpec(key: toneKey(frequency: 174, seconds: 7.5, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16]), frequency: 174, seconds: 7.5, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.42),
-            ToneSpec(key: toneKey(frequency: 704, seconds: 1.6, level: 0.40, harmonics: [1, 2.02, 3.15]), frequency: 704, seconds: 1.6, level: 0.40, harmonics: [1, 2.02, 3.15], decayRate: 1.6),
-        ]
+        let specs = ToneSpec.allSpecs
+
         assetPreparationTask?.cancel()
         playerPreparationTask?.cancel()
         playerPreparationTask = nil
         tonePreparationTask?.cancel()
         tonePreparationTask = nil
         assetPreparationTask = Task { @MainActor [weak self] in
+            let toneTask = Task.detached(priority: .utility) { () -> [String: [Float]] in
+                var tones: [String: [Float]] = [:]
+                for spec in specs {
+                    if Task.isCancelled { return [:] }
+                    tones[spec.key] = EoleAudioEngine.generateToneSamples(
+                        spec: spec,
+                        sampleRate: format.sampleRate,
+                        volume: volume
+                    )
+                }
+                return tones
+            }
+            self?.tonePreparationTask = toneTask
+
             let playerTask = Task.detached(priority: .utility) { () -> PreparedPlayers in
                 var players: [String: AVAudioPlayer] = [:]
                 for (index, entry) in urls.enumerated() {
@@ -677,40 +689,19 @@ public final class EoleAudioEngine {
                 }
                 return PreparedPlayers(items: players)
             }
-            let toneTask = Task.detached(priority: .utility) { () -> [String: [Float]] in
-                var tones: [String: [Float]] = [:]
-                for spec in specs {
-                    let frames = Int(format.sampleRate * spec.seconds)
-                    var samples = [Float](repeating: 0, count: frames)
-                    let harmonicWeight = max(1.0, spec.harmonics.indices.map { 1.0 / Double($0 + 2) }.reduce(0, +))
-                    for index in 0..<frames {
-                        if index & 2047 == 0, Task.isCancelled { return [:] }
-                        let t = Double(index) / format.sampleRate
-                        let attack = min(1.0, t / 0.015)
-                        let release = min(1.0, max(0.0, (spec.seconds - t) / 0.05))
-                        let envelope = attack * release * exp(-t * spec.decayRate)
-                        var sample = 0.0
-                        for (harmonicIndex, ratio) in spec.harmonics.enumerated() {
-                            let damping = exp(-t * spec.decayRate * Double(harmonicIndex) * 0.5)
-                            sample += (sin(2 * .pi * spec.frequency * ratio * t) / Double(harmonicIndex + 2)) * damping
-                        }
-                        samples[index] = Float((sample / harmonicWeight) * envelope * spec.level * volume)
-                    }
-                    tones[spec.key] = samples
-                }
-                return tones
-            }
             self?.playerPreparationTask = playerTask
-            self?.tonePreparationTask = toneTask
-            let loaded = await playerTask.value
-            let loadedPlayers = loaded.items
+
             let generatedTones = await toneTask.value
             guard !Task.isCancelled, let self else { return }
-            self.playerPreparationTask = nil
-            self.tonePreparationTask = nil
-            self.preparedBreathPlayers = loadedPlayers.filter { breathNames.contains($0.key) }
-            self.preparedAmbientPlayers = loadedPlayers.filter { ambientNames.contains($0.key) }
             self.preparedTones = generatedTones
+            self.tonePreparationTask = nil
+
+            let loaded = await playerTask.value
+            guard !Task.isCancelled else { return }
+            self.playerPreparationTask = nil
+            self.preparedBreathPlayers = loaded.items.filter { breathNames.contains($0.key) }
+            self.preparedAmbientPlayers = loaded.items.filter { ambientNames.contains($0.key) }
+
             if self.isUnlocked {
                 self.startAmbient(track: self.musicTrack)
             }

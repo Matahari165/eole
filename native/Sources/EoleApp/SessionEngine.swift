@@ -72,6 +72,9 @@ public final class SessionEngine: ObservableObject {
         hasStarted = true
         task = Task { @MainActor [weak self] in
             guard let self, !Task.isCancelled, !self.hasPersisted else { return }
+            let soundSettings = AppDefaults.shared.soundSettings
+            self.audio.apply(settings: soundSettings)
+            self.haptics.enabled = soundSettings.hapticsEnabled
             self.audioUnlockTask = Task { @MainActor [weak self] in
                 guard let self, !Task.isCancelled, !self.hasPersisted else { return }
                 await self.audio.unlock(pace: self.config.pace)
@@ -164,6 +167,9 @@ public final class SessionEngine: ObservableObject {
         // Phase d'installation préalable : permet de s'installer calmement avant le décompte.
         phase = .starting
         guard await sleep(seconds: Self.settleSeconds) else { return }
+        if let audioUnlockTask {
+            _ = await audioUnlockTask.value
+        }
         guard !Task.isCancelled, !hasPersisted else { return }
 
         // Compte à rebours de trois secondes avec repères sonores.
@@ -176,9 +182,6 @@ public final class SessionEngine: ObservableObject {
             guard await sleep(seconds: 1) else { return }
         }
 
-        // L'audio a eu ~5 s d'avance (installation + décompte) et
-        // prepareAudioAssetsAndCues relance l'ambiance à la fin du
-        // chargement : pas d'attente bloquante qui figerait le "1".
         guard !Task.isCancelled, !hasPersisted else { return }
 
         let timing = paceTiming(for: config.pace)
@@ -234,8 +237,9 @@ public final class SessionEngine: ObservableObject {
             for remaining in stride(from: Self.recoveryHoldSeconds, through: 1, by: -1) {
                 guard !Task.isCancelled else { return }
                 recoveryCountdown = remaining
-                if currentRound < config.rounds, remaining <= 3 {
+                if remaining <= 3 {
                     audio.playSoftDing()
+                    haptics.tap()
                 }
                 guard await sleep(seconds: 1) else { return }
             }
@@ -263,10 +267,8 @@ public final class SessionEngine: ObservableObject {
     private func startDisplayTimer() {
         displayTimer?.invalidate()
         displayTimer = nil
-        // Mode .common : le chrono reste fluide même pendant un scroll ou un
-        // tracking. Structure de closure identique à l'origine (hop MainActor
-        // via Task) : aucun changement de modèle de concurrence.
-        let timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+        // 0,5 s + .common : chrono lisse même pendant un scroll.
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, self.phase == .retention, let start = self.retentionStart else { return }
                 let elapsed = Date().timeIntervalSince(start)

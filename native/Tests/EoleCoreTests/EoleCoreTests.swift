@@ -200,10 +200,14 @@ final class EoleCoreTests: XCTestCase {
     }
 
     func testRetentionAndDurationFormattingUseStableBoundaries() {
+        XCTAssertNil(getNewRetentionMinute(elapsedSeconds: 0, lastMinute: 0))
         XCTAssertNil(getNewRetentionMinute(elapsedSeconds: 59.99, lastMinute: 0))
         XCTAssertEqual(getNewRetentionMinute(elapsedSeconds: 60, lastMinute: 0), 1)
-        XCTAssertNil(getNewRetentionMinute(elapsedSeconds: 119, lastMinute: 1))
+        XCTAssertEqual(getNewRetentionMinute(elapsedSeconds: 60.5, lastMinute: 0), 1)
+        XCTAssertNil(getNewRetentionMinute(elapsedSeconds: 61, lastMinute: 1))
+        XCTAssertNil(getNewRetentionMinute(elapsedSeconds: 119.9, lastMinute: 1))
         XCTAssertEqual(getNewRetentionMinute(elapsedSeconds: 120, lastMinute: 1), 2)
+        XCTAssertEqual(getNewRetentionMinute(elapsedSeconds: 180, lastMinute: 2), 3)
 
         XCTAssertEqual(formatDuration(42), "42 s")
         XCTAssertEqual(formatDuration(92), "1 min 32 s")
