@@ -234,13 +234,6 @@ public final class SessionEngine: ObservableObject {
         ))
     }
 
-    /// Passe le maintien de 15 s (récupération poumons pleins) vers l'expire.
-    /// Les 15 s restent la valeur proposée, l'utilisateur pressé ne subit pas.
-    public func skipRecoveryHold() {
-        guard phase == .recoveryHold else { return }
-        skipHoldRequested = true
-    }
-
     public func discard() {
         onPersist = nil
         audio.onInterruptionBegan = nil
