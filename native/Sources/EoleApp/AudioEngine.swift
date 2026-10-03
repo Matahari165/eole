@@ -124,7 +124,7 @@ public final class EoleAudioEngine {
                 Task { @MainActor [weak self] in self?.resetEngine() }
             },
             center.addObserver(
-                forName: Notification.Name(rawValue: "AVAudioEngineConfigurationChangeNotification"),
+                forName: AVAudioEngine.configurationChangeNotification,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
@@ -563,6 +563,9 @@ public final class EoleAudioEngine {
             if self.previewAmbientPlayer === p {
                 self.previewAmbientPlayer = nil
             }
+            // Fin naturelle de l'extrait : prévient la vue (bouton Arrêter
+            // sinon affiché en silence jusqu'au prochain tap).
+            self.onPreviewAmbientEnded?()
         }
     }
 
@@ -573,7 +576,13 @@ public final class EoleAudioEngine {
         previewAmbientPlayer = nil
         cuePlayer?.stop()
         cuePlayerAlt?.stop()
+        onPreviewAmbientEnded?()
     }
+
+    /// Called when the ambient preview stops (natural 5s end, settings
+    /// change, or cut): the view syncs its Listen/Stop button instead of
+    /// showing a stale state.
+    public var onPreviewAmbientEnded: (() -> Void)?
 
     nonisolated private static func generateToneSamples(spec: ToneSpec, sampleRate: Double, volume: Double) -> [Float] {
         let frames = Int(sampleRate * spec.seconds)

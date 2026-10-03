@@ -22,9 +22,6 @@ public struct StatsView: View {
     @State private var selectedWeekDay: String?
     @State private var sessionToDelete: BreathSession?
     @State private var hasAppeared = false
-    /// CSV mis en cache : reconstruit uniquement quand l'historique change,
-    /// pas à chaque body (days, sélection, toggles).
-    @State private var cachedCSV = ""
     private let onPrepare: () -> Void
 
     private static let shortDayFormatter: DateFormatter = {
@@ -801,9 +798,11 @@ public struct StatsView: View {
     }
 
     private var exportAction: some View {
+        // CSV built on demand: always fresh, never an empty or stale cache
+        // (history holds hundreds of rows at most).
         VStack(alignment: .leading, spacing: 8) {
             ShareLink(
-                item: SessionsCSVExport(csv: cachedCSV),
+                item: SessionsCSVExport(csv: buildSessionsCsv(store.sessions)),
                 preview: SharePreview("Eole history")
             ) {
                 Label("Export history as CSV", systemImage: "square.and.arrow.up")
@@ -812,10 +811,6 @@ public struct StatsView: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(Color.eolePrimary)
             .accessibilityHint("Opens history sharing options")
-            .onAppear { cachedCSV = buildSessionsCsv(store.sessions) }
-            .onChange(of: store.sessions) { _, _ in
-                cachedCSV = buildSessionsCsv(store.sessions)
-            }
             Text("This file contains your full detailed history. Only share it with someone you trust.")
                 .font(.footnote)
                 .foregroundStyle(Color.eoleMuted)

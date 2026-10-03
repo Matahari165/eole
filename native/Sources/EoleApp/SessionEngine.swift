@@ -71,9 +71,11 @@ public final class SessionEngine: ObservableObject {
     private var task: Task<Void, Never>?
     private var audioUnlockTask: Task<Void, Never>?
     private var retentionStart: Date?
+    private var recoveryHoldStart: Date?
     private var retentionContinuation: CheckedContinuation<Void, Never>?
     private var lastRetentionMinute = 0
     private var lastEndRetentionAt = Date.distantPast
+    private var retentionDidEnd = false
     private var skipHoldRequested = false
     private var displayTimer: Timer?
     private let startedAt = Date()
@@ -176,12 +178,14 @@ public final class SessionEngine: ObservableObject {
 
     /// Fin de rétention via le double-toucher « Double-touchez pour terminer ».
     public func endRetention() {
-        guard phase == .retention else { return }
+        guard phase == .retention, !retentionDidEnd else { return }
         // Débounce 300 ms : double-tap + bouton + action VoiceOver peuvent
         // arriver ensemble et rejoueraient le signal sonore deux fois.
+        // Le latch couvre les taps espacés : la continuation est déjà réveillée.
         let now = Date()
         guard now.timeIntervalSince(lastEndRetentionAt) > 0.3 else { return }
         lastEndRetentionAt = now
+        retentionDidEnd = true
         if let start = retentionStart {
             noteCappedRetention(rawSeconds: Int(Date().timeIntervalSince(start)))
         }
@@ -228,6 +232,13 @@ public final class SessionEngine: ObservableObject {
             breathsCompleted: config.breathsPerRound,
             retentionSeconds: Self.cappedRetention(retentionSeconds)
         ))
+    }
+
+    /// Passe le maintien de 15 s (récupération poumons pleins) vers l'expire.
+    /// Les 15 s restent la valeur proposée, l'utilisateur pressé ne subit pas.
+    public func skipRecoveryHold() {
+        guard phase == .recoveryHold else { return }
+        skipHoldRequested = true
     }
 
     public func discard() {
@@ -320,6 +331,7 @@ public final class SessionEngine: ObservableObject {
             phase = .retention
             retentionSeconds = 0
             retentionCapped = false
+            retentionDidEnd = false
             // La rétention est ancrée sur Date : exacte même après un fond.
             backgroundWarning = nil
             lastRetentionMinute = 0
@@ -352,17 +364,26 @@ public final class SessionEngine: ObservableObject {
             guard await sleep(seconds: Self.recoveryInhaleSeconds) else { return }
             phase = .recoveryHold
             skipHoldRequested = false
+            // Anchored on Date like retention: background during the hold
+            // must not stretch the phase by the absence duration.
+            let holdStart = Date()
+            recoveryHoldStart = holdStart
             for remaining in stride(from: Self.recoveryHoldSeconds, through: 1, by: -1) {
                 guard !Task.isCancelled else { return }
                 if skipHoldRequested { break }
-                recoveryCountdown = remaining
-                if remaining <= 3 {
+                // Re-anchored on the clock each tick (background return).
+                let elapsed = Int(Date().timeIntervalSince(holdStart))
+                let adjusted = Self.recoveryHoldSeconds - elapsed
+                if adjusted <= 0 { break }
+                recoveryCountdown = min(remaining, adjusted)
+                if recoveryCountdown <= 3 {
                     audio.playSoftDing()
                     haptics.tap()
                 }
                 guard await sleep(seconds: 1) else { return }
             }
             skipHoldRequested = false
+            recoveryHoldStart = nil
             phase = .recoveryExhale
             // Fondu doux : le cue 540 résonne 0,3 s avant que l'expire
             // ne démarre lui-même en fondu (playBreath 0,35 s). Pas de
@@ -458,6 +479,12 @@ public final class SessionEngine: ObservableObject {
         }
         pendingSession = session
         phase = .saving
+        // Anti-deadlock guard: without a callback (view without onAppear,
+        // tests), fail explicitly instead of a ProgressView with no exit.
+        guard onPersist != nil else {
+            markSaveFailed("Recording could not start.")
+            return
+        }
         onPersist?(session)
     }
 

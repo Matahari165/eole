@@ -500,6 +500,25 @@ public final class SessionStore: ObservableObject {
         Error: \(storageErrorMessage ?? "none")
         """
     }
+
+    /// Texte à coller au support (bouton Réglages) : versions, compteurs,
+    /// erreur éventuelle. Aucune donnée de séance détaillée dedans.
+    public func diagnosticText() -> String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "dev"
+        let build = info?["CFBundleVersion"] as? String ?? "dev"
+        let system: String
+        #if os(iOS)
+        system = "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
+        #else
+        system = ProcessInfo.processInfo.operatingSystemVersionString
+        #endif
+        return """
+        Eole \(short) (\(build)) · \(system)
+        Séances : \(sessions.count) · ignorées : \(rejectedCount)
+        Erreur : \(storageErrorMessage ?? "aucune")
+        """
+    }
 }
 
 /// Réglages locaux non liés à l'historique des sessions.

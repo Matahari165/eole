@@ -209,6 +209,14 @@ public struct SettingsView: View {
         .tint(Color.eolePrimary)
         // Pas de navigationTitle : le header "Settings" porte déjà isHeader.
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear {
+            // Binding captured (not self, a struct): the engine notifies when
+            // the preview stops on its own, so the button never lies.
+            let playing = $isPlayingAmbientPreview
+            audio?.onPreviewAmbientEnded = {
+                Task { @MainActor in playing.wrappedValue = false }
+            }
+        }
         .onChange(of: settings) { oldSettings, newSettings in
             // Retour immédiat (volumes audibles en direct), persistance
             // différée pour ne pas écrire en UserDefaults à 60 Hz.
@@ -235,6 +243,7 @@ public struct SettingsView: View {
             AppDefaults.shared.soundSettings = settings
             onSettingsChanged(settings)
             audio?.stopPreview()
+            audio?.onPreviewAmbientEnded = nil
             isPlayingAmbientPreview = false
         }
         .alert("Practice safely", isPresented: $showSafety) {
@@ -248,6 +257,10 @@ public struct SettingsView: View {
             titleVisibility: .visible
         ) {
             Button("Erase all", role: .destructive) {
+                // Cancel the delayed write in flight: otherwise it would
+                // rewrite the pre-erase values 250ms after the reset (GDPR).
+                persistTask?.cancel()
+                persistTask = nil
                 onDeleteAll()
                 // Les réglages reviennent aux défauts : réapplique au moteur
                 // audio/haptique vivant, sinon sliders à 32 et mémoire à 0.

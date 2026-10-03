@@ -136,7 +136,9 @@ public struct EoleRootView: View {
             Text(eoleSafetyNoticeText)
         }
         .alert("History unavailable", isPresented: Binding(
-            get: { store.storageErrorMessage != nil },
+            // Chained behind the safety notice: two simultaneous alerts on
+            // the same view would only present one, losing the other silently.
+            get: { !showSafety && store.storageErrorMessage != nil },
             set: { isPresented in
                 if !isPresented { store.clearStorageError() }
             }
@@ -214,7 +216,9 @@ public struct OnboardingView: View {
                 startPoint: .top, endPoint: .bottom
             )
             .ignoresSafeArea()
-            .allowsHitTesting(false)
+            // No allowsHitTesting(false): this full-screen background MUST
+            // block taps to the tabs below (else "Start" launches a ghost
+            // session under the onboarding).
 
             ScrollView {
                 VStack(spacing: 0) {
