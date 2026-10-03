@@ -18,3 +18,10 @@ DerivedData/
 native/.build/
 .build/
 .swiftpm/
+
+# Distribution : archives locales TestFlight/Ad Hoc, jamais dans le repo.
+*.ipa
+*.dSYM
+*.dSYM.zip
+*.xcarchive
+fastlane/report.xml

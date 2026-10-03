@@ -111,7 +111,7 @@ public final class EoleAudioEngine {
                 Task { @MainActor [weak self] in self?.resetEngine() }
             },
             center.addObserver(
-                forName: Notification.Name(rawValue: "AVAudioEngineConfigurationChangeNotification"),
+                forName: AVAudioEngine.configurationChangeNotification,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
@@ -258,24 +258,28 @@ public final class EoleAudioEngine {
 
     // MARK: - Ambiance (boucle, ducking sous les guides)
 
-    public func startAmbient(track: BreathMusicTrack) {
+    @discardableResult
+    public func startAmbient(track: BreathMusicTrack) -> Bool {
         // Un aperçu des Réglages ne doit jamais continuer sous la séance.
         stopPreview()
-        guard musicVolume > 0 else { return }
-        if ambientTrack == track, ambientPlayer?.isPlaying == true { return }
+        // Volume à 0 = choix utilisateur, pas un échec : séance visuelle
+        // volontaire, on retourne succès pour ne pas afficher d'alerte.
+        guard musicVolume > 0 else { return true }
+        if ambientTrack == track, ambientPlayer?.isPlaying == true { return true }
         stopAmbient(fadeSeconds: 0)
         let name = ambientFileName(for: track)
-        guard let player = preparedAmbientPlayers[name] else { return }
+        guard let player = preparedAmbientPlayers[name] else { return false }
         player.stop()
         player.currentTime = 0
         player.numberOfLoops = -1
         player.volume = ambientLevel()
-        guard player.play() else { return }
+        guard player.play() else { return false }
         ambientPlayer = player
         ambientTrack = track
+        return true
     }
 
-    public func stopAmbient(fadeSeconds: Double = 0.85) {
+    public func stopAmbient(fadeSeconds: Double = EoleAudioFade.stop) {
         ambientFadeTask?.cancel()
         ambientFadeTask = nil
         duckingTask?.cancel()
@@ -302,7 +306,7 @@ public final class EoleAudioEngine {
     }
 
     /// Met en pause la musique d'ambiance avec un fondu doux.
-    public func pauseAmbient(fadeSeconds: Double = 0.4) {
+    public func pauseAmbient(fadeSeconds: Double = EoleAudioFade.pause) {
         ambientFadeTask?.cancel()
         ambientFadeTask = nil
         duckingTask?.cancel()
@@ -327,21 +331,24 @@ public final class EoleAudioEngine {
     }
 
     /// Reprend la musique d'ambiance avec un fondu montant doux.
-    public func resumeAmbient(fadeSeconds: Double = 0.6) {
+    /// Retourne faux si la reprise échoue (l'appelant décide d'avertir).
+    @discardableResult
+    public func resumeAmbient(fadeSeconds: Double = EoleAudioFade.resume) -> Bool {
         ambientFadeTask?.cancel()
         ambientFadeTask = nil
         duckingTask?.cancel()
         duckingTask = nil
-        guard musicVolume > 0 else { return }
+        // Volume à 0 = choix utilisateur, pas un échec (cf. startAmbient).
+        guard musicVolume > 0 else { return true }
         let targetVolume = ambientLevel()
         if let player = ambientPlayer {
             if !player.isPlaying {
                 player.volume = 0
-                guard player.play() else { return }
+                guard player.play() else { return false }
             }
             if fadeSeconds <= 0 {
                 player.volume = targetVolume
-                return
+                return true
             }
             let steps = 10
             ambientFadeTask = Task { @MainActor [weak player] in
@@ -355,10 +362,11 @@ public final class EoleAudioEngine {
                 player?.volume = targetVolume
             }
         } else if let track = ambientTrack {
-            startAmbient(track: track)
+            return startAmbient(track: track)
         } else {
-            startAmbient(track: musicTrack)
+            return startAmbient(track: musicTrack)
         }
+        return true
     }
 
     /// Réduit temporairement l'ambiance sous les sons-guides.
@@ -382,8 +390,11 @@ public final class EoleAudioEngine {
         duckAmbient(depth: 0.68)
         // Les guides sont obligatoirement préparés avant le compte à rebours.
         // Si un asset manque ou n'est pas prêt, rester silencieux évite tout
-        // décodage synchrone et laisse la séance visuelle continuer.
-        _ = playRecordedBreath(inhale: inhale, duration: duration)
+        // décodage synchrone et laisse la séance visuelle continuer — mais on
+        // le signale une fois via le callback (symétrique à l'ambiance).
+        if !playRecordedBreath(inhale: inhale, duration: duration) {
+            onBreathGuideFailed?()
+        }
         restoreAfter(duration)
     }
 
@@ -496,7 +507,9 @@ public final class EoleAudioEngine {
         guard let url = bundleAudioURL(named: name),
               let player = try? AVAudioPlayer(contentsOf: url) else { return }
 
-        let targetVol = min(1.0, Float(musicVolume) / 100.0)
+        // Même niveau qu'en séance (ducking 0.85) : l'aperçu ne doit pas
+        // sembler plus fort que le vrai fond sonore.
+        let targetVol = Float(musicVolume) / 100 * 0.85
         player.volume = targetVol
         guard player.play() else { return }
         previewAmbientPlayer = player
@@ -513,6 +526,9 @@ public final class EoleAudioEngine {
             if self.previewAmbientPlayer === p {
                 self.previewAmbientPlayer = nil
             }
+            // Fin naturelle de l'extrait : prévient la vue (bouton Arrêter
+            // sinon affiché en silence jusqu'au prochain tap).
+            self.onPreviewAmbientEnded?()
         }
     }
 
@@ -522,11 +538,13 @@ public final class EoleAudioEngine {
         previewAmbientPlayer?.stop()
         previewAmbientPlayer = nil
         cuePlayer?.stop()
+        onPreviewAmbientEnded?()
     }
 
-    public var isPreviewingAmbient: Bool {
-        previewAmbientPlayer?.isPlaying == true
-    }
+    /// Appelé quand l'aperçu d'ambiance s'arrête (fin naturelle à 5 s,
+    /// changement de réglage, ou coupe) : la vue synchronise son bouton
+    /// Écouter/Arrêter au lieu d'afficher un état menteur.
+    public var onPreviewAmbientEnded: (() -> Void)?
 
     nonisolated private static func generateToneSamples(spec: ToneSpec, sampleRate: Double, volume: Double) -> [Float] {
         let frames = Int(sampleRate * spec.seconds)
@@ -714,6 +732,13 @@ public final class EoleAudioEngine {
         rebuildEngine()
     }
 
+    /// Appelé sur interruption audio entrante (appel, alarme) : la séance
+    /// décide (avertissement, pas d'arrêt automatique = pas de perte d'effort).
+    public var onInterruptionBegan: (() -> Void)?
+    /// Appelé quand un guide respiratoire ne peut pas être joué (asset
+    /// manquant/non prêt) : la séance affiche un avertissement unique.
+    public var onBreathGuideFailed: (() -> Void)?
+
     private func handleInterruption(rawValue: UInt) {
         guard let type = AVAudioSession.InterruptionType(rawValue: rawValue) else { return }
         if type == .ended, isUnlocked {
@@ -726,6 +751,7 @@ public final class EoleAudioEngine {
             cuePlayer?.stop()
             engine.stop()
             engineReady = false
+            onInterruptionBegan?()
         }
     }
 

@@ -115,9 +115,12 @@ public struct HomeView: View {
                         .overlay {
                             Capsule().stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
                         }
-                        .accessibilityLabel("Série en cours : \(stats.currentStreak) jours")
+                        .accessibilityLabel("Série en cours : \(stats.currentStreak) jours, comptés en jours locaux")
                     }
                 }
+                Text("Série comptée en jours locaux.")
+                    .font(.caption2)
+                    .foregroundStyle(Color.eoleMuted)
 
                 HStack(spacing: 8) {
                     configTag("\(defaults.rounds) tours", icon: "arrow.triangle.2.circlepath")
@@ -265,7 +268,7 @@ public struct HomeView: View {
                     }
 
                     HStack(alignment: .bottom, spacing: 10) {
-                        ForEach(Array(session.rounds.enumerated()), id: \.element.roundIndex) { index, round in
+                        ForEach(Array(session.rounds.enumerated()), id: \.offset) { index, round in
                             VStack(spacing: 6) {
                                 let ratio = CGFloat(round.retentionSeconds) / CGFloat(maxRetention)
                                 // Hauteur finale fixe + montée scaleY : pas de

@@ -14,9 +14,6 @@ public struct ActiveSessionView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AccessibilityFocusState private var isCompletionFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
-    /// Garde anti-double-fermeture : l'alerte (asyncAfter) et l'auto-close du
-    /// récap vide peuvent tirer onClose dans la même seconde.
-    @State private var didRequestClose = false
     @State private var showStopConfirm = false
     @State private var showResultsAnimated = false
     @State private var settlePulse = false
@@ -58,6 +55,20 @@ public struct ActiveSessionView: View {
             } else {
                 VStack {
                     topBar
+                    if let warning = engine.backgroundWarning ?? engine.audioWarning {
+                        // Icône selon la nature : dérive de rythme vs audio.
+                        Label(
+                            warning,
+                            systemImage: engine.backgroundWarning != nil ? "moon.zzz" : "speaker.slash"
+                        )
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.9))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.white.opacity(0.12), in: Capsule())
+                            .padding(.top, 8)
+                            .accessibilityLabel(warning)
+                    }
                     Spacer()
                     centerStage
                         // Un seul moteur de fondu par macro-phase : inspire/expire
@@ -72,10 +83,9 @@ public struct ActiveSessionView: View {
         }
         .foregroundStyle(.white)
         .navigationBarBackButtonHidden(true)
-        .interactiveDismissDisabled(engine.phase == .saving)
         .onAppear {
             let sessionEngine = engine
-            sessionEngine.onPersist = { [store, weak sessionEngine] session, _ in
+            sessionEngine.onPersist = { [store, weak sessionEngine] session in
                 guard let sessionEngine else { return }
                 let savedLocally = store.saveSession(session)
                 if savedLocally {
@@ -88,7 +98,17 @@ public struct ActiveSessionView: View {
         }
         .onDisappear { engine.discard() }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active { engine.refreshRetentionDisplay() }
+            if newPhase == .active {
+                engine.refreshRetentionDisplay()
+            } else if newPhase == .background {
+                // Vrai arrière-plan uniquement (.inactive = Control Center ou
+                // appel entrant : l'app reste visible, pas d'alerte à tort).
+                // Coupe le tick 0,5 s (batterie), l'ancrage Date recalcule la
+                // rétention au retour. Les phases respiratoires, elles,
+                // dérivent : on le signale.
+                engine.suspendDisplayTimer()
+                engine.noteBackgrounded()
+            }
         }
         // Si Reduce Motion s'active en cours de séance, stoppe les pulsations
         // infinies que .animation(nil) ne peut pas interrompre.
@@ -102,13 +122,8 @@ public struct ActiveSessionView: View {
             Button("Continuer", role: .cancel) {}
             Button("Arrêter", role: .destructive) {
                 engine.stop()
-                if engine.results.isEmpty && engine.errorMessage == nil {
-                    // Laisse l'alerte système se dissiper avant de fermer la
-                    // séance, sinon fondu séance + dismiss alerte se chevauchent.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        requestClose()
-                    }
-                }
+                // Pas de fermeture auto : si aucun tour n'est terminé,
+                // l'écran final l'explique (« Séance trop courte »).
             }
         } message: {
             Text("Les tours terminés seront conservés et résumés.")
@@ -368,6 +383,18 @@ public struct ActiveSessionView: View {
                 }
                 .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.breathLabelFade), value: engine.phase)
                 .accessibilityLabel(engine.phase == .recoveryHold ? "Récupération : \(engine.recoveryCountdown) secondes" : "Récupération")
+                // Maintien de 15 s skippable : proposé, pas imposé.
+                if engine.phase == .recoveryHold {
+                    Button { engine.skipRecoveryHold() } label: {
+                        Label("Passer", systemImage: "forward.end.fill")
+                            .font(.footnote.weight(.medium))
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.glass)
+                    .tint(.white.opacity(0.84))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .accessibilityHint("Passe le maintien et va à l'expiration")
+                }
             }
             .transition(gentlePhaseTransition)
         case .pause:
@@ -493,7 +520,12 @@ public struct ActiveSessionView: View {
     }
 
     private var completeStage: some View {
-        let priorSessions = store.sessions.filter { $0.id != engine.sessionId }
+        // Records calculés sur les vraies séances : les exemples du bundle
+        // ne doivent ni offrir ni voler un record.
+        let demoIDs = store.demoIDs
+        let priorSessions = store.sessions.filter {
+            $0.id != engine.sessionId && !demoIDs.contains($0.id)
+        }
         let evaluation = evaluateSessionRecords(sessionRounds: engine.results, priorSessions: priorSessions)
         let totalRetention = engine.results.map(\.retentionSeconds).reduce(0, +)
         let isEarlyStop = engine.results.count < config.rounds
@@ -517,13 +549,25 @@ public struct ActiveSessionView: View {
 
                     Text(isEarlyStop
                          ? "\(engine.results.count) tour\(engine.results.count > 1 ? "s" : "") sur \(config.rounds) complété\(engine.results.count > 1 ? "s" : "")"
-                         : "\(config.rounds) tours complétés • Rythme \(config.pace.rawValue.capitalized)")
+                         : "\(config.rounds) tours complétés • Rythme \(frenchPaceLabel(config.pace))")
                         .font(.subheadline)
                         .foregroundStyle(.white.opacity(0.85))
                 }
                 .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                 .offset(y: reduceMotion || showResultsAnimated ? 0 : 6)
                 .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.05), value: showResultsAnimated)
+
+                if engine.wasTooShort || engine.results.isEmpty {
+                    // Arrêt avant tout tour : message explicite au lieu d'une
+                    // fermeture silencieuse. Pas de bouton Réessayer ici
+                    // (rien à persister), juste Terminer en bas.
+                    Label("Séance trop courte : aucun tour terminé, rien n'a été enregistré.", systemImage: "info.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
+                        .accessibilityLabel("Séance trop courte, rien n'a été enregistré")
+                }
 
                 if let message = engine.errorMessage {
                     VStack(spacing: 12) {
@@ -544,24 +588,34 @@ public struct ActiveSessionView: View {
                         .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.05), value: showResultsAnimated)
                 }
 
-                // Métriques clés : Temps total, Rétention, Tours
-                // Groupe 2 : un seul délai partagé avec le graphique.
-                keyMetricsGrid(totalRetention: totalRetention)
-                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
-                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 8)
-                    .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
+                // Métriques, graphique et détail seulement s'il y a au moins
+                // un tour : sinon l'écran n'affiche que le message explicite.
+                if !engine.results.isEmpty {
+                    // Métriques clés : Temps total, Rétention, Tours
+                    // Groupe 2 : un seul délai partagé avec le graphique.
+                    keyMetricsGrid(totalRetention: totalRetention)
+                        .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                        .offset(y: reduceMotion || showResultsAnimated ? 0 : 8)
+                        .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
 
-                // Graphique visuel en barres de chaque rétention
-                retentionBarChart(evaluation: evaluation)
-                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
-                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 10)
-                    .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
+                    // Graphique visuel en barres de chaque rétention
+                    retentionBarChart(evaluation: evaluation)
+                        .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                        .offset(y: reduceMotion || showResultsAnimated ? 0 : 10)
+                        .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
 
-                // Liste détaillée de chaque tour — groupe 3 final.
-                roundDetailsList(evaluation: evaluation)
-                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
-                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 12)
-                    .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.25), value: showResultsAnimated)
+                    // Liste détaillée de chaque tour — groupe 3 final.
+                    roundDetailsList(evaluation: evaluation)
+                        .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                        .offset(y: reduceMotion || showResultsAnimated ? 0 : 12)
+                        .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.25), value: showResultsAnimated)
+
+                    if engine.didCapRetention {
+                        Text("Rétentions de plus d'1 h ramenées à 1 h dans l'historique.")
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 24)
@@ -598,13 +652,9 @@ public struct ActiveSessionView: View {
                 }
             }
         }
-        // Fermeture auto si rien à montrer : un arrêt avant toute rétention
-        // ne doit pas flasher un récap vide (0 tour, graphique vide).
-        .onChange(of: engine.phase == .complete) { _, isComplete in
-            if isComplete, engine.results.isEmpty, engine.errorMessage == nil {
-                DispatchQueue.main.async { requestClose() }
-            }
-        }
+        // Plus de fermeture auto silencieuse : une séance trop courte affiche
+        // désormais un message explicite ci-dessus, l'utilisateur ferme via
+        // Terminer. Évite le ticket « ma séance n'a pas été enregistrée ».
         .onChange(of: showResultsAnimated) { _, isShown in
             // Focus quand le reveal démarre vraiment, pas sur un délai fixe
             // qui peut arriver avant la fin de l'orchestration.
@@ -622,6 +672,15 @@ public struct ActiveSessionView: View {
     }
 
     // MARK: - Éléments du récapitulatif de fin de séance
+
+    /// Libellé FR du rythme (le `rawValue` est un identifiant technique EN).
+    private func frenchPaceLabel(_ pace: Pace) -> String {
+        switch pace {
+        case .slow: return "Lente"
+        case .normal: return "Normale"
+        case .fast: return "Rapide"
+        }
+    }
 
     private func recordBanner(evaluation: SessionRecordEvaluation) -> some View {
         HStack(spacing: 12) {
@@ -733,7 +792,7 @@ public struct ActiveSessionView: View {
             // 8 tours max : 28 pt + 8 pt d'espacement = 280 pt, tient
             // dans le panel utile ~318 pt sur 390 px. Plus de clip.
             HStack(alignment: .bottom, spacing: 8) {
-                ForEach(Array(engine.results.enumerated()), id: \.element.roundIndex) { index, round in
+                ForEach(Array(engine.results.enumerated()), id: \.offset) { index, round in
                     let roundEval = evaluation.roundEvaluations.first(where: { $0.roundIndex == round.roundIndex })
                     let isOverall = roundEval?.isOverallRecord == true
                     let isRoundRec = roundEval?.isRoundRecord == true
@@ -844,7 +903,9 @@ public struct ActiveSessionView: View {
 
     private func roundDetailsList(evaluation: SessionRecordEvaluation) -> some View {
         VStack(spacing: 8) {
-            ForEach(engine.results, id: \.roundIndex) { round in
+            // Identité par position, pas par roundIndex : un historique
+            // corrompu avec deux R1 ne doit jamais crasher SwiftUI.
+            ForEach(Array(engine.results.enumerated()), id: \.offset) { _, round in
                 let roundEval = evaluation.roundEvaluations.first(where: { $0.roundIndex == round.roundIndex })
                 let isOverall = roundEval?.isOverallRecord == true
                 let isRoundRec = roundEval?.isRoundRecord == true
@@ -901,13 +962,6 @@ public struct ActiveSessionView: View {
     }
 
     private var retentionLabel: String {
-        formatClockDuration(engine.retentionSeconds)
-    }
-
-    /// Fermeture unique, même si alerte et auto-close tirent ensemble.
-    private func requestClose() {
-        guard !didRequestClose else { return }
-        didRequestClose = true
-        onClose()
+        formatClockDuration(engine.retentionSeconds) + (engine.retentionCapped ? "+" : "")
     }
 }

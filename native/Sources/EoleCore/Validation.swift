@@ -3,6 +3,8 @@ import Foundation
 // Validation des données persistées et importées.
 
 private func makeISOFormatter(fractional: Bool) -> ISO8601DateFormatter {
+    // ISO8601DateFormatter est insensible à la région/calendrier système par
+    // construction : le round-trip reste stable (DST incluse).
     let formatter = ISO8601DateFormatter()
     formatter.formatOptions = fractional
         ? [.withInternetDateTime, .withFractionalSeconds]
@@ -18,23 +20,25 @@ private func isIntegerBetween(_ value: Int, min: Int, max: Int) -> Bool {
     value >= min && value <= max
 }
 
-func parseDate(_ value: String) -> Date? {
+/// Parsing ISO tolérant (avec/sans millisecondes). Public pour un futur
+/// découpage SPM où `EoleApp` deviendrait une vraie cible séparée.
+public func parseDate(_ value: String) -> Date? {
     makeISOFormatter(fractional: true).date(from: value)
         ?? makeISOFormatter(fractional: false).date(from: value)
 }
 
 public func isValidSession(_ session: BreathSession) -> Bool {
     guard isUuid(session.id) else { return false }
-    guard isIntegerBetween(session.plannedRounds, min: 1, max: 8) else { return false }
-    guard isIntegerBetween(session.breathsPerRound, min: 10, max: 60) else { return false }
+    guard SessionLimits.rounds.contains(session.plannedRounds) else { return false }
+    guard SessionLimits.breathsPerRound.contains(session.breathsPerRound) else { return false }
     guard let startedAt = parseDate(session.startedAt),
           let completedAt = parseDate(session.completedAt),
           completedAt >= startedAt
     else { return false }
-    guard session.rounds.count <= 8 else { return false }
+    guard session.rounds.count <= SessionLimits.rounds.upperBound else { return false }
     return session.rounds.allSatisfy { round in
-        isIntegerBetween(round.roundIndex, min: 1, max: 8)
-            && isIntegerBetween(round.breathsCompleted, min: 10, max: 60)
+        SessionLimits.rounds.contains(round.roundIndex)
+            && SessionLimits.breathsPerRound.contains(round.breathsCompleted)
             && isIntegerBetween(round.retentionSeconds, min: 1, max: 3600)
     }
 }

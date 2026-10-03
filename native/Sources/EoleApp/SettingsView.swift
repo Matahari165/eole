@@ -2,6 +2,9 @@
 import EoleCore
 #endif
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 /// Réglages locaux présentés comme une vraie page de réglages iOS.
 /// Toute modification est persistée immédiatement et répercutée à la séance
@@ -10,17 +13,36 @@ public struct SettingsView: View {
     @State private var settings = AppDefaults.shared.soundSettings
     @State private var showSafety = false
     @State private var isPlayingAmbientPreview = false
+    @State private var showDeleteAllConfirm = false
+    @State private var showDemoConfirm = false
+    @State private var infoMessage: String?
     /// Écriture UserDefaults différée : le drag d'un Slider émet à 60 Hz,
     /// l'audio suit en direct mais le disque attend la fin du geste.
     @State private var persistTask: Task<Void, Never>?
     private let audio: EoleAudioEngine?
+    /// Compteur poussé par le parent (qui observe le store) : toujours frais,
+    /// sans `ObservedObject` optionnel ni refresh manuel dans cette vue.
+    private let demoCount: Int
+    private let onDeleteAll: () -> Void
+    private let onDeleteDemo: () -> Void
+    /// Diagnostic frais au moment du tap (versions, compteurs, erreur),
+    /// fourni par le parent qui détient le store.
+    private let makeDiagnostic: () -> String
     private let onSettingsChanged: (SoundSettings) -> Void
 
     public init(
         audio: EoleAudioEngine? = nil,
+        demoCount: Int = 0,
+        onDeleteAll: @escaping () -> Void = {},
+        onDeleteDemo: @escaping () -> Void = {},
+        makeDiagnostic: @escaping () -> String = { "" },
         onSettingsChanged: @escaping (SoundSettings) -> Void = { _ in }
     ) {
         self.audio = audio
+        self.demoCount = demoCount
+        self.onDeleteAll = onDeleteAll
+        self.onDeleteDemo = onDeleteDemo
+        self.makeDiagnostic = makeDiagnostic
         self.onSettingsChanged = onSettingsChanged
     }
 
@@ -116,13 +138,69 @@ public struct SettingsView: View {
 
             Section {
                 Label {
-                    Text("Les séances et les réglages restent sur cet iPhone, sans synchronisation cloud.")
+                    Text("Stockées uniquement sur cet iPhone (incluses dans votre sauvegarde chiffrée) et partageables uniquement si vous exportez le CSV.")
                 } icon: {
                     Image(systemName: "internaldrive")
                         .foregroundStyle(Color.eolePrimary)
                 }
+                if AppDefaults.shared.hadInvalidStoredSoundSettings {
+                    // Réglages illisibles : on est retombé sur les défauts,
+                    // on le dit au lieu de laisser croire à une perte magique.
+                    Label {
+                        Text("Réglages sonores restaurés par défaut (données précédentes illisibles).")
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(Color.eolePrimary)
+                    }
+                }
             } header: {
                 Text("Données privées")
+            } footer: {
+                Text("Politique : séances et réglages locaux, sans compte ni serveur. Conservés tant que l'app est installée. Suppression par séance dans Progrès, effacement total ci-dessous, désinstaller = tout effacer. Sauvegarde iCloud/iTunes chiffrée de l'appareil incluse. Export CSV = seul partage, à vos mains.")
+            }
+
+            Section {
+                if demoCount > 0 {
+                    Button(role: .destructive) {
+                        showDemoConfirm = true
+                    } label: {
+                        Label("Supprimer les séances d'exemple (\(demoCount))", systemImage: "trash")
+                    }
+                }
+                Button(role: .destructive) {
+                    showDeleteAllConfirm = true
+                } label: {
+                    Label("Tout effacer", systemImage: "trash.fill")
+                }
+            } header: {
+                Text("Gestion de l'historique")
+            } footer: {
+                Text("Tout effacer supprime séances et réglages sur cet iPhone, notice de sécurité incluse (présentée à nouveau ensuite). Action immédiate et irréversible.")
+            }
+
+            Section {
+                Label {
+                    Text("Eole \(appVersionText())")
+                        .monospacedDigit()
+                } icon: {
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(Color.eolePrimary)
+                }
+                Button {
+                    copyDiagnostic()
+                } label: {
+                    Label("Copier le diagnostic", systemImage: "doc.on.doc")
+                }
+                .foregroundStyle(Color.eolePrimary)
+                if let infoMessage {
+                    Text(infoMessage)
+                        .font(.footnote)
+                        .foregroundStyle(Color.eoleMuted)
+                }
+            } header: {
+                Text("À propos et aide")
+            } footer: {
+                Text("Un problème ? Depuis l'app TestFlight, envoyez une capture d'écran avec votre commentaire : le modèle d'iPhone, la version iOS et la version Eole ci-dessus partiront avec.")
             }
         }
         .formStyle(.grouped)
@@ -162,9 +240,64 @@ public struct SettingsView: View {
         .alert("Pratique en sécurité", isPresented: $showSafety) {
             Button("Compris", role: .cancel) {}
         } message: {
-            // Texte unique partagé avec l'alerte d'accueil (EoleRootView).
-            Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux.")
+            Text(eoleSafetyNoticeText)
         }
+        .confirmationDialog(
+            "Tout effacer ?",
+            isPresented: $showDeleteAllConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Tout effacer", role: .destructive) {
+                onDeleteAll()
+                // Les réglages reviennent aux défauts : réapplique au moteur
+                // audio/haptique vivant, sinon sliders à 32 et mémoire à 0.
+                let fresh = AppDefaults.shared.soundSettings
+                settings = fresh
+                onSettingsChanged(fresh)
+                infoMessage = "Historique et réglages effacés."
+                announce("Historique et réglages effacés.")
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Séances et réglages seront supprimés de cet iPhone.")
+        }
+        .confirmationDialog(
+            "Supprimer les exemples ?",
+            isPresented: $showDemoConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Supprimer", role: .destructive) {
+                onDeleteDemo()
+                infoMessage = "Séances d'exemple supprimées."
+                announce("Séances d'exemple supprimées.")
+            }
+            Button("Annuler", role: .cancel) {}
+        } message: {
+            Text("Vos vraies séances seront conservées.")
+        }
+    }
+
+    private func announce(_ message: String) {
+        #if os(iOS)
+        UIAccessibility.post(notification: .announcement, argument: message)
+        #endif
+    }
+
+    /// Version lisible depuis le bundle (`1.0 (3)`), « dev » hors Xcode.
+    private func appVersionText() -> String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "dev"
+        let build = info?["CFBundleVersion"] as? String ?? "dev"
+        return "\(short) (\(build))"
+    }
+
+    private func copyDiagnostic() {
+        let text = makeDiagnostic()
+        #if os(iOS)
+        UIPasteboard.general.string = text
+        #endif
+        infoMessage = "Diagnostic copié : collez-le dans votre retour TestFlight."
+        announce("Diagnostic copié.")
     }
 
     private func previewRow<Preview: View>(description: String, @ViewBuilder preview: () -> Preview) -> some View {

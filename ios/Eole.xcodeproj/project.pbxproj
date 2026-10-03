@@ -37,6 +37,7 @@
 		CEEEC1D349B701D18540B2DA /* ../native/Sources/EoleCore/SessionExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC46FC093090F1082CBDE07 /* ../native/Sources/EoleCore/SessionExport.swift */; };
 		E2F8AF2EE58D8892A06E7F86 /* initial_sessions.json in Resources */ = {isa = PBXBuildFile; fileRef = E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */; };
 		E9851C137BB8A3B90DFABCB5 /* ../native/Sources/EoleApp/AudioEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC651A7FBB11D15515D38118 /* ../native/Sources/EoleApp/AudioEngine.swift */; };
+		P20100000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = P10100000000000000000001 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -70,6 +71,7 @@
 		D6B66CD316DDBDDF2A563965 /* EolePhoneApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EolePhoneApp.swift; sourceTree = SOURCE_ROOT; };
 		E10331BA5624DEAB3DB16A7F /* ../native/Sources/EoleApp/SessionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/SessionEngine.swift; sourceTree = SOURCE_ROOT; };
 		E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = initial_sessions.json; sourceTree = SOURCE_ROOT; };
+		P10100000000000000000001 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = PrivacyInfo.xcprivacy; sourceTree = SOURCE_ROOT; };
 		FC651A7FBB11D15515D38118 /* ../native/Sources/EoleApp/AudioEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../native/Sources/EoleApp/AudioEngine.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -115,6 +117,7 @@
 				258CC2494E8D4C12CC9C5599 /* ../native/Sources/EoleApp/StatsView.swift */,
 				D6B66CD316DDBDDF2A563965 /* EolePhoneApp.swift */,
 				E6A9C5F6D3A74D8DBD8CC5B1 /* initial_sessions.json */,
+				P10100000000000000000001 /* PrivacyInfo.xcprivacy */,
 				D10100000000000000000001 /* Assets.xcassets */,
 				B10100000000000000000001 /* Resources/Audio/eole-bambou.mp3 */,
 				B10100000000000000000002 /* Resources/Audio/eole-exhale-fast.mp3 */,
@@ -197,6 +200,7 @@
 				A10100000000000000000007 /* Resources/Audio/eole-inhale-slow.mp3 in Resources */,
 				A10100000000000000000008 /* Resources/Audio/eole-meditation.mp3 in Resources */,
 				A10100000000000000000009 /* Resources/Audio/eole-serenite.mp3 in Resources */,
+				P20100000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -255,8 +259,8 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = 4J7BXN697F;
+				CURRENT_PROJECT_VERSION = 3;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Eole;
@@ -282,8 +286,7 @@
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
-				DEVELOPMENT_TEAM = 4J7BXN697F;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Eole;

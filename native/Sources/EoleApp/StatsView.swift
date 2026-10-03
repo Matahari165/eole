@@ -64,6 +64,11 @@ public struct StatsView: View {
                 header
                 if stats.sessionCount == 0 {
                     emptyState
+                    if store.rejectedCount > 0 {
+                        Text("\(store.rejectedCount) séance(s) ignorée(s) : données illisibles.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.eoleMuted)
+                    }
                 } else {
                     primaryMetric(stats)
                     secondaryMetrics(stats)
@@ -578,6 +583,9 @@ public struct StatsView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("Sept derniers jours")
                 .accessibilityValue(Text(weekDotsAccessibility(active: active, days: weekDays, calendar: calendar)))
+                Text("Série calculée en jours locaux. Un voyage avec changement de fuseau peut l'interrompre.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
             }
         }
     }
@@ -622,6 +630,11 @@ public struct StatsView: View {
                     }
                 }
             }
+            if store.rejectedCount > 0 {
+                Text("\(store.rejectedCount) séance(s) ignorée(s) : données illisibles.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
+            }
         }
     }
 
@@ -655,19 +668,24 @@ public struct StatsView: View {
     }
 
     private var exportAction: some View {
-        ShareLink(
-            item: SessionsCSVExport(csv: cachedCSV),
-            preview: SharePreview("Historique Eole")
-        ) {
-            Label("Exporter l’historique CSV", systemImage: "square.and.arrow.up")
-                .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Color.eolePrimary)
-        .accessibilityHint("Ouvre les options de partage de l’historique")
-        .onAppear { cachedCSV = buildSessionsCsv(store.sessions) }
-        .onChange(of: store.sessions.count) { _, _ in
-            cachedCSV = buildSessionsCsv(store.sessions)
+        VStack(alignment: .leading, spacing: 8) {
+            ShareLink(
+                item: SessionsCSVExport(csv: cachedCSV),
+                preview: SharePreview("Historique Eole")
+            ) {
+                Label("Exporter l’historique CSV", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.eolePrimary)
+            .accessibilityHint("Ouvre les options de partage de l’historique")
+            .onAppear { cachedCSV = buildSessionsCsv(store.sessions) }
+            .onChange(of: store.sessions) { _, _ in
+                cachedCSV = buildSessionsCsv(store.sessions)
+            }
+            Text("Ce fichier contient tout votre historique détaillé. Ne le partagez qu'avec une personne de confiance.")
+                .font(.footnote)
+                .foregroundStyle(Color.eoleMuted)
         }
     }
 
@@ -791,10 +809,17 @@ private struct SessionsCSVExport: Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(exportedContentType: .commaSeparatedText) { export in
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
+            // Date lisible en préfixe (« où est mon fichier ? ») + UUID court
+            // contre les collisions dans `temporaryDirectory` (purgé par l'OS).
+            let day: String = {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.dateFormat = "yyyy-MM-dd"
+                return formatter.string(from: Date())
+            }()
+            let short = String(UUID().uuidString.prefix(8)).lowercased()
             let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("eole-historique-\(formatter.string(from: Date())).csv")
+                .appendingPathComponent("eole-\(day)-\(short).csv")
             try export.csv.write(to: url, atomically: true, encoding: .utf8)
             return SentTransferredFile(url)
         }

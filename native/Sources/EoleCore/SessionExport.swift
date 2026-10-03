@@ -3,10 +3,16 @@ import Foundation
 // Export CSV : BOM, séparateur ";", "\r\n", une ligne par round.
 
 public func csvCell(_ value: String) -> String {
-    if value.contains(";") || value.contains("\"") || value.contains("\n") || value.contains("\r") {
-        return "\"\(value.replacingOccurrences(of: "\"", with: "\"\""))\""
+    // Anti formula-injection (Excel) : préfixe "'" si premier caractère
+    // parmi = + - @, avant l'échappement ";" / guillemets / retours.
+    var safe = value
+    if let first = safe.first, "=+-@".contains(first) {
+        safe = "'" + safe
     }
-    return value
+    if safe.contains(";") || safe.contains("\"") || safe.contains("\n") || safe.contains("\r") {
+        return "\"\(safe.replacingOccurrences(of: "\"", with: "\"\""))\""
+    }
+    return safe
 }
 
 public func buildSessionsCsv(_ sessions: [BreathSession]) -> String {

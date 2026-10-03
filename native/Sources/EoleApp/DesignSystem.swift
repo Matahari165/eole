@@ -101,8 +101,6 @@ public enum EoleMotion {
     public static let sessionDismiss: Double = 0.70
     /// Cross-fade doux du fond de séance au changement de macro-phase.
     public static let chromeFade: Double = 0.65
-    /// Moment d'installation préalable (« Installe-toi ») avant le décompte.
-    public static let settleDuration: Double = 1.80
     /// Dévoilement progressif et paisible de l'écran des scores en fin de séance.
     public static let completionReveal: Double = 0.85
     /// Montée fluide et progressive des barres du graphique de rétention.
@@ -129,12 +127,10 @@ public enum EoleMotion {
     public static let chartStagger: Double = 0.08
     /// Révélation du graphique, calme et progressive.
     public static let chartReveal: Double = 0.9
-    /// Flou de transition d'ouverture/fermeture de séance.
-    public static let sessionBlur: Double = 0.75
 }
 
-/// Fondus audio miroirs des défauts d'EoleAudioEngine, exposés pour rester
-/// synchronisés avec le motion sans dupliquer de littéraux.
+/// Durées des fondus audio, source unique utilisée par `EoleAudioEngine`
+/// (aucun littéral dupliqué côté moteur).
 public enum EoleAudioFade {
     public static let stop: Double = 0.85
     public static let pause: Double = 0.4

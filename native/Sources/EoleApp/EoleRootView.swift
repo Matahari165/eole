@@ -3,6 +3,11 @@ import EoleCore
 #endif
 import SwiftUI
 
+/// Notice de sécurité, texte unique partagé entre l'alerte d'accueil et les
+/// réglages. Un seul endroit à faire évoluer (et à re-versionner côté
+/// `safetyNoticeSeen` si la formulation change).
+public let eoleSafetyNoticeText = "La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux."
+
 /// Racine iPhone : trois onglets, séance plein écran et notice de sécurité à la
 /// première ouverture.
 /// Le wrapper Xcode ajoute `@main struct EolePhoneApp: App` autour de EoleRootView.
@@ -12,7 +17,8 @@ public struct EoleRootView: View {
     @State private var activeSession: SessionLaunch?
     @State private var pendingSessionConfig: SessionConfig?
     @State private var showConfigurator = false
-    @State private var showSafety = !AppDefaults.shared.safetyNoticeSeen
+    @State private var showOnboarding = !AppDefaults.shared.onboardingSeen
+    @State private var showSafety = false
     private let audio: EoleAudioEngine
     private let haptics: EoleHaptics
 
@@ -49,6 +55,10 @@ public struct EoleRootView: View {
                     NavigationStack {
                         SettingsView(
                             audio: audio,
+                            demoCount: store.demoSessionsCount,
+                            onDeleteAll: { store.deleteAllSessions() },
+                            onDeleteDemo: { store.deleteDemoSessions() },
+                            makeDiagnostic: { store.diagnosticText() },
                             onSettingsChanged: { settings in
                                 audio.apply(settings: settings)
                                 haptics.enabled = settings.hapticsEnabled
@@ -80,6 +90,19 @@ public struct EoleRootView: View {
                 .transition(.opacity)
                 .zIndex(100)
             }
+
+            if showOnboarding {
+                OnboardingView(onDone: finishOnboarding)
+                    .transition(.opacity)
+                    .zIndex(200)
+            }
+        }
+        .onAppear {
+            // Première ouverture : l'onboarding passe d'abord, la notice de
+            // sécurité suit. Sinon, la notice s'affiche si jamais validée.
+            if AppDefaults.shared.onboardingSeen, !AppDefaults.shared.safetyNoticeSeen {
+                showSafety = true
+            }
         }
         .task {
             audio.prewarm(pace: AppDefaults.shared.sessionDefaults.pace)
@@ -110,10 +133,13 @@ public struct EoleRootView: View {
                 AppDefaults.shared.safetyNoticeSeen = true
             }
         } message: {
-            Text("La respiration rapide suivie d'apnées peut provoquer vertiges ou malaise. Pratique assis ou allongé, jamais dans l'eau, au volant ou dans une situation où un malaise serait dangereux.")
+            Text(eoleSafetyNoticeText)
         }
         .alert("Historique indisponible", isPresented: Binding(
-            get: { store.storageErrorMessage != nil },
+            // Chaînée derrière la notice de sécurité : deux alertes
+            // simultanées sur la même vue n'en présenteraient qu'une,
+            // l'autre serait perdue sans laisser de trace.
+            get: { !showSafety && store.storageErrorMessage != nil },
             set: { isPresented in
                 if !isPresented { store.clearStorageError() }
             }
@@ -132,6 +158,150 @@ public struct EoleRootView: View {
         withAnimation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.sessionPresent)) {
             activeSession = SessionLaunch(config: config)
         }
+    }
+
+    private func finishOnboarding() {
+        AppDefaults.shared.onboardingSeen = true
+        withAnimation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.sessionDismiss)) {
+            showOnboarding = false
+        }
+        if !AppDefaults.shared.safetyNoticeSeen {
+            // Laisse le fondu de sortie se terminer avant l'alerte système.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showSafety = true
+            }
+        }
+    }
+}
+
+/// Présentation du cycle respiratoire en 3 temps calmes : respirer, suspendre,
+/// récupérer. Même ADN que la séance (fond sombre, verre, fondus doux), sans
+/// image séquentielle ni à-coup. Une seule apparition par installation.
+public struct OnboardingView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var page = 0
+    private let onDone: () -> Void
+
+    public init(onDone: @escaping () -> Void = {}) {
+        self.onDone = onDone
+    }
+
+    private struct OnboardingPage {
+        let icon: String
+        let title: String
+        let text: String
+    }
+
+    private let pages: [OnboardingPage] = [
+        OnboardingPage(
+            icon: "wind",
+            title: "Respire",
+            text: "Des respirations guidées au rythme que tu choisis : lent, normal ou rapide."
+        ),
+        OnboardingPage(
+            icon: "timer",
+            title: "Suspends",
+            text: "Poumons vides, retiens ton souffle aussi longtemps que c'est confortable. Double-touche l'écran pour terminer."
+        ),
+        OnboardingPage(
+            icon: "drop.fill",
+            title: "Récupère",
+            text: "Inspire profondément, garde 15 secondes, expire. Puis recommence, tour après tour."
+        ),
+    ]
+
+    public var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(hex: 0x2A756C), Color(hex: 0x0A2B29)],
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            // Pas de allowsHitTesting(false) : ce fond plein écran DOIT
+            // bloquer les taps vers les onglets dessous (sinon « Commencer »
+            // démarre une séance fantôme sous l'onboarding).
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 48)
+                EoleLogo(size: 64)
+                    .accessibilityHidden(true)
+                Text("Eole")
+                    .font(.eoleDisplay)
+                    .foregroundStyle(.white)
+                    .padding(.top, 12)
+                    .accessibilityAddTraits(.isHeader)
+
+                TabView(selection: $page) {
+                    ForEach(pages.indices, id: \.self) { index in
+                        VStack(spacing: 14) {
+                            Image(systemName: pages[index].icon)
+                                .font(.system(size: 44, weight: .regular))
+                                .foregroundStyle(Color(hex: 0x83E7DC))
+                                .symbolRenderingMode(.hierarchical)
+                                .accessibilityHidden(true)
+                            Text(pages[index].title)
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(.white)
+                            Text(pages[index].text)
+                                .font(.body)
+                                .foregroundStyle(.white.opacity(0.85))
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .tag(index)
+                        .padding(.vertical, 24)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: 320)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("\(pages[page].title) : \(pages[page].text)")
+
+                HStack(spacing: 8) {
+                    ForEach(pages.indices, id: \.self) { index in
+                        Capsule()
+                            .fill(index == page ? Color.white : Color.white.opacity(0.35))
+                            .frame(width: index == page ? 22 : 7, height: 7)
+                            .animation(
+                                reduceMotion ? nil : .eoleSoft(duration: EoleMotion.chromeFade),
+                                value: page
+                            )
+                    }
+                }
+                .padding(.top, 8)
+                .accessibilityHidden(true)
+
+                Spacer(minLength: 24)
+                HStack(spacing: 12) {
+                    Button("Passer") { onDone() }
+                        .font(.body)
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(minHeight: 44)
+                        .accessibilityHint("Va directement à l'accueil")
+                    Spacer()
+                    Button(page == pages.count - 1 ? "Commencer" : "Suivant") {
+                        if page == pages.count - 1 {
+                            onDone()
+                        } else if reduceMotion {
+                            page += 1
+                        } else {
+                            withAnimation(.eoleSoft(duration: EoleMotion.phaseTransition)) {
+                                page += 1
+                            }
+                        }
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(.white.opacity(0.92))
+                    .foregroundStyle(Color(hex: 0x0A5C56))
+                    .controlSize(.extraLarge)
+                    .accessibilityHint(page == pages.count - 1 ? "Ferme la présentation" : "Page suivante")
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 32)
+            }
+        }
+        .foregroundStyle(.white)
     }
 }
 

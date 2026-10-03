@@ -3,6 +3,48 @@ import EoleCore
 #endif
 import Foundation
 import SwiftData
+#if os(iOS)
+import UIKit
+#endif
+#if canImport(OSLog)
+import OSLog
+#endif
+#if canImport(MetricKit)
+import MetricKit
+#endif
+
+/// Journal local (Console.app + rapports TestFlight), sans réseau ni serveur :
+/// la promesse « 100 % local » reste intacte.
+#if canImport(OSLog)
+let eoleLog = Logger(subsystem: "com.jeremydelloume.eole", category: "session")
+#else
+/// Repli hors Apple : no-op, l'app ne dépend jamais du logging.
+struct EoleNoopLog {
+    func error(_ message: String) {}
+    func warning(_ message: String) {}
+    func info(_ message: String) {}
+}
+let eoleLog = EoleNoopLog()
+#endif
+
+#if canImport(MetricKit)
+/// Diagnostics crash/exception on-device (Apple, sans serveur ni tracking) :
+/// alimentent Xcode Organizer + App Store Connect quand l'utilisateur accepte
+/// de partager ses analyses. Enregistrement unique au lancement du store.
+final class EoleMetricSubscriber: NSObject, MXMetricManagerSubscriber {
+    static let shared = EoleMetricSubscriber()
+    static func register() { MXMetricManager.shared.add(shared) }
+    func didReceive(_ payloads: [MXMetricPayload]) {}
+    func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        eoleLog.error("Diagnostics système reçus : \(payloads.count) lot(s).")
+    }
+}
+#else
+/// Repli hors Apple : enregistrement no-op.
+enum EoleMetricSubscriber {
+    static func register() {}
+}
+#endif
 
 /// Enregistrement SwiftData d'une séance de respiration.
 /// Les dates et UUID conservent leur précision lors de l'import. Les tours sont
@@ -63,8 +105,9 @@ public final class StoredBreathSession {
     }
 }
 
-/// Marqueur SwiftData posé uniquement après l'écriture réussie des données
-/// initiales. Une relance déduplique toujours par UUID avant toute insertion.
+/// Marqueur SwiftData posé quand l'import initial a été traité (sessions
+/// écrites, ou rien à importer : bundle absent, invalide, ou Release sans
+/// exemples). Une relance déduplique toujours par UUID avant insertion.
 @Model
 public final class SessionImportMarker {
     @Attribute(.unique) public var key: String
@@ -76,17 +119,82 @@ public final class SessionImportMarker {
     }
 }
 
+/// Schéma versionné v1 : fige le modèle avant toute évolution.
+/// Ajouter un champ = créer EoleSchemaV2 + étape de migration,
+/// jamais modifier V1. `pendingSync` reste dans le schéma (toujours `false`,
+/// jamais lu) pour compatibilité avec les bases existantes.
+public enum EoleSchemaV1: VersionedSchema {
+    public static var versionIdentifier: Schema.Version = .init(1, 0, 0)
+    public static var models: [any PersistentModel.Type] {
+        [StoredBreathSession.self, SessionImportMarker.self]
+    }
+}
+
+public struct EoleMigrationPlan: SchemaMigrationPlan {
+    public static var schemas: [any VersionedSchema.Type] { [EoleSchemaV1.self] }
+    public static var stages: [MigrationStage] { [] }
+}
+
+/// Charge le bundle d'exemples (import initial + détection des démos
+/// partagent ce helper : une seule logique de décodage à maintenir).
+private func loadBundledInitialSessions() -> [BreathSession]? {
+    guard let url = Bundle.main.url(forResource: "initial_sessions", withExtension: "json"),
+          let data = try? Data(contentsOf: url),
+          let initial = try? JSONDecoder().decode([BreathSession].self, from: data),
+          !initial.isEmpty
+    else { return nil }
+    return initial
+}
+/// Repli quand le bundle est absent (tests SwiftPM, previews) : les UUID
+/// connus de `initial_sessions.json`. À tenir synchronisé avec le bundle à
+/// chaque ajout/retrait d'exemple (sinon `deleteDemoSessions` rate les
+/// nouveaux IDs hors app).
+private let eoleFallbackDemoSessionIDs: Set<String> = [
+    "a5e4f8f0-cc4a-4bf2-8db0-9f5d3b14d8a7",
+    "9b05bc9c-21a0-4619-a9eb-d79d31343202",
+    "5b7ec132-113a-4fbf-a6b0-e2138bbd3e25",
+    "44ab27c1-031b-4768-9bf8-254fad5500bf",
+    "40912256-dce2-4955-b61e-f0ecf0512027",
+    "593e7d34-147f-40a4-8be8-b1c8f545ddd2",
+]
+
+/// UUID des séances d'exemple du bundle. Lus depuis le bundle quand il est
+/// disponible (un ajout futur est donc couvert), sinon repli ci-dessus.
+/// Le bundle historique ne marque pas les démos : on les reconnaît par ID
+/// pour les supprimer en masse sans toucher aux vraies séances.
+public var eoleDemoSessionIDs: Set<String> {
+    guard let initial = loadBundledInitialSessions() else { return eoleFallbackDemoSessionIDs }
+    return Set(initial.map(\.id))
+}
+
 @MainActor
 public final class SessionStore: ObservableObject {
     @Published public private(set) var sessions: [BreathSession] = []
     @Published public private(set) var storageErrorMessage: String?
+    /// Lignes stockées mais rejetées par `isValidSession` (corrompues,
+    /// vieux bundle, fuseau exotique) : exposé pour diagnostic au lieu
+    /// d'une disparition silencieuse des stats.
+    @Published public private(set) var rejectedCount: Int = 0
 
-    // Version incrémentée pour que les installations qui ont déjà importé les
-    // cinq premières séances récupèrent aussi la séance ajoutée ensuite.
+    /// Nombre de séances d'exemple encore présentes (IDs résolus à l'init).
+    public var demoSessionsCount: Int {
+        sessions.filter { demoIDs.contains($0.id) }.count
+    }
+
+    // Version du marqueur d'import : en Debug, les installs qui ont déjà
+    // importé récupèrent les ajouts ultérieurs du bundle (dédupliqués par
+    // UUID). En Release, aucun import n'a lieu (prod sans exemples).
     private static let importMarkerKey = "eole.initial-sessions.v2"
     private let modelContainer: ModelContainer
     private let modelContext: ModelContext
+    /// IDs d'exemple résolus une fois par store (bundle immuable au runtime) :
+    /// ni I/O ni décodage JSON à chaque `body` ou chaque séance comparée.
+    /// Exposé en interne pour filtrer les démos des records (récompenses
+    /// calculées sur les vraies séances uniquement).
+    let demoIDs: Set<String>
     public init(modelContainer: ModelContainer? = nil) {
+        EoleMetricSubscriber.register()
+        demoIDs = eoleDemoSessionIDs
         let (container, didFallback) = modelContainer.map { ($0, false) } ?? Self.makeContainer()
         self.modelContainer = container
         self.modelContext = ModelContext(container)
@@ -101,11 +209,14 @@ public final class SessionStore: ObservableObject {
 
     public func reload() {
         do {
-            sessions = try fetchRecords().compactMap { $0.makeSession() }
-                .filter(isValidSession)
+            let records = try fetchRecords()
+            let decoded = records.compactMap { $0.makeSession() }
+            rejectedCount = records.count - decoded.count + decoded.filter { !isValidSession($0) }.count
+            sessions = decoded.filter(isValidSession)
             storageErrorMessage = nil
         } catch {
             sessions = []
+            rejectedCount = 0
             presentStorageError()
         }
     }
@@ -132,31 +243,83 @@ public final class SessionStore: ObservableObject {
         }
     }
 
+    /// Effacement total RGPD (art. 17) : supprime toutes les séances et
+    /// réinitialise les préférences légères. Les marqueurs d'import sont
+    /// conservés : sans eux, le prochain launch réimporterait les exemples.
+    /// La désinstallation reste un effacement total équivalent.
+    /// Note : la notice de sécurité est réinitialisée elle aussi, elle sera
+    /// présentée à nouveau à la prochaine ouverture (démarrage frais).
+    public func deleteAllSessions() {
+        do {
+            for record in try fetchRecords() {
+                modelContext.delete(record)
+            }
+            guard saveContext() else { return }
+            AppDefaults.shared.resetUserPreferences()
+            reload()
+        } catch {
+            presentStorageError()
+        }
+    }
+
+    /// Supprime uniquement les séances d'exemple du bundle initial.
+    /// Les vraies séances de l'utilisateur sont conservées.
+    public func deleteDemoSessions() {
+        do {
+            var removed = false
+            for record in try fetchRecords() where demoIDs.contains(record.id) {
+                modelContext.delete(record)
+                removed = true
+            }
+            guard removed else { reload(); return }
+            guard saveContext() else { return }
+            reload()
+        } catch {
+            presentStorageError()
+        }
+    }
+
     // MARK: - SwiftData
 
     /// Conteneur persistant, avec repli mémoire si la base est corrompue ou
-    /// le disque plein : jamais de crash au launch en Release.
+    /// le disque plein. Le repli mémoire ne fait aucune I/O : seul un OOM
+    /// total peut encore échouer (cas où l'OS tue le processus de toute
+    /// façon). Pas de `try!` : en Release un `assertionFailure` est no-op
+    /// mais `try!` crashe toujours.
     private static func makeContainer() -> (ModelContainer, Bool) {
-        if let persistent = try? ModelContainer(for: StoredBreathSession.self, SessionImportMarker.self) {
+        // V1 actuelle = schéma implicite (données existantes préservées).
+        // EoleSchemaV1/EoleMigrationPlan sont figés ci-dessus pour la v1.1 :
+        // basculer cet appel vers `migrationPlan:` uniquement lors de
+        // l'ajout d'un champ (V2 + étape de migration testée).
+        if let persistent = try? ModelContainer(
+            for: StoredBreathSession.self, SessionImportMarker.self
+        ) {
             return (persistent, false)
         }
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        if let memory = try? ModelContainer(
-            for: StoredBreathSession.self, SessionImportMarker.self,
-            configurations: config
-        ) {
+        do {
+            let memory = try ModelContainer(
+                for: StoredBreathSession.self, SessionImportMarker.self,
+                configurations: config
+            )
+            eoleLog.warning("SwiftData persistant indisponible, repli mémoire (données non conservées).")
             return (memory, true)
+        } catch {
+            assertionFailure("Base SwiftData indisponible, repli mémoire : \(error)")
+            // Le conteneur mémoire ne fait aucune I/O : seul un OOM total
+            // peut échouer ici (l'OS tue l'app de toute façon).
+            #if DEBUG
+            fatalError("Base SwiftData indisponible même en mémoire : \(error)")
+            #else
+            if let degraded = try? ModelContainer(
+                for: StoredBreathSession.self, SessionImportMarker.self,
+                configurations: config
+            ) {
+                return (degraded, true)
+            }
+            fatalError("Base SwiftData indisponible même en mémoire.")
+            #endif
         }
-        // Ultime repli : conteneur vide en mémoire. La création mémoire avec
-        // un modèle valide ne fait aucune I/O et ne peut pas échouer en
-        // pratique ; ce try! ne couvre qu'une impossibilité théorique (le
-        // history restera vide et le bandeau d'erreur affiché dans ce cas).
-        assertionFailure("Base SwiftData indisponible, repli mémoire.")
-        let empty = try! ModelContainer(
-            for: StoredBreathSession.self, SessionImportMarker.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        return (empty, true)
     }
 
     private func fetchRecords() throws -> [StoredBreathSession] {
@@ -179,6 +342,7 @@ public final class SessionStore: ObservableObject {
         // Échec d'encodage = ne rien insérer plutôt qu'un roundsData vide qui
         // rendrait la séance invisible sans erreur (fail-fast vers Réessayer).
         guard (try? JSONEncoder().encode(session.rounds)) != nil else {
+            eoleLog.error("Encodage rounds impossible, séance \(session.id) non enregistrée.")
             presentStorageError()
             return false
         }
@@ -204,6 +368,7 @@ public final class SessionStore: ObservableObject {
             return true
         } catch {
             modelContext.rollback()
+            eoleLog.error("Échec d'enregistrement SwiftData : \(error)")
             presentStorageError()
             assertionFailure("Échec d'enregistrement SwiftData : \(error)")
             return false
@@ -214,10 +379,13 @@ public final class SessionStore: ObservableObject {
 
     private func importInitialSessionsIfNeeded() {
         guard !hasImportMarker else { return }
-        guard let url = Bundle.main.url(forResource: "initial_sessions", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let initial = try? JSONDecoder().decode([BreathSession].self, from: data),
-              !initial.isEmpty
+        #if !DEBUG
+        // Prod : pas d'exemples importés. Les installs existantes les
+        // suppriment via « Supprimer les exemples » (migration douce).
+        markImported()
+        return
+        #endif
+        guard let initial = loadBundledInitialSessions()
         else {
             // Bundle absent ou illisible : statique, rejouer à chaque launch
             // ne servirait à rien. Marque pour ne pas repayer le décodage.
@@ -254,6 +422,7 @@ public final class SessionStore: ObservableObject {
             try modelContext.save()
         } catch {
             modelContext.rollback()
+            eoleLog.error("Échec de l'import SwiftData des sessions initiales : \(error)")
             presentStorageError()
             assertionFailure("Échec de l'import SwiftData des sessions initiales : \(error)")
             return
@@ -265,6 +434,7 @@ public final class SessionStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
         } catch {
             modelContext.rollback()
+            eoleLog.error("Échec de l'écriture du marqueur d'import Eole : \(error)")
             presentStorageError()
             assertionFailure("Échec de l'écriture du marqueur d'import Eole : \(error)")
         }
@@ -279,6 +449,9 @@ public final class SessionStore: ObservableObject {
             UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
         } catch {
             modelContext.rollback()
+            // UD marqué quand même : le bundle est statique, rejouer ne
+            // servirait à rien. Divergence UD/SwiftData tracée ici.
+            eoleLog.error("Marqueur d'import non persisté (UD marqué) : \(error)")
             UserDefaults.standard.set(true, forKey: Self.importMarkerKey)
         }
     }
@@ -294,8 +467,10 @@ public final class SessionStore: ObservableObject {
             }
             return exists
         } catch {
+            // Échec de lecture : ne pas marquer, on retentera au prochain
+            // launch au lieu de rester bloqué avec un historique vide.
             presentStorageError()
-            return true
+            return false
         }
     }
 
@@ -305,6 +480,25 @@ public final class SessionStore: ObservableObject {
 
     private func presentStorageError() {
         storageErrorMessage = "L’historique local est momentanément indisponible."
+    }
+
+    /// Texte à coller au support (bouton Réglages) : versions, compteurs,
+    /// erreur éventuelle. Aucune donnée de séance détaillée dedans.
+    public func diagnosticText() -> String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "dev"
+        let build = info?["CFBundleVersion"] as? String ?? "dev"
+        let system: String
+        #if os(iOS)
+        system = "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
+        #else
+        system = ProcessInfo.processInfo.operatingSystemVersionString
+        #endif
+        return """
+        Eole \(short) (\(build)) · \(system)
+        Séances : \(sessions.count) · ignorées : \(rejectedCount)
+        Erreur : \(storageErrorMessage ?? "aucune")
+        """
     }
 }
 
@@ -321,6 +515,7 @@ public final class AppDefaults {
         static let sessionDefaults = "eole-session-defaults-v1"
         static let soundSettings = "eole-sound-settings-v1"
         static let safetyNoticeSeen = "eole-safety-notice-seen-v1"
+        static let onboardingSeen = "eole-onboarding-seen-v1"
     }
 
     public var sessionDefaults: SessionConfig {
@@ -341,7 +536,9 @@ public final class AppDefaults {
                 "breathsPerRound": newValue.breathsPerRound,
                 "pace": newValue.pace.rawValue,
             ]
-            store.set(try? JSONSerialization.data(withJSONObject: json), forKey: Key.sessionDefaults)
+            // Échec d'encodage = ne pas écraser l'ancienne valeur avec nil.
+            guard let data = try? JSONSerialization.data(withJSONObject: json) else { return }
+            store.set(data, forKey: Key.sessionDefaults)
         }
     }
 
@@ -353,11 +550,41 @@ public final class AppDefaults {
             else { return defaultSoundSettings }
             return decoded
         }
-        set { store.set(try? JSONEncoder().encode(newValue), forKey: Key.soundSettings) }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue) else { return }
+            store.set(data, forKey: Key.soundSettings)
+        }
+    }
+
+    /// Vrai si une valeur est stockée mais illisible/hors bornes : l'app
+    /// retombe sur les défauts. Exposé pour afficher « réglages restaurés »
+    /// au lieu d'une réinitialisation silencieuse.
+    public var hadInvalidStoredSoundSettings: Bool {
+        guard let data = store.data(forKey: Key.soundSettings) else { return false }
+        guard let decoded = try? JSONDecoder().decode(SoundSettings.self, from: data),
+              isValidSettings(decoded)
+        else { return true }
+        return false
+    }
+
+    /// Effacement des préférences utilisateur (séance, son, notice).
+    /// Ne touche ni à l'onboarding ni au marqueur d'import : nom exact,
+    /// pas un « tout » (voir `deleteAllSessions` pour le périmètre total).
+    public func resetUserPreferences() {
+        store.removeObject(forKey: Key.sessionDefaults)
+        store.removeObject(forKey: Key.soundSettings)
+        store.removeObject(forKey: Key.safetyNoticeSeen)
     }
 
     public var safetyNoticeSeen: Bool {
         get { store.bool(forKey: Key.safetyNoticeSeen) }
         set { store.set(newValue, forKey: Key.safetyNoticeSeen) }
+    }
+
+    /// Onboarding présenté une fois. Volontairement hors `resetUserPreferences()` :
+    /// effacer l'historique ne doit pas réimposer la présentation.
+    public var onboardingSeen: Bool {
+        get { store.bool(forKey: Key.onboardingSeen) }
+        set { store.set(newValue, forKey: Key.onboardingSeen) }
     }
 }

@@ -69,10 +69,25 @@ public struct ConfiguratorView: View {
     }
 
     private var introduction: some View {
-        Text("Prépare ton rythme")
-            .font(.subheadline)
-            .foregroundStyle(Color.eoleMuted)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Prépare ton rythme")
+                .font(.subheadline)
+                .foregroundStyle(Color.eoleMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            // Estimation d'effort : respirations seules, apnées en plus.
+            Text("≈ \(estimatedBreathingText) de respiration + tes apnées.")
+                .font(.footnote)
+                .foregroundStyle(Color.eoleMuted)
+                .monospacedDigit()
+        }
+    }
+
+    /// Durée des phases respiratoires seules (sans apnées ni récupérations) :
+    /// un tour = respirations × (inspire + expire), minuteur du pace.
+    private var estimatedBreathingText: String {
+        let timing = paceTiming(for: pace)
+        let seconds = Double(rounds * breaths) * (timing.inhaleSeconds + timing.exhaleSeconds)
+        return formatDuration(seconds)
     }
 
     private var configurationPanel: some View {
@@ -80,16 +95,16 @@ public struct ConfiguratorView: View {
             VStack(alignment: .leading, spacing: 0) {
                 parameterRow(
                     title: "Tours",
-                    hint: "De 1 à 8",
+                    hint: "De \(SessionLimits.rounds.lowerBound) à \(SessionLimits.rounds.upperBound)",
                     value: rounds,
-                    stepper: Stepper(value: $rounds, in: 1...8, step: 1) { EmptyView() }
+                    stepper: Stepper(value: $rounds, in: SessionLimits.rounds, step: 1) { EmptyView() }
                 )
                 Divider().padding(.vertical, 16)
                 parameterRow(
                     title: "Respirations",
-                    hint: "De 10 à 60, par 5",
+                    hint: "De \(SessionLimits.breathsPerRound.lowerBound) à \(SessionLimits.breathsPerRound.upperBound), par \(SessionLimits.breathStep)",
                     value: breaths,
-                    stepper: Stepper(value: $breaths, in: 10...60, step: 5) { EmptyView() }
+                    stepper: Stepper(value: $breaths, in: SessionLimits.breathsPerRound, step: SessionLimits.breathStep) { EmptyView() }
                 )
             }
         }
@@ -152,6 +167,11 @@ public struct ConfiguratorView: View {
                 Text(paceDescription(pace))
                     .font(.footnote)
                     .foregroundStyle(Color.eoleMuted)
+                if pace == .fast {
+                    Label("Cadence intense, déconseillée aux débutants.", systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(Color.eoleMuted)
+                }
             }
         }
     }
