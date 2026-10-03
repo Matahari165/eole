@@ -73,7 +73,13 @@ public struct StatsView: View {
                     }
                 } else {
                     heroMetrics(stats)
+                        .opacity(hasAppeared || reduceMotion ? 1 : 0)
+                        .offset(y: hasAppeared || reduceMotion ? 0 : 10)
+                        .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal), value: hasAppeared)
                     supportMetrics(stats)
+                        .opacity(hasAppeared || reduceMotion ? 1 : 0)
+                        .offset(y: hasAppeared || reduceMotion ? 0 : 10)
+                        .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(EoleMotion.chartStagger), value: hasAppeared)
                     consistencySection(stats)
                     retentionChart(series)
                     if !roundStats.isEmpty {
@@ -635,6 +641,10 @@ public struct StatsView: View {
                                             .frame(width: 6, height: 6)
                                     }
                                 }
+                                // Micro-feedback de sélection : la pastille
+                                // respire légèrement, en plus de l'anneau.
+                                .scaleEffect(isSelected ? 1.08 : 1.0)
+                                .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.controlTransition), value: isSelected)
                             }
                             .frame(maxWidth: .infinity, minHeight: 44)
                             .contentShape(Rectangle())
@@ -697,9 +707,11 @@ public struct StatsView: View {
             ForEach(daySessions, id: \.id) { session in
                 let retention = session.rounds.map(\.retentionSeconds).reduce(0, +)
                 HStack {
-                    Text("\(session.rounds.count) rounds")
+                    Text("\(session.rounds.count) rounds · \(session.pace.rawValue.capitalized)")
                         .font(.caption)
                         .foregroundStyle(Color.eoleMuted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                     Spacer()
                     Text(formatDuration(Double(retention)))
                         .font(.caption.weight(.semibold))
