@@ -19,6 +19,7 @@ public struct StatsView: View {
     @State private var days = 30
     @State private var showAllHistory = false
     @State private var selectedDay: String?
+    @State private var selectedWeekDay: String?
     @State private var sessionToDelete: BreathSession?
     @State private var hasAppeared = false
     /// CSV mis en cache : reconstruit uniquement quand l'historique change,
@@ -71,13 +72,13 @@ public struct StatsView: View {
                             .foregroundStyle(Color.eoleMuted)
                     }
                 } else {
-                    primaryMetric(stats)
-                    secondaryMetrics(stats)
+                    heroMetrics(stats)
+                    supportMetrics(stats)
+                    consistencySection(stats)
                     retentionChart(series)
                     if !roundStats.isEmpty {
                         roundPaliersSection(roundStats)
                     }
-                    consistencySection(stats)
                     history
                     exportAction
                 }
@@ -163,68 +164,107 @@ public struct StatsView: View {
             .accessibilityAddTraits(days == value ? .isSelected : [])
     }
 
-    private func primaryMetric(_ stats: SessionStats) -> some View {
+    /// Hero gamifié : moyenne en grand, record (trophée) et série (flamme).
+    /// Palette de l'app uniquement, pas de couleurs criardes.
+    private func heroMetrics(_ stats: SessionStats) -> some View {
         let progress = progressionText()
 
         return EolePanel {
-            VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Average retention")
-                HStack(alignment: .lastTextBaseline, spacing: 8) {
-                    Text(formatDuration(stats.averageRetention))
-                        .font(.system(.largeTitle, design: .rounded).weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(Color.eoleForeground)
-                        .minimumScaleFactor(0.72)
-                        .accessibilityLabel("Average retention")
-                        .accessibilityValue(formatDuration(stats.averageRetention))
-                    Text("per round")
-                        .font(.subheadline)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lungs.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.eolePrimary)
+                        .accessibilityHidden(true)
+                    Text("Average retention")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.eoleMuted)
+                    Spacer()
+                    Text("\(stats.sessionCount) sessions")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(Color.eoleMuted)
+                        .lineLimit(1)
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Record: \(formatDuration(Double(stats.maxRetention)))")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.eoleMuted)
-                    if let progress {
-                        Text(progress.text)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(progress.positive ? Color.eolePrimary : Color.eoleMuted)
-                    }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Average retention, \(stats.sessionCount) sessions")
+
+                Text(formatDuration(stats.averageRetention))
+                    .font(.system(size: 44, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.eoleForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .accessibilityLabel("Average \(formatDuration(stats.averageRetention)) per round")
+                Text("per round")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.eoleMuted)
+
+                if let progress {
+                    Text(progress.text)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(progress.positive ? Color.eolePrimary : Color.eoleMuted)
+                }
+
+                Divider().overlay(Color.eoleBorder.opacity(0.5))
+
+                HStack(spacing: 16) {
+                    heroBadge(
+                        icon: "trophy.fill",
+                        tint: Color(hex: 0xF5C518),
+                        title: "Record",
+                        value: formatDuration(Double(stats.maxRetention))
+                    )
+                    heroBadge(
+                        icon: "flame.fill",
+                        tint: Color.eolePrimary,
+                        title: "Streak",
+                        value: stats.currentStreak > 0 ? "\(stats.currentStreak)d" : "—"
+                    )
                 }
             }
         }
     }
 
-    private func secondaryMetrics(_ stats: SessionStats) -> some View {
+    private func heroBadge(icon: String, tint: Color, title: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(tint)
+                .frame(width: 32, height: 32)
+                .background(tint.opacity(0.12), in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Color.eoleMuted)
+                Text(value)
+                    .font(.headline.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.eoleForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(value)")
+    }
+
+    private func supportMetrics(_ stats: SessionStats) -> some View {
         let sessions = store.sessions.filter { !$0.rounds.isEmpty }
         let retentionTotal = sessions.flatMap { $0.rounds.map(\.retentionSeconds) }.reduce(0, +)
-        let breathsTotal = sessions.flatMap { $0.rounds.map(\.breathsCompleted) }.reduce(0, +)
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 12) {
-                EoleMetricTile(
-                    label: "Sessions",
-                    value: "\(stats.sessionCount)",
-                    detail: stats.currentStreak > 0 ? "Streak: \(stats.currentStreak)d" : "No current streak"
-                )
-                EoleMetricTile(
-                    label: "Rounds",
-                    value: "\(stats.totalRounds)",
-                    detail: "Avg \(oneDecimal(stats.averageRounds)) / session"
-                )
-            }
-            HStack(alignment: .top, spacing: 12) {
-                EoleMetricTile(
-                    label: "Time in retention",
-                    value: formatDuration(Double(retentionTotal)),
-                    detail: "Of \(formatDuration(stats.totalPracticeSeconds)) total"
-                )
-                EoleMetricTile(
-                    label: "Breaths",
-                    value: "\(breathsTotal)",
-                    detail: topPaceLabel(sessions).map { "Pace: \($0)" } ?? "Mixed paces"
-                )
-            }
+        return HStack(alignment: .top, spacing: 12) {
+            EoleMetricTile(
+                label: "Total retention",
+                value: formatDuration(Double(retentionTotal)),
+                detail: "Of \(formatDuration(stats.totalPracticeSeconds)) total"
+            )
+            EoleMetricTile(
+                label: "Rounds / session",
+                value: "\(oneDecimal(stats.averageRounds))",
+                detail: "\(stats.totalRounds) rounds total"
+            )
         }
     }
 
@@ -275,9 +315,10 @@ public struct StatsView: View {
             if days <= 7 {
                 return series.map(\.key)
             }
-            // En tailles d'accessibilité, 7 libellés "12 sept." se
-            // chevauchent sur 302 pt : on n'en garde que 3-4.
-            let targetTicks = sizeCategory.isAccessibilityCategory ? 3 : 6
+            // En tailles d'accessibilité, les libellés se chevauchent :
+            // 4-5 repères max en régulier (3-4 en AX), jamais plus.
+            // (Le dernier point est toujours inclus, d'où +1 possible.)
+            let targetTicks = sizeCategory.isAccessibilityCategory ? 3 : 4
             let step = max(1, (series.count - 1) / (targetTicks - 1))
             var ticks: [String] = []
             var i = 0
@@ -416,6 +457,8 @@ public struct StatsView: View {
                                 Text(label)
                                     .font(.caption.weight(.medium))
                                     .foregroundStyle(Color.eoleMuted)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                             }
                         }
                     }
@@ -526,7 +569,7 @@ public struct StatsView: View {
                     Spacer()
                     if stats.currentStreak > 0 {
                         HStack(spacing: 4) {
-                            Image(systemName: "drop.fill")
+                            Image(systemName: "flame.fill")
                                 .font(.caption.weight(.semibold))
                             Text("Streak: \(stats.currentStreak)d")
                                 .font(.caption.weight(.bold))
@@ -538,59 +581,146 @@ public struct StatsView: View {
                         .overlay {
                             Capsule().stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
                         }
+                        .accessibilityLabel("Current streak: \(stats.currentStreak) days")
                     }
                 }
 
                 HStack(spacing: 0) {
                     ForEach(Array(weekDays.enumerated()), id: \.offset) { index, date in
-                        let isPracticed = active.contains(localDateKey(date, calendar: calendar))
+                        let key = localDateKey(date, calendar: calendar)
+                        let isPracticed = active.contains(key)
                         let isToday = calendar.isDateInToday(date)
+                        let isSelected = selectedWeekDay == key
                         let dayLabel = weekDayLabel(date, calendar: calendar)
+                        let count = sessions(onDayKey: key).count
 
-                        VStack(spacing: 8) {
-                            Text(dayLabel)
-                                .font(.caption2.weight(isToday ? .bold : .medium))
-                                .foregroundStyle(isToday ? Color.eolePrimary : Color.eoleMuted)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-
-                            ZStack {
-                                Circle()
-                                    .fill(isPracticed ? Color.eolePrimary : Color.eoleSurfaceSoft)
-                                    .frame(width: 32, height: 32)
-                                    .overlay {
-                                        Circle()
-                                            .stroke(isToday ? Color.eolePrimary : Color.eoleBorder.opacity(0.5), lineWidth: isToday ? 1.5 : 0.5)
-                                    }
-
-                                if isPracticed {
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 13, weight: .bold))
-                                        // Pastille eolePrimary adaptative (teal sombre
-                                        // en light, clair en dark) : coche
-                                        // inversée comme EolePrimaryButton.
-                                        .foregroundStyle(colorScheme == .dark ? Color(hex: 0x07332F) : .white)
-                                } else {
-                                    Circle()
-                                        .fill(Color.eoleMuted.opacity(0.5))
-                                        .frame(width: 6, height: 6)
+                        Button {
+                            if reduceMotion {
+                                selectedWeekDay = isSelected ? nil : key
+                            } else {
+                                withAnimation(.eoleCalm(duration: EoleMotion.controlTransition)) {
+                                    selectedWeekDay = isSelected ? nil : key
                                 }
                             }
+                        } label: {
+                            VStack(spacing: 8) {
+                                Text(dayLabel)
+                                    .font(.caption2.weight(isToday ? .bold : .medium))
+                                    .foregroundStyle(isToday ? Color.eolePrimary : Color.eoleMuted)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+
+                                ZStack {
+                                    Circle()
+                                        .fill(isPracticed ? Color.eolePrimary : Color.eoleSurfaceSoft)
+                                        .frame(width: 32, height: 32)
+                                        .overlay {
+                                            Circle()
+                                                .stroke(
+                                                    isSelected ? Color.eolePrimary : (isToday ? Color.eolePrimary : Color.eoleBorder.opacity(0.5)),
+                                                    lineWidth: (isSelected || isToday) ? 1.5 : 0.5
+                                                )
+                                        }
+
+                                    if isPracticed {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 13, weight: .bold))
+                                            // Pastille eolePrimary adaptative (teal sombre
+                                            // en light, clair en dark) : coche
+                                            // inversée comme EolePrimaryButton.
+                                            .foregroundStyle(colorScheme == .dark ? Color(hex: 0x07332F) : .white)
+                                    } else {
+                                        Circle()
+                                            .fill(Color.eoleMuted.opacity(0.5))
+                                            .frame(width: 6, height: 6)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                         }
-                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.plain)
                         .opacity((hasAppeared || reduceMotion) ? 1 : 0)
                         .scaleEffect((hasAppeared || reduceMotion) ? 1 : 0.85)
                         .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal).delay(Double(index) * EoleMotion.chartStagger), value: hasAppeared)
+                        .accessibilityLabel("\(dayLabel): \(isPracticed ? "practiced, \(count) sessions" : "rest")")
+                        .accessibilityHint(isPracticed ? "Shows sessions for this day" : "")
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
                 }
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Last 7 days")
-                .accessibilityValue(Text(weekDotsAccessibility(active: active, days: weekDays, calendar: calendar)))
+                .accessibilityElement(children: .contain)
+
+                if let key = selectedWeekDay,
+                   let date = weekDays.first(where: { localDateKey($0, calendar: calendar) == key }) {
+                    weekDayDetail(key: key, date: date, calendar: calendar)
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .top)))
+                        .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.controlTransition), value: selectedWeekDay)
+                }
+
                 Text("Streak counted in local days. Travel across time zones may break it.")
                     .font(.footnote)
                     .foregroundStyle(Color.eoleMuted)
             }
         }
+    }
+
+    /// Sessions terminées un jour local donné (clé `localDateKey`).
+    private func sessions(onDayKey key: String) -> [BreathSession] {
+        let calendar = Calendar.current
+        return store.sessions.filter {
+            guard !$0.rounds.isEmpty, let completed = parseDate($0.completedAt) else { return false }
+            return localDateKey(completed, calendar: calendar) == key
+        }
+    }
+
+    /// Petit récap animé du jour tapé : nombre de séances et détail par séance.
+    private func weekDayDetail(key: String, date: Date, calendar: Calendar) -> some View {
+        let daySessions = sessions(onDayKey: key)
+        let total = daySessions.flatMap { $0.rounds.map(\.retentionSeconds) }.reduce(0, +)
+        let title: String = {
+            if calendar.isDateInToday(date) { return "Today" }
+            return Self.dayMonthFormatter.string(from: date).capitalized
+        }()
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.eoleForeground)
+                Spacer()
+                Text("\(daySessions.count) sessions · Total \(formatDuration(Double(total)))")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.eoleMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            ForEach(daySessions, id: \.id) { session in
+                let retention = session.rounds.map(\.retentionSeconds).reduce(0, +)
+                HStack {
+                    Text("\(session.rounds.count) rounds")
+                        .font(.caption)
+                        .foregroundStyle(Color.eoleMuted)
+                    Spacer()
+                    Text(formatDuration(Double(retention)))
+                        .font(.caption.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.eoleForeground)
+                }
+            }
+            if daySessions.isEmpty {
+                Text("Rest day — no sessions recorded.")
+                    .font(.caption)
+                    .foregroundStyle(Color.eoleMuted)
+            }
+        }
+        .padding(12)
+        .background(Color.eoleSurfaceSoft, in: RoundedRectangle(cornerRadius: EoleRadius.control, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: EoleRadius.control, style: .continuous)
+                .stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title): \(daySessions.count) sessions, total retention \(formatDuration(Double(total)))")
     }
 
     private func weekDayLabel(_ date: Date, calendar: Calendar) -> String {
@@ -743,19 +873,6 @@ public struct StatsView: View {
         return ("\(sign)\(formatDuration(Double(abs(delta)))) vs previous period", delta > 0)
     }
 
-    private func topPaceLabel(_ sessions: [BreathSession]) -> String? {
-        var counts: [Pace: Int] = [:]
-        for session in sessions {
-            counts[session.pace, default: 0] += 1
-        }
-        guard let top = counts.max(by: { $0.value < $1.value })?.key else { return nil }
-        switch top {
-        case .slow: return "Slow"
-        case .normal: return "Normal"
-        case .fast: return "Fast"
-        }
-    }
-
     private func retentionSummary(_ session: BreathSession) -> String {
         session.rounds.map { "R\($0.roundIndex) \(formatDuration(Double($0.retentionSeconds)))" }
             .joined(separator: ", ")
@@ -796,14 +913,6 @@ public struct StatsView: View {
             parts.append(selectedDayDetail(point))
         }
         return parts.joined(separator: ". ")
-    }
-
-    private func weekDotsAccessibility(active: Set<String>, days: [Date], calendar: Calendar) -> String {
-        let formatter = Self.shortDayFormatter
-        return days.map { date in
-            let mark = active.contains(localDateKey(date, calendar: calendar)) ? "practiced" : "rest"
-            return "\(formatter.string(from: date)): \(mark)"
-        }.joined(separator: "; ")
     }
 }
 
