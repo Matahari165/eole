@@ -5,7 +5,8 @@ import Foundation
 import UIKit
 #endif
 
-/// Repères haptiques natifs, désactivés par défaut.
+/// Repères haptiques natifs. Activés par défaut via `defaultSoundSettings`
+/// (appliqués au lancement) ; coupés si l'utilisateur les désactive.
 @MainActor
 public final class EoleHaptics {
     public var enabled = false

@@ -12,11 +12,9 @@ public struct ActiveSessionView: View {
     @StateObject private var engine: SessionEngine
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @AccessibilityFocusState private var isCompletionFocused: Bool
     @AccessibilityFocusState private var isErrorFocused: Bool
-    /// Garde anti-double-fermeture : l'alerte (asyncAfter) et l'auto-close du
-    /// récap vide peuvent tirer onClose dans la même seconde.
-    @State private var didRequestClose = false
     @State private var showStopConfirm = false
     @State private var showResultsAnimated = false
     @State private var settlePulse = false
@@ -56,18 +54,22 @@ public struct ActiveSessionView: View {
                         )
                     )
             } else {
-                VStack {
-                    topBar
-                    Spacer()
-                    centerStage
-                        // Un seul moteur de fondu par macro-phase : inspire/expire
-                        // partagent "breathing" pour laisser les contours respirer
-                        // au rythme du pace sans double animation 0.9s + pace.
-                        .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.phaseTransition), value: stagePhaseKey)
-                    Spacer()
+                if verticalSizeClass == .compact {
+                    // Paysage / hauteur compacte : la colonne défile au lieu
+                    // de rogner contours et boutons 44 pt.
+                    ScrollView {
+                        sessionColumn
+                    }
+                    .scrollIndicators(.hidden)
+                    .contentShape(Rectangle())
+                    .transition(.opacity)
+                } else {
+                    sessionColumn
+                        .contentShape(Rectangle())
+                        // Opacité seule : le scale interne gentle suffit, pas de
+                        // double-zoom 0.994 × 0.97 plein écran.
+                        .transition(.opacity)
                 }
-                .contentShape(Rectangle())
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.994)))
             }
         }
         .foregroundStyle(.white)
@@ -75,20 +77,30 @@ public struct ActiveSessionView: View {
         .interactiveDismissDisabled(engine.phase == .saving)
         .onAppear {
             let sessionEngine = engine
-            sessionEngine.onPersist = { [store, weak sessionEngine] session, _ in
+            sessionEngine.onPersist = { [store, weak sessionEngine] session in
                 guard let sessionEngine else { return }
                 let savedLocally = store.saveSession(session)
                 if savedLocally {
                     sessionEngine.markSaved()
                 } else {
-                    sessionEngine.markSaveFailed("La séance n'a pas pu être enregistrée.")
+                    sessionEngine.markSaveFailed("Couldn't save the session.")
                 }
             }
             sessionEngine.start()
         }
         .onDisappear { engine.discard() }
         .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active { engine.refreshRetentionDisplay() }
+            if newPhase == .active {
+                engine.refreshRetentionDisplay()
+            } else if newPhase == .background {
+                // Vrai arrière-plan uniquement (.inactive = Control Center ou
+                // appel entrant : l'app reste visible, pas d'alerte à tort).
+                // Coupe le tick 0,5 s (batterie), l'ancrage Date recalcule la
+                // rétention au retour. Les phases respiratoires, elles,
+                // dérivent : on le signale.
+                engine.suspendDisplayTimer()
+                engine.noteBackgrounded()
+            }
         }
         // Si Reduce Motion s'active en cours de séance, stoppe les pulsations
         // infinies que .animation(nil) ne peut pas interrompre.
@@ -98,20 +110,15 @@ public struct ActiveSessionView: View {
                 retentionHintPulse = false
             }
         }
-        .alert("Arrêter la séance ?", isPresented: $showStopConfirm) {
-            Button("Continuer", role: .cancel) {}
-            Button("Arrêter", role: .destructive) {
+        .alert("Stop session?", isPresented: $showStopConfirm) {
+            Button("Continue", role: .cancel) {}
+            Button("Stop", role: .destructive) {
                 engine.stop()
-                if engine.results.isEmpty && engine.errorMessage == nil {
-                    // Laisse l'alerte système se dissiper avant de fermer la
-                    // séance, sinon fondu séance + dismiss alerte se chevauchent.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        requestClose()
-                    }
-                }
+                // Pas de fermeture auto : si aucun tour n'est terminé,
+                // l'écran final l'explique (« Séance trop courte »).
             }
         } message: {
-            Text("Les tours terminés seront conservés et résumés.")
+            Text("Finished rounds will be kept and summarized.")
         }
     }
 
@@ -137,10 +144,13 @@ public struct ActiveSessionView: View {
 
     /// Macro-phase du centre : inspire/expire partagent "breathing" pour éviter
     /// de rejouer un fondu 0,9 s à chaque respiration ; seuls les vrais
-    /// changements d'ambiance animent le stage.
+    /// changements d'ambiance animent le stage. "settling" et "counting" ont
+    /// leur propre clé pour un fondu doux logo → 3 → contours.
     private var stagePhaseKey: String {
         switch engine.phase {
-        case .ready, .starting, .countdown, .inhale, .exhale: return "breathing"
+        case .ready, .starting: return "settling"
+        case .countdown: return "counting"
+        case .inhale, .exhale: return "breathing"
         case .recoveryInhale, .recoveryHold, .recoveryExhale: return "recovery"
         default: return engine.phase.rawValue
         }
@@ -160,15 +170,23 @@ public struct ActiveSessionView: View {
         }
     }
 
-    /// Durée de l'aura asservie aux contours : rythme du pace, maintien 15 s.
+    /// Diamètre des contours : 320 en régulier (tous les iPhones iOS 26+
+    /// font ≥375 pt de large), réduit en hauteur compacte (paysage) pour
+    /// tenir avec topBar + labels sur ~375 pt de haut.
+    private var contoursSide: CGFloat {
+        verticalSizeClass == .compact ? 200 : 320
+    }
+
+    /// Durée de l'aura asservie aux contours : rythme du pace (plancher 1,6 s
+    /// pour éviter un halo saccadé en cadence rapide), maintien stable.
     private var auraDuration: Double {
         let timing = paceTiming(for: config.pace)
         switch engine.phase {
         case .starting: return SessionEngine.settleSeconds
-        case .inhale: return timing.inhaleSeconds
-        case .exhale: return timing.exhaleSeconds
+        case .inhale: return max(timing.inhaleSeconds, 1.6)
+        case .exhale: return max(timing.exhaleSeconds, 1.6)
         case .recoveryInhale: return SessionEngine.recoveryInhaleSeconds
-        case .recoveryHold: return Double(SessionEngine.recoveryHoldSeconds)
+        case .recoveryHold: return EoleMotion.chromeFade
         case .recoveryExhale: return SessionEngine.recoveryExhaleSeconds
         default: return EoleMotion.chromeFade
         }
@@ -215,11 +233,40 @@ public struct ActiveSessionView: View {
         .accessibilityHidden(true)
     }
 
+    /// Colonne de séance (hors récap) : identique en portrait et paysage,
+    /// le conteneur parent choisit VStack ou ScrollView selon la hauteur.
+    private var sessionColumn: some View {
+        VStack {
+            topBar
+            if let warning = engine.backgroundWarning ?? engine.audioWarning {
+                // Icône selon la nature : dérive de rythme vs audio.
+                Label(
+                    warning,
+                    systemImage: engine.backgroundWarning != nil ? "moon.zzz" : "speaker.slash"
+                )
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.9))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.12), in: Capsule())
+                    .padding(.top, 8)
+                    .accessibilityLabel(warning)
+            }
+            Spacer(minLength: verticalSizeClass == .compact ? 8 : 0)
+            centerStage
+                // Un seul moteur de fondu par macro-phase : seuls les vrais
+                // changements d'ambiance animent le stage.
+                .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.phaseTransition), value: stagePhaseKey)
+            Spacer(minLength: verticalSizeClass == .compact ? 8 : 0)
+        }
+        .safeAreaPadding(.bottom)
+    }
+
     private var topBar: some View {
-        ZStack {
-            VStack(spacing: 2) {
-                if engine.phase != .complete {
-                    Text("Tour \(engine.round) sur \(config.rounds)")
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                if engine.phase != .complete && engine.phase != .saving {
+                    Text("Round \(engine.round) of \(config.rounds)")
                         .font(.subheadline).monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -241,28 +288,32 @@ public struct ActiveSessionView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .center)
-            // Marge anti-chevauchement AX5 : le compteur centré ne passe
-            // jamais sous le bouton X en très grande police.
-            .padding(.trailing, 60)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.breathLabelFade), value: engine.phase)
-            HStack {
-                Spacer()
-                if engine.phase != .complete && engine.phase != .saving {
-                    Button { showStopConfirm = true } label: {
-                        Image(systemName: "xmark")
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(EoleGlassIconButtonStyle())
-                    .tint(.white.opacity(0.84))
-                    .transition(.opacity)
-                    .accessibilityLabel("Arrêter la séance")
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(sessionProgressLabel)
+            Spacer(minLength: 12)
+            if engine.phase != .complete && engine.phase != .saving {
+                Button { showStopConfirm = true } label: {
+                    Image(systemName: "xmark")
+                        .foregroundStyle(.white)
                 }
+                .buttonStyle(EoleGlassIconButtonStyle())
+                .tint(.white.opacity(0.84))
+                .transition(.opacity)
+                .accessibilityLabel("Stop session")
             }
         }
         .padding(.horizontal, 18)
         .safeAreaPadding(.top)
         .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.breathLabelFade), value: engine.phase == .complete)
+    }
+
+    private var sessionProgressLabel: String {
+        if engine.phase == .inhale || engine.phase == .exhale {
+            return "Round \(engine.round) of \(config.rounds), breath \(engine.breath) of \(config.breathsPerRound)"
+        }
+        return "Round \(engine.round) of \(config.rounds)"
     }
 
     @ViewBuilder
@@ -282,10 +333,10 @@ public struct ActiveSessionView: View {
                             }
                         }
                     }
-                Text("Installe-toi.")
+                Text("Settle in.")
                     .font(.title2.weight(.medium))
                     .foregroundStyle(.white)
-                Text("Prends une posture confortable et détends tes épaules.")
+                Text("Get comfortable and relax your shoulders.")
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
@@ -299,7 +350,7 @@ public struct ActiveSessionView: View {
             }
         case .countdown:
             VStack(spacing: 16) {
-                Text("Installe-toi.").font(.title2)
+                Text("Settle in.").font(.title2)
                 Text("\(engine.countdownValue)")
                     .font(.system(size: countdownFontSize, weight: .regular))
                     .monospacedDigit()
@@ -308,34 +359,35 @@ public struct ActiveSessionView: View {
                     // contentTransition seule : pas de .animation concurrente
                     // qui ferait glisser + fondre le chiffre à la fois.
                     .contentTransition(.numericText())
-                    .accessibilityLabel("Compte à rebours : \(engine.countdownValue)")
+                    .accessibilityLabel("Countdown: \(engine.countdownValue)")
             }
             .transition(gentlePhaseTransition)
         case .inhale, .exhale:
             VStack(spacing: 12) {
                 BreathContoursView(
                     motion: engine.phase == .inhale ? .inhale : .exhale,
-                    pace: config.pace
+                    pace: config.pace,
+                    side: contoursSide
                 )
-                .frame(width: 320, height: 320)
+                .frame(width: contoursSide, height: contoursSide)
                 // Identité stable : pas de recréation entre inspire/expire, seul
                 // le motion anime les contours — aucun flash séquentiel.
                 .id("breath-contours")
                 // Labels en cross-fade doux (opacité + décalage), sans flou
                 // animé coûteux en passes offscreen à chaque respiration.
                 ZStack {
-                    Text("Inspire")
+                    Text("Breathe in")
                         .font(.title3)
                         .opacity(engine.phase == .inhale ? 1 : 0)
                         .offset(y: engine.phase == .inhale ? 0 : 6)
-                    Text("Expire")
+                    Text("Breathe out")
                         .font(.title3)
                         .opacity(engine.phase == .exhale ? 1 : 0)
                         .offset(y: engine.phase == .exhale ? 0 : 6)
                 }
                 .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.breathLabelFade), value: engine.phase)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(engine.phase == .inhale ? "Inspire" : "Expire")
+                .accessibilityLabel(engine.phase == .inhale ? "Breathe in" : "Breathe out")
             }
             .transition(gentlePhaseTransition)
         case .retention:
@@ -346,12 +398,13 @@ public struct ActiveSessionView: View {
                 BreathContoursView(
                     motion: recoveryMotion,
                     pace: config.pace,
-                    overrideDuration: recoveryDuration
+                    overrideDuration: recoveryDuration,
+                    side: contoursSide
                 )
-                .frame(width: 320, height: 320)
+                .frame(width: contoursSide, height: contoursSide)
                 .id("recovery-contours")
                 ZStack {
-                    Text("Récupération")
+                    Text("Recovery")
                         .font(.title3)
                         .opacity(engine.phase == .recoveryHold ? 0 : 1)
                         .offset(y: engine.phase == .recoveryHold ? 6 : 0)
@@ -362,26 +415,37 @@ public struct ActiveSessionView: View {
                         .minimumScaleFactor(0.6)
                         .contentTransition(.numericText())
                         .opacity(engine.phase == .recoveryHold ? 1 : 0)
-                        // Animation du tick scopée au chiffre seul : le ZStack
-                        // ne porte que le fondu de phase, plus de tremblement.
-                        .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.countdown), value: engine.recoveryCountdown)
                 }
                 .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.breathLabelFade), value: engine.phase)
-                .accessibilityLabel(engine.phase == .recoveryHold ? "Récupération : \(engine.recoveryCountdown) secondes" : "Récupération")
+                .accessibilityLabel(engine.phase == .recoveryHold ? "Recovery: \(engine.recoveryCountdown) seconds" : "Recovery")
+                // Maintien de 15 s skippable : proposé, pas imposé.
+                if engine.phase == .recoveryHold {
+                    Button { engine.skipRecoveryHold() } label: {
+                        Label("Skip", systemImage: "forward.end.fill")
+                            .font(.footnote.weight(.medium))
+                            .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.glass)
+                    .tint(.white.opacity(0.84))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .transition(.opacity)
+                    .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.chromeFade), value: engine.phase)
+                    .accessibilityHint("Skip the hold and go to the exhale")
+                }
             }
             .transition(gentlePhaseTransition)
         case .pause:
             // Transition inter-round d'1 s : fondu bref dédié (0,4 s), pas
             // le phaseTransition 0,9 s du stage qui le rendrait illisible.
-            Text("Tour suivant…")
+            Text("Next round…")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.85))
                 .transition(.opacity)
-                .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.chromeFade), value: stagePhaseKey)
+                .animation(reduceMotion ? nil : .eoleSoft(duration: EoleMotion.controlTransition), value: stagePhaseKey)
         case .saving:
             VStack(spacing: 8) {
                 ProgressView().tint(.white)
-                Text("Enregistrement…").foregroundStyle(.white)
+                Text("Saving…").foregroundStyle(.white)
             }
             .padding(32)
             // Scrim sombre fixe : le .regularMaterial clair délavé rendait
@@ -403,17 +467,21 @@ public struct ActiveSessionView: View {
 
     /// Rétention : double-toucher en raccourci + vrai bouton 44 pt visible,
     /// halo très lent, geste accessible.
+    private var retentionHaloSide: CGFloat {
+        verticalSizeClass == .compact ? 200 : 260
+    }
+
     private var retentionStage: some View {
         VStack(spacing: 24) {
-            Text("Rétention")
+            Text("Retention")
                 .font(.headline)
                 .foregroundStyle(.white.opacity(0.85))
             ZStack {
-                // Halo apaisé derrière le chrono : 260 px, trait fin,
-                // pulsation lente 2,4 s, seul le halo pulse.
+                // Halo apaisé derrière le chrono : trait fin, pulsation
+                // lente 2,4 s, seul le halo pulse. Réduit en compact.
                 Circle()
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
-                    .frame(width: 260, height: 260)
+                    .frame(width: retentionHaloSide, height: retentionHaloSide)
                     .scaleEffect(reduceMotion ? 1.0 : (retentionHintPulse ? 1.07 : 1.0))
                     .opacity(reduceMotion ? 0.7 : (retentionHintPulse ? 0.9 : 0.6))
                     .animation(
@@ -430,9 +498,9 @@ public struct ActiveSessionView: View {
                     // d'un fondu 0,5 s concurrent qui fait sauter le chrono.
                     .contentTransition(.numericText())
             }
-            // Conteneur 285 : le halo 260 + pulse 1.07 (~278) ne doit pas
-            // être rogné en haut/bas pendant la rétention longue.
-            .frame(height: 285)
+            // Conteneur flexible : le halo + pulse ne doit pas être rogné,
+            // et AX5 peut grandir sans clip.
+            .frame(minHeight: retentionHaloSide + 25)
             .contentShape(Rectangle())
             // Double-tap scopé au chrono seul : posé sur tout le VStack, il
             // se déclencherait aussi via le bouton 44 pt (2× endRetention).
@@ -440,9 +508,9 @@ public struct ActiveSessionView: View {
                 engine.endRetention()
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Rétention : \(retentionLabel)")
-            .accessibilityHint("Double-touchez ou utilisez le bouton Terminer la rétention pour passer à la récupération.")
-            .accessibilityAction(named: "Terminer la rétention") {
+            .accessibilityLabel("Retention: \(retentionLabel)")
+            .accessibilityHint("Double-tap or use the End retention button to move to recovery.")
+            .accessibilityAction(named: "End retention") {
                 engine.endRetention()
             }
             HStack(spacing: 8) {
@@ -450,7 +518,7 @@ public struct ActiveSessionView: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.85))
                     .accessibilityHidden(true)
-                Text("Double-touchez pour terminer")
+                Text("Double-tap to finish")
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.85))
             }
@@ -466,14 +534,14 @@ public struct ActiveSessionView: View {
             Button {
                 engine.endRetention()
             } label: {
-                Label("Terminer la rétention", systemImage: "forward.fill")
+                Label("End retention", systemImage: "forward.fill")
                     .frame(maxWidth: 260, minHeight: 44)
             }
             .buttonStyle(.glassProminent)
             .tint(.white.opacity(0.92))
             .foregroundStyle(Color(hex: 0x0A5C56))
             .controlSize(.large)
-            .accessibilityHint("Termine la rétention et passe à la récupération")
+            .accessibilityHint("Ends retention and moves to recovery")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
@@ -493,42 +561,76 @@ public struct ActiveSessionView: View {
     }
 
     private var completeStage: some View {
-        let priorSessions = store.sessions.filter { $0.id != engine.sessionId }
+        // Records calculés sur les vraies séances : les exemples du bundle
+        // ne doivent ni offrir ni voler un record.
+        let demoIDs = store.demoIDs
+        let priorSessions = store.sessions.filter {
+            $0.id != engine.sessionId && !demoIDs.contains($0.id)
+        }
         let evaluation = evaluateSessionRecords(sessionRounds: engine.results, priorSessions: priorSessions)
         let totalRetention = engine.results.map(\.retentionSeconds).reduce(0, +)
         let isEarlyStop = engine.results.count < config.rounds
 
         return ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 22) {
-                // En-tête sobre et valorisant
-                VStack(spacing: 8) {
-                    Image(systemName: evaluation.hasOverallRecord ? "trophy.fill" : "checkmark.circle.fill")
-                        .font(.system(size: 46, weight: .semibold))
-                        // Séance toujours sur fond sombre : teinte claire fixe,
-                        // pas eoleAccent adaptatif (invisible en dark).
+            VStack(spacing: 16) {
+                // En-tête Liquid Glass : titre + coche sur la même ligne.
+                // Responsive 390×844 et petits iPhones : titre flexible,
+                // icône verre fixe 52 pt, pas de sous-titre rythme.
+                HStack(spacing: 14) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Session complete")
+                            .font(.eoleDisplay)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .foregroundStyle(.white)
+                            .accessibilityFocused($isCompletionFocused)
+                            .accessibilityAddTraits(.isHeader)
+                        if isEarlyStop, !engine.results.isEmpty {
+                            Text("\(engine.results.count) of \(config.rounds) rounds")
+                                .font(.subheadline)
+                                .foregroundStyle(.white.opacity(0.75))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer(minLength: 8)
+                    Image(systemName: evaluation.hasOverallRecord ? "trophy.fill" : "checkmark")
+                        .font(.system(size: 22, weight: .semibold))
                         .foregroundStyle(evaluation.hasOverallRecord ? Color(hex: 0xF5C518) : Color(hex: 0x83E7DC))
                         .symbolRenderingMode(.hierarchical)
+                        .frame(width: 52, height: 52)
+                        .glassEffect(.regular.interactive(), in: Circle())
                         .accessibilityHidden(true)
-
-                    Text("Séance terminée")
-                        .font(.eoleDisplay)
-                        .multilineTextAlignment(.center)
-                        .accessibilityFocused($isCompletionFocused)
-
-                    Text(isEarlyStop
-                         ? "\(engine.results.count) tour\(engine.results.count > 1 ? "s" : "") sur \(config.rounds) complété\(engine.results.count > 1 ? "s" : "")"
-                         : "\(config.rounds) tours complétés • Rythme \(config.pace.rawValue.capitalized)")
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.85))
                 }
+                .padding(16)
+                .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(isEarlyStop ? "Session complete, \(engine.results.count) of \(config.rounds) rounds" : "Session complete")
                 .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                 .offset(y: reduceMotion || showResultsAnimated ? 0 : 6)
                 .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.05), value: showResultsAnimated)
 
+                if engine.wasTooShort || engine.results.isEmpty {
+                    // Arrêt avant tout tour : message explicite au lieu d'une
+                    // fermeture silencieuse. Pas de bouton Réessayer ici
+                    // (rien à persister), juste Terminer en bas.
+                    Label("Session too short: no round finished, nothing was saved.", systemImage: "info.circle")
+                        .font(.footnote)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 8)
+                        .accessibilityLabel("Session too short, nothing was saved")
+                }
+
                 if let message = engine.errorMessage {
                     VStack(spacing: 12) {
                         Text(message).font(.footnote).foregroundStyle(.white.opacity(0.9))
-                        Button("Réessayer") { engine.retryPersist() }
+                        Button("Retry") { engine.retryPersist() }
                             .buttonStyle(.glassProminent)
                             .controlSize(.large)
                     }
@@ -544,48 +646,65 @@ public struct ActiveSessionView: View {
                         .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.05), value: showResultsAnimated)
                 }
 
-                // Métriques clés : Temps total, Rétention, Tours
-                // Groupe 2 : un seul délai partagé avec le graphique.
-                keyMetricsGrid(totalRetention: totalRetention)
-                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
-                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 8)
-                    .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
+                // Métriques, graphique et détail seulement s'il y a au moins
+                // un tour : sinon l'écran n'affiche que le message explicite.
+                if !engine.results.isEmpty {
+                    // Métriques clés : Temps total, Rétention, Tours
+                    // Groupe 2 : un seul délai partagé avec le graphique.
+                    keyMetricsGrid(totalRetention: totalRetention)
+                        .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                        .offset(y: reduceMotion || showResultsAnimated ? 0 : 8)
+                        .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
 
-                // Graphique visuel en barres de chaque rétention
-                retentionBarChart(evaluation: evaluation)
-                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
-                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 10)
-                    .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
+                    // Graphique visuel en barres de chaque rétention
+                    retentionBarChart(evaluation: evaluation)
+                        .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                        .offset(y: reduceMotion || showResultsAnimated ? 0 : 10)
+                        .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.15), value: showResultsAnimated)
 
-                // Liste détaillée de chaque tour — groupe 3 final.
-                roundDetailsList(evaluation: evaluation)
-                    .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
-                    .offset(y: reduceMotion || showResultsAnimated ? 0 : 12)
-                    .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.25), value: showResultsAnimated)
+                    // Liste détaillée de chaque tour — groupe 3 final.
+                    roundDetailsList(evaluation: evaluation)
+                        .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
+                        .offset(y: reduceMotion || showResultsAnimated ? 0 : 12)
+                        .animation(reduceMotion ? nil : .eolePhase(duration: EoleMotion.completionReveal).delay(0.25), value: showResultsAnimated)
+
+                    if engine.didCapRetention {
+                        Text("Retentions over 1 hr capped at 1 hr in history.")
+                            .font(.footnote)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 24)
-            // Réserve la place du CTA fixe pour qu'il ne masque pas le récap.
-            .padding(.bottom, 96)
+            .padding(.top, 12)
+            // Réserve la place du CTA flottant pour qu'il ne masque pas le récap.
+            .padding(.bottom, 120)
         }
-        .frame(maxHeight: .infinity)
-        // CTA fixe en bas, même pattern que Configurator : Divider + fond
-        // .bar, sinon le récap défile et transparaît sous le bouton verre.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // CTA flottant Liquid Glass : plus de barre grise (.bar + Divider).
+        // Dégradé sombre subtil pour la lisibilité du défilement, bouton
+        // verre prominent comme l'interface principale.
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                Divider()
-                Button(engine.errorMessage == nil ? "Terminer" : "Fermer sans enregistrer") {
+            EoleGlassContainer(spacing: 0) {
+                Button(engine.errorMessage == nil ? "Done" : "Close without saving") {
                     onClose()
                 }
                 .buttonStyle(.glassProminent)
                 .tint(.white.opacity(0.92))
                 .foregroundStyle(Color(hex: 0x0A5C56))
                 .controlSize(.extraLarge)
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
+                .frame(maxWidth: .infinity, minHeight: 52)
             }
-            .background(.bar)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
+            .padding(.bottom, 10)
+            .background(
+                LinearGradient(
+                    colors: [.clear, Color.black.opacity(0.35)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
         .onAppear {
             if !showResultsAnimated {
@@ -598,18 +717,17 @@ public struct ActiveSessionView: View {
                 }
             }
         }
-        // Fermeture auto si rien à montrer : un arrêt avant toute rétention
-        // ne doit pas flasher un récap vide (0 tour, graphique vide).
-        .onChange(of: engine.phase == .complete) { _, isComplete in
-            if isComplete, engine.results.isEmpty, engine.errorMessage == nil {
-                DispatchQueue.main.async { requestClose() }
-            }
-        }
+        // Plus de fermeture auto silencieuse : une séance trop courte affiche
+        // désormais un message explicite ci-dessus, l'utilisateur ferme via
+        // Terminer. Évite le ticket « ma séance n'a pas été enregistrée ».
         .onChange(of: showResultsAnimated) { _, isShown in
-            // Focus quand le reveal démarre vraiment, pas sur un délai fixe
-            // qui peut arriver avant la fin de l'orchestration.
+            // Focus quand le récap est lisible (≈0,6 s), pas au démarrage
+            // du reveal où l'en-tête est encore à opacité 0.
             if isShown {
-                isCompletionFocused = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(reduceMotion ? 0 : 0.6))
+                    isCompletionFocused = true
+                }
             }
         }
         .onChange(of: engine.errorMessage) { _, message in
@@ -631,22 +749,22 @@ public struct ActiveSessionView: View {
                 .foregroundStyle(evaluation.hasOverallRecord ? Color(hex: 0xF5C518) : Color(hex: 0x83E7DC))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(evaluation.hasOverallRecord ? "Nouveau record personnel !" : "Nouveau record de tour !")
+                Text(evaluation.hasOverallRecord ? "New personal best!" : "New round record!")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.white)
 
                 if evaluation.hasOverallRecord,
                    let bestRoundIdx = evaluation.overallRecordRoundIndex,
                    let round = engine.results.first(where: { $0.roundIndex == bestRoundIdx }) {
-                    Text("Meilleure rétention : \(formatDuration(Double(round.retentionSeconds))) (Tour \(bestRoundIdx))")
+                    Text("Best retention: \(formatDuration(Double(round.retentionSeconds))) (Round \(bestRoundIdx))")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.85))
                 } else {
                     let recordRounds = evaluation.roundEvaluations
                         .filter(\.isRoundRecord)
-                        .map { "Tour \($0.roundIndex) (\(formatDuration(Double($0.retentionSeconds))))" }
+                        .map { "Round \($0.roundIndex) (\(formatDuration(Double($0.retentionSeconds))))" }
                         .joined(separator: ", ")
-                    Text("Record battu : \(recordRounds)")
+                    Text("Record broken: \(recordRounds)")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.85))
                 }
@@ -666,21 +784,19 @@ public struct ActiveSessionView: View {
     }
 
     private func keyMetricsGrid(totalRetention: Int) -> some View {
-        HStack(spacing: 10) {
+        HStack(alignment: .top, spacing: 10) {
             metricCard(
-                title: "Temps total",
+                title: "Total time",
                 value: formatDuration(engine.totalDurationSeconds),
                 icon: "clock"
             )
             metricCard(
-                // Titre court : "Rétention totale" tronque en caption2 dans
-                // ~76 pt utiles sur 390 px.
-                title: "Rétention",
+                title: "Retention",
                 value: formatDuration(Double(totalRetention)),
                 icon: "lungs.fill"
             )
             metricCard(
-                title: "Tours",
+                title: "Rounds",
                 value: "\(engine.results.count) / \(config.rounds)",
                 icon: "arrow.triangle.2.circlepath"
             )
@@ -708,10 +824,14 @@ public struct ActiveSessionView: View {
                 .minimumScaleFactor(0.6)
                 .lineLimit(1)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
         .padding(.vertical, 12)
         .padding(.horizontal, 10)
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
         .accessibilityElement(children: .combine)
     }
 
@@ -721,19 +841,19 @@ public struct ActiveSessionView: View {
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text("Rétentions")
+                Text("Retentions")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.white)
                 Spacer()
-                Text("Temps par tour")
+                Text("Time per round")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
             }
 
-            // 8 tours max : 28 pt + 8 pt d'espacement = 280 pt, tient
-            // dans le panel utile ~318 pt sur 390 px. Plus de clip.
+            // Responsive : barres flexibles (pas de largeur fixe 28 pt qui
+            // clippe sur petits iPhones en AX5), hauteur 130 pt constante.
             HStack(alignment: .bottom, spacing: 8) {
-                ForEach(Array(engine.results.enumerated()), id: \.element.roundIndex) { index, round in
+                ForEach(Array(engine.results.enumerated()), id: \.offset) { index, round in
                     let roundEval = evaluation.roundEvaluations.first(where: { $0.roundIndex == round.roundIndex })
                     let isOverall = roundEval?.isOverallRecord == true
                     let isRoundRec = roundEval?.isRoundRecord == true
@@ -756,7 +876,7 @@ public struct ActiveSessionView: View {
                         } else {
                             Text("")
                                 .font(.caption2)
-                                .frame(height: 12)
+                                .frame(minHeight: 12)
                         }
 
                         // Durée au-dessus de la barre (colonnes ~28 pt : 1 ligne).
@@ -765,7 +885,7 @@ public struct ActiveSessionView: View {
                             .monospacedDigit()
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                            .minimumScaleFactor(0.6)
                             .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
 
                         // Barre : hauteur finale fixe, montée en scaleY ancrée
@@ -773,7 +893,8 @@ public struct ActiveSessionView: View {
                         ZStack(alignment: .bottom) {
                             Capsule()
                                 .fill(Color.white.opacity(0.12))
-                                .frame(width: 28, height: chartHeight)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: chartHeight)
 
                             Capsule()
                                 .fill(
@@ -789,7 +910,8 @@ public struct ActiveSessionView: View {
                                             endPoint: .bottom
                                         )
                                 )
-                                .frame(width: 28, height: targetBarHeight)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: targetBarHeight)
                                 .scaleEffect(
                                     x: 1,
                                     y: (showResultsAnimated || reduceMotion) ? 1 : 0.05,
@@ -807,6 +929,7 @@ public struct ActiveSessionView: View {
                                     }
                                 }
                         }
+                        .frame(maxWidth: 44)
 
                         // Libellé du tour
                         Text("R\(round.roundIndex)")
@@ -815,36 +938,44 @@ public struct ActiveSessionView: View {
 
                         // Étiquette de record sous la barre (Dynamic Type safe)
                         if isOverall {
-                            Text("Général")
+                            Text("Overall")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color(hex: 0xF5C518))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                                 .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                         } else if isRoundRec {
-                            Text("Tour")
+                            Text("Round")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color(hex: 0x83E7DC))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                                 .opacity(showResultsAnimated || reduceMotion ? 1 : 0)
                         } else {
                             Text("")
                                 .font(.caption2)
-                                .frame(height: 11)
+                                .frame(minHeight: 11)
                         }
                     }
                     .frame(maxWidth: .infinity)
                     .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Tour \(round.roundIndex) : \(formatDuration(Double(round.retentionSeconds)))\(isOverall ? ", Nouveau record personnel" : (isRoundRec ? ", Nouveau record pour le tour \(round.roundIndex)" : ""))")
+                    .accessibilityLabel("Round \(round.roundIndex): \(formatDuration(Double(round.retentionSeconds)))\(isOverall ? ", New personal best" : (isRoundRec ? ", New record for round \(round.roundIndex)" : ""))")
                 }
             }
         }
         .padding(16)
         .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: EoleRadius.md, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        }
     }
 
     private func roundDetailsList(evaluation: SessionRecordEvaluation) -> some View {
         VStack(spacing: 8) {
-            ForEach(engine.results, id: \.roundIndex) { round in
+            // Identité par position, pas par roundIndex : un historique
+            // corrompu avec deux R1 ne doit jamais crasher SwiftUI.
+            ForEach(Array(engine.results.enumerated()), id: \.offset) { _, round in
                 let roundEval = evaluation.roundEvaluations.first(where: { $0.roundIndex == round.roundIndex })
                 let isOverall = roundEval?.isOverallRecord == true
                 let isRoundRec = roundEval?.isRoundRecord == true
@@ -854,10 +985,11 @@ public struct ActiveSessionView: View {
                         Text("R\(round.roundIndex)")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
-                            .frame(width: 28, height: 24)
+                            .frame(minWidth: 28, minHeight: 24)
+                            .padding(.horizontal, 6)
                             .background(Color.white.opacity(0.15), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
 
-                        Text("\(round.breathsCompleted) respirations")
+                        Text("\(round.breathsCompleted) breaths")
                             .font(.subheadline)
                             .foregroundStyle(.white.opacity(0.85))
                             .lineLimit(1)
@@ -868,7 +1000,7 @@ public struct ActiveSessionView: View {
 
                     HStack(spacing: 8) {
                         if isOverall {
-                            Label("Record général", systemImage: "trophy.fill")
+                            Label("Overall record", systemImage: "trophy.fill")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color(hex: 0xF5C518))
                                 .lineLimit(1)
@@ -876,7 +1008,7 @@ public struct ActiveSessionView: View {
                                 .padding(.vertical, 3)
                                 .background(Color(hex: 0xF5C518).opacity(0.15), in: Capsule())
                         } else if isRoundRec {
-                            Label("Record Tour \(round.roundIndex)", systemImage: "star.fill")
+                            Label("Round \(round.roundIndex) record", systemImage: "star.fill")
                                 .font(.caption2.weight(.bold))
                                 .foregroundStyle(Color(hex: 0x83E7DC))
                                 .lineLimit(1)
@@ -901,13 +1033,6 @@ public struct ActiveSessionView: View {
     }
 
     private var retentionLabel: String {
-        formatClockDuration(engine.retentionSeconds)
-    }
-
-    /// Fermeture unique, même si alerte et auto-close tirent ensemble.
-    private func requestClose() {
-        guard !didRequestClose else { return }
-        didRequestClose = true
-        onClose()
+        formatClockDuration(engine.retentionSeconds) + (engine.retentionCapped ? "+" : "")
     }
 }

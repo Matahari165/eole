@@ -2,8 +2,13 @@
 
 ## Produit
 
-- Eole est une application native de respiration pour iPhone `390 × 844` et
-  iOS 26 uniquement.
+- Eole is a native breathing app for all iPhones supporting iOS 26 and later
+  (including iOS 27): SE to Pro Max, portrait and landscape, Dynamic Type
+  up to accessibility sizes.
+- All user-facing strings (UI, accessibility, alerts, onboarding, safety
+  notice, settings, stats, CSV headers, dates/numbers) MUST be written in
+  English. Code comments and logs may stay in French. Asset file names
+  (`eole-bambou`, pace/status raw values) must never be translated.
 - L’interface utilise les API Liquid Glass natives pour la navigation et les
   contrôles ; les surfaces de contenu restent sobres et lisibles.
 - Les séances vivent dans SwiftData et les préférences légères dans

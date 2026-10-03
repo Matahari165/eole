@@ -38,11 +38,11 @@ public struct ConfiguratorView: View {
         }
         .scrollIndicators(.hidden)
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
-        .navigationTitle("Nouvelle séance")
+        .navigationTitle("New session")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Annuler") { dismiss() }
+                Button("Cancel") { dismiss() }
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -53,8 +53,8 @@ public struct ConfiguratorView: View {
                 Button {
                     onStart(SessionConfig(rounds: rounds, breathsPerRound: breaths, pace: pace))
                 } label: {
-                    // Même verbe que l'accueil ("Commencer"), une seule action.
-                    Label("Commencer", systemImage: "play.fill")
+                    // Same verb as Home ("Start"), a single action.
+                    Label("Start", systemImage: "play.fill")
                 }
                 .buttonStyle(EolePrimaryButton())
                 .padding(.horizontal, 20)
@@ -69,27 +69,42 @@ public struct ConfiguratorView: View {
     }
 
     private var introduction: some View {
-        Text("Prépare ton rythme")
-            .font(.subheadline)
-            .foregroundStyle(Color.eoleMuted)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Set your rhythm")
+                .font(.subheadline)
+                .foregroundStyle(Color.eoleMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            // Estimation d'effort : respirations seules, apnées en plus.
+            Text("≈ \(estimatedBreathingText) of breathing + your breath-holds.")
+                .font(.footnote)
+                .foregroundStyle(Color.eoleMuted)
+                .monospacedDigit()
+        }
+    }
+
+    /// Durée des phases respiratoires seules (sans apnées ni récupérations) :
+    /// un tour = respirations × (inspire + expire), minuteur du pace.
+    private var estimatedBreathingText: String {
+        let timing = paceTiming(for: pace)
+        let seconds = Double(rounds * breaths) * (timing.inhaleSeconds + timing.exhaleSeconds)
+        return formatDuration(seconds)
     }
 
     private var configurationPanel: some View {
         EolePanel {
             VStack(alignment: .leading, spacing: 0) {
                 parameterRow(
-                    title: "Tours",
-                    hint: "De 1 à 8",
+                    title: "Rounds",
+                    hint: "From \(SessionLimits.rounds.lowerBound) to \(SessionLimits.rounds.upperBound)",
                     value: rounds,
-                    stepper: Stepper(value: $rounds, in: 1...8, step: 1) { EmptyView() }
+                    stepper: Stepper(value: $rounds, in: SessionLimits.rounds, step: 1) { EmptyView() }
                 )
                 Divider().padding(.vertical, 16)
                 parameterRow(
-                    title: "Respirations",
-                    hint: "De 10 à 60, par 5",
+                    title: "Breaths",
+                    hint: "From \(SessionLimits.breathsPerRound.lowerBound) to \(SessionLimits.breathsPerRound.upperBound), in steps of \(SessionLimits.breathStep)",
                     value: breaths,
-                    stepper: Stepper(value: $breaths, in: 10...60, step: 5) { EmptyView() }
+                    stepper: Stepper(value: $breaths, in: SessionLimits.breathsPerRound, step: SessionLimits.breathStep) { EmptyView() }
                 )
             }
         }
@@ -135,14 +150,14 @@ public struct ConfiguratorView: View {
     private var pacePanel: some View {
         EolePanel {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Cadence")
+                Text("Pace")
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Color.eoleForeground)
 
-                Picker("Cadence", selection: $pace) {
-                    Text("Lente").tag(Pace.slow)
-                    Text("Normale").tag(Pace.normal)
-                    Text("Rapide").tag(Pace.fast)
+                Picker("Pace", selection: $pace) {
+                    Text("Slow").tag(Pace.slow)
+                    Text("Normal").tag(Pace.normal)
+                    Text("Fast").tag(Pace.fast)
                 }
                 .pickerStyle(.segmented)
                 .tint(Color.eolePrimary)
@@ -152,6 +167,11 @@ public struct ConfiguratorView: View {
                 Text(paceDescription(pace))
                     .font(.footnote)
                     .foregroundStyle(Color.eoleMuted)
+                if pace == .fast {
+                    Label("Intense pace, not recommended for beginners.", systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(Color.eoleMuted)
+                }
             }
         }
     }
@@ -170,7 +190,7 @@ public struct ConfiguratorView: View {
             }
         } label: {
             Label(
-                defaultsSaved ? "Réglages par défaut enregistrés" : "Enregistrer comme réglages par défaut",
+                defaultsSaved ? "Default settings saved" : "Save as default settings",
                 systemImage: defaultsSaved ? "checkmark.circle.fill" : "bookmark"
             )
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -178,14 +198,14 @@ public struct ConfiguratorView: View {
         .font(.subheadline.weight(.medium))
         .foregroundStyle(Color.eolePrimary)
         .contentShape(Rectangle())
-        .accessibilityHint("Utilisera ces valeurs au prochain démarrage")
+        .accessibilityHint("Will use these values next time")
     }
 
     private func paceDescription(_ pace: Pace) -> String {
         switch pace {
-        case .slow: return "Inspire et expire en 3 secondes."
-        case .normal: return "Inspire et expire en 2 secondes."
-        case .fast: return "Inspire et expire en 1,25 seconde."
+        case .slow: return "Inhale and exhale over 3 seconds."
+        case .normal: return "Inhale and exhale over 2 seconds."
+        case .fast: return "Inhale and exhale over 1.25 seconds."
         }
     }
 }

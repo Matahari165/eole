@@ -27,6 +27,8 @@ public final class EoleAudioEngine {
     }
 
     private var cuePlayer: AVAudioPlayerNode?
+    private var cuePlayerAlt: AVAudioPlayerNode?
+    private var useAltCueNode = false
     private var assetPreparationTask: Task<Void, Never>?
     private var playerPreparationTask: Task<PreparedPlayers, Never>?
     private var tonePreparationTask: Task<[String: [Float]], Never>?
@@ -38,6 +40,9 @@ public final class EoleAudioEngine {
     /// Relance d'ambiance après reconstruction du graphe : stockée pour
     /// être annulable par release(), sinon réveil après arrêt.
     private var rebuildAmbientTask: Task<Void, Never>?
+    /// Second dong de fin de séance : annulable par release() si l'écran
+    /// est fermé avant 1,15 s, pour ne pas rejouer sur un moteur arrêté.
+    private var completionTask: Task<Void, Never>?
 
     private struct ToneSpec: Sendable {
         let key: String
@@ -46,26 +51,34 @@ public final class EoleAudioEngine {
         let level: Double
         let harmonics: [Double]
         let decayRate: Double
+        let attackSeconds: Double
+        let releaseSeconds: Double
 
-        // Clarté
-        static let cueClarte480 = ToneSpec(key: "cue-clarte-480", frequency: 480, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8)
-        static let cueClarte540 = ToneSpec(key: "cue-clarte-540", frequency: 540, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8)
-        static let cueClarte620 = ToneSpec(key: "cue-clarte-620", frequency: 620, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8)
-        static let dingClarte = ToneSpec(key: "ding-clarte", frequency: 216, seconds: 6.5, level: 0.48, harmonics: [1, 2.4, 3.9], decayRate: 0.8)
-        static let softDingClarte = ToneSpec(key: "softding-clarte", frequency: 528, seconds: 0.85, level: 0.38, harmonics: [1, 2.76, 5.4], decayRate: 3.2)
-        static let previewClarte = ToneSpec(key: "preview-clarte", frequency: 216, seconds: 2.8, level: 0.48, harmonics: [1, 2.4, 3.9], decayRate: 1.2)
+        // Clarté — cues courts et présents
+        static let cueClarte480 = ToneSpec(key: "cue-clarte-480", frequency: 480, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8, attackSeconds: 0.015, releaseSeconds: 0.08)
+        static let cueClarte540 = ToneSpec(key: "cue-clarte-540", frequency: 540, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8, attackSeconds: 0.015, releaseSeconds: 0.08)
+        static let cueClarte620 = ToneSpec(key: "cue-clarte-620", frequency: 620, seconds: 0.62, level: 0.42, harmonics: [1], decayRate: 1.8, attackSeconds: 0.015, releaseSeconds: 0.08)
+        // Dongs de rétention : graves, doux, méditatifs — juste assez forts.
+        // Fréquences abaissées, harmoniques hautes retirées (moins "téléphone"),
+        // attaque douce 45 ms, niveau réduit pour rester sous la musique.
+        static let dingClarte = ToneSpec(key: "ding-clarte", frequency: 196, seconds: 5.0, level: 0.36, harmonics: [1, 2.01, 2.99], decayRate: 0.85, attackSeconds: 0.045, releaseSeconds: 0.45)
+        static let softDingClarte = ToneSpec(key: "softding-clarte", frequency: 528, seconds: 0.85, level: 0.36, harmonics: [1, 2.76, 5.4], decayRate: 3.2, attackSeconds: 0.025, releaseSeconds: 0.18)
+        static let previewClarte = ToneSpec(key: "preview-clarte", frequency: 196, seconds: 2.8, level: 0.38, harmonics: [1, 2.01, 2.99], decayRate: 1.0, attackSeconds: 0.035, releaseSeconds: 0.35)
+        // Fin de séance : dong distinct, minimaliste, même famille méditative.
+        static let completionClarte = ToneSpec(key: "completion-clarte", frequency: 324, seconds: 4.2, level: 0.36, harmonics: [1, 2.0, 2.99], decayRate: 0.7, attackSeconds: 0.05, releaseSeconds: 0.6)
 
-        // Bols tibétains
-        static let cueTibetan396 = ToneSpec(key: "cue-tibetan-396", frequency: 396, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4)
-        static let cueTibetan432 = ToneSpec(key: "cue-tibetan-432", frequency: 432, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4)
-        static let cueTibetan528 = ToneSpec(key: "cue-tibetan-528", frequency: 528, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4)
-        static let dingTibetan = ToneSpec(key: "ding-tibetan", frequency: 174, seconds: 7.5, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.42)
-        static let softDingTibetan = ToneSpec(key: "softding-tibetan", frequency: 704, seconds: 0.85, level: 0.40, harmonics: [1, 2.02, 3.15], decayRate: 2.6)
-        static let previewTibetan = ToneSpec(key: "preview-tibetan", frequency: 174, seconds: 3.2, level: 0.52, harmonics: [1, 2.78, 5.42, 8.16], decayRate: 0.8)
+        // Bols tibétains — dongs graves
+        static let cueTibetan396 = ToneSpec(key: "cue-tibetan-396", frequency: 396, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4, attackSeconds: 0.015, releaseSeconds: 0.1)
+        static let cueTibetan432 = ToneSpec(key: "cue-tibetan-432", frequency: 432, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4, attackSeconds: 0.015, releaseSeconds: 0.1)
+        static let cueTibetan528 = ToneSpec(key: "cue-tibetan-528", frequency: 528, seconds: 0.95, level: 0.42, harmonics: [1, 2.05], decayRate: 1.4, attackSeconds: 0.015, releaseSeconds: 0.1)
+        static let dingTibetan = ToneSpec(key: "ding-tibetan", frequency: 164, seconds: 5.5, level: 0.38, harmonics: [1, 2.02, 2.94], decayRate: 0.55, attackSeconds: 0.05, releaseSeconds: 0.5)
+        static let softDingTibetan = ToneSpec(key: "softding-tibetan", frequency: 704, seconds: 0.85, level: 0.38, harmonics: [1, 2.02, 3.15], decayRate: 2.6, attackSeconds: 0.025, releaseSeconds: 0.18)
+        static let previewTibetan = ToneSpec(key: "preview-tibetan", frequency: 164, seconds: 3.2, level: 0.40, harmonics: [1, 2.02, 2.94], decayRate: 0.7, attackSeconds: 0.04, releaseSeconds: 0.4)
+        static let completionTibetan = ToneSpec(key: "completion-tibetan", frequency: 258, seconds: 5.0, level: 0.38, harmonics: [1, 2.02, 3.01], decayRate: 0.55, attackSeconds: 0.055, releaseSeconds: 0.65)
 
         static let allSpecs: [ToneSpec] = [
-            cueClarte480, cueClarte540, cueClarte620, dingClarte, softDingClarte, previewClarte,
-            cueTibetan396, cueTibetan432, cueTibetan528, dingTibetan, softDingTibetan, previewTibetan
+            cueClarte480, cueClarte540, cueClarte620, dingClarte, softDingClarte, previewClarte, completionClarte,
+            cueTibetan396, cueTibetan432, cueTibetan528, dingTibetan, softDingTibetan, previewTibetan, completionTibetan
         ]
     }
     private var engineReady = false
@@ -207,6 +220,8 @@ public final class EoleAudioEngine {
         assetPreparationTask = nil
         rebuildAmbientTask?.cancel()
         rebuildAmbientTask = nil
+        completionTask?.cancel()
+        completionTask = nil
         playerPreparationTask?.cancel()
         playerPreparationTask = nil
         tonePreparationTask?.cancel()
@@ -220,6 +235,9 @@ public final class EoleAudioEngine {
         duckingTask = nil
         cuePlayer?.stop()
         cuePlayer = nil
+        cuePlayerAlt?.stop()
+        cuePlayerAlt = nil
+        useAltCueNode = false
         engine.stop()
         // Recréer le graphe après l'arrêt évite l'assertion native detachNode:
         // un lecteur peut avoir quitté la chaîne de sortie entre deux callbacks.
@@ -256,26 +274,30 @@ public final class EoleAudioEngine {
         }
     }
 
-    // MARK: - Ambiance (boucle, ducking sous les guides)
+    // MARK: - Ambiance (boucle, volume constant)
 
-    public func startAmbient(track: BreathMusicTrack) {
+    @discardableResult
+    public func startAmbient(track: BreathMusicTrack) -> Bool {
         // Un aperçu des Réglages ne doit jamais continuer sous la séance.
         stopPreview()
-        guard musicVolume > 0 else { return }
-        if ambientTrack == track, ambientPlayer?.isPlaying == true { return }
+        // Volume à 0 = choix utilisateur, pas un échec : séance visuelle
+        // volontaire, on retourne succès pour ne pas afficher d'alerte.
+        guard musicVolume > 0 else { return true }
+        if ambientTrack == track, ambientPlayer?.isPlaying == true { return true }
         stopAmbient(fadeSeconds: 0)
         let name = ambientFileName(for: track)
-        guard let player = preparedAmbientPlayers[name] else { return }
+        guard let player = preparedAmbientPlayers[name] else { return false }
         player.stop()
         player.currentTime = 0
         player.numberOfLoops = -1
         player.volume = ambientLevel()
-        guard player.play() else { return }
+        guard player.play() else { return false }
         ambientPlayer = player
         ambientTrack = track
+        return true
     }
 
-    public func stopAmbient(fadeSeconds: Double = 0.85) {
+    public func stopAmbient(fadeSeconds: Double = EoleAudioFade.stop) {
         ambientFadeTask?.cancel()
         ambientFadeTask = nil
         duckingTask?.cancel()
@@ -302,7 +324,7 @@ public final class EoleAudioEngine {
     }
 
     /// Met en pause la musique d'ambiance avec un fondu doux.
-    public func pauseAmbient(fadeSeconds: Double = 0.4) {
+    public func pauseAmbient(fadeSeconds: Double = EoleAudioFade.pause) {
         ambientFadeTask?.cancel()
         ambientFadeTask = nil
         duckingTask?.cancel()
@@ -327,22 +349,31 @@ public final class EoleAudioEngine {
     }
 
     /// Reprend la musique d'ambiance avec un fondu montant doux.
-    public func resumeAmbient(fadeSeconds: Double = 0.6) {
+    /// Retourne faux si la reprise échoue (l'appelant décide d'avertir).
+    /// Si l'ambiance joue déjà au bon niveau, ne fait rien (pas de
+    /// remontée auto : le volume reste constant toute la séance).
+    @discardableResult
+    public func resumeAmbient(fadeSeconds: Double = EoleAudioFade.resume) -> Bool {
         ambientFadeTask?.cancel()
         ambientFadeTask = nil
         duckingTask?.cancel()
         duckingTask = nil
-        guard musicVolume > 0 else { return }
+        // Volume à 0 = choix utilisateur, pas un échec (cf. startAmbient).
+        guard musicVolume > 0 else { return true }
         let targetVolume = ambientLevel()
         if let player = ambientPlayer {
+            if player.isPlaying, abs(player.volume - targetVolume) < 0.01 {
+                return true
+            }
             if !player.isPlaying {
                 player.volume = 0
-                guard player.play() else { return }
+                guard player.play() else { return false }
             }
             if fadeSeconds <= 0 {
                 player.volume = targetVolume
-                return
+                return true
             }
+            let startVolume = player.isPlaying ? player.volume : 0
             let steps = 10
             ambientFadeTask = Task { @MainActor [weak player] in
                 for step in 1...steps {
@@ -350,25 +381,28 @@ public final class EoleAudioEngine {
                         try await Task.sleep(for: .seconds(fadeSeconds / Double(steps)))
                     } catch { return }
                     guard !Task.isCancelled else { return }
-                    player?.volume = targetVolume * Float(Double(step) / Double(steps))
+                    let t = Float(Double(step) / Double(steps))
+                    player?.volume = startVolume + (targetVolume - startVolume) * t
                 }
                 player?.volume = targetVolume
             }
         } else if let track = ambientTrack {
-            startAmbient(track: track)
+            return startAmbient(track: track)
         } else {
-            startAmbient(track: musicTrack)
+            return startAmbient(track: musicTrack)
         }
+        return true
     }
 
-    /// Réduit temporairement l'ambiance sous les sons-guides.
+    /// Volontairement sans ducking : la musique de fond garde un volume
+    /// constant pendant toute la séance (pas de baisse ni de remontée auto).
+    /// Conservé pour compatibilité d'API — ne fait rien.
     public func duckAmbient(depth: Float = 0.6) {
-        // La profondeur est transmise directement, et non son complément.
-        ambientPlayer?.volume = ambientLevel() * max(0, min(1, depth))
     }
 
+    /// Conservé pour compatibilité : ne remonte jamais le volume
+    /// automatiquement (cf. duckAmbient).
     public func restoreAmbient() {
-        ambientPlayer?.volume = ambientLevel()
     }
 
     private func ambientLevel() -> Float {
@@ -379,23 +413,16 @@ public final class EoleAudioEngine {
 
     public func playBreath(inhale: Bool, duration: Double) {
         guard breathVolume > 0 else { return }
-        duckAmbient(depth: 0.68)
-        // Les guides sont obligatoirement préparés avant le compte à rebours.
-        // Si un asset manque ou n'est pas prêt, rester silencieux évite tout
-        // décodage synchrone et laisse la séance visuelle continuer.
-        _ = playRecordedBreath(inhale: inhale, duration: duration)
-        restoreAfter(duration)
+        // Pas de ducking : l'ambiance reste constante, le guide démarre
+        // en fondu doux (0,35 s) pour un chevauchement apaisé.
+        if !playRecordedBreath(inhale: inhale, duration: duration) {
+            onBreathGuideFailed?()
+        }
     }
 
     private func restoreAfter(_ seconds: Double) {
-        duckingTask?.cancel()
-        duckingTask = Task { @MainActor [weak self] in
-            do {
-                try await Task.sleep(for: .seconds(max(0, seconds + 0.15)))
-            } catch { return }
-            guard !Task.isCancelled else { return }
-            self?.restoreAmbient()
-        }
+        // Plus de ducking donc plus de restauration auto : la musique ne
+        // baisse ni ne remonte jamais seule. Conservé en no-op.
     }
 
     /// Sélectionne la variante audio la plus proche de la durée cible.
@@ -409,18 +436,24 @@ public final class EoleAudioEngine {
         let name = inhale ? "eole-inhale-\(variant)" : "eole-exhale-\(variant)"
         guard bundleAudioURL(named: name) != nil,
               let player = preparedBreathPlayers[name] else { return false }
-        player.stop()
-        player.currentTime = 0
-        player.volume = Float(breathVolume) / 100
-        return player.play()
+        let target = Float(breathVolume) / 100
+        // Fondu d'entrée doux : évite le "mélange" brutal quand le guide
+        // démarre sur la fin d'un dong (fin de rétention → récupération).
+        if player.isPlaying {
+            player.stop()
+            player.currentTime = 0
+        }
+        player.volume = 0
+        guard player.play() else { return false }
+        player.setVolume(target, fadeDuration: 0.35)
+        return true
     }
 
     // MARK: - Cues
 
-    /// Guide sonore court.
+    /// Guide sonore court — sans ducking, volume d'ambiance constant.
     public func playCue(frequency: Double = 520) {
         guard breathVolume > 0 else { return }
-        duckAmbient(depth: 0.58)
         let spec: ToneSpec
         if bellStyle == .tibetan {
             if frequency <= 480 {
@@ -440,25 +473,40 @@ public final class EoleAudioEngine {
             }
         }
         playTone(spec: spec)
-        restoreAfter(spec.seconds)
     }
 
-    /// Son de fin de rétention ou jalon de minute avec résonance profonde.
+    /// Dong de rétention ou jalon de minute : grave, doux, méditatif.
+    /// Volume constant de l'ambiance — le dong est timbré pour percer
+    /// juste assez, sans ducking.
     public func playDing() {
         guard breathVolume > 0 else { return }
-        duckAmbient(depth: 0.48)
         let spec = (bellStyle == .tibetan) ? ToneSpec.dingTibetan : ToneSpec.dingClarte
         playTone(spec: spec)
-        restoreAfter(spec.seconds)
     }
 
     /// Indication sonore méditative pour le compte à rebours de récupération (3, 2, 1).
     public func playSoftDing() {
         guard breathVolume > 0 else { return }
-        duckAmbient(depth: 0.78)
         let spec = (bellStyle == .tibetan) ? ToneSpec.softDingTibetan : ToneSpec.softDingClarte
         playTone(spec: spec)
-        restoreAfter(spec.seconds)
+    }
+
+    /// Son de fin de séance : double dong minimaliste, distinct du dong de
+    /// rétention (fréquence plus haute, même famille méditative). Sans
+    /// ducking — l'ambiance s'estompe séparément en fondu long.
+    public func playSessionComplete() {
+        guard breathVolume > 0 else { return }
+        let spec = (bellStyle == .tibetan) ? ToneSpec.completionTibetan : ToneSpec.completionClarte
+        playTone(spec: spec)
+        completionTask?.cancel()
+        completionTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(1.15))
+            guard !Task.isCancelled else { return }
+            guard let self, self.breathVolume > 0 else { return }
+            // Second nœud : chevauchement naturel avec la résonance,
+            // pas de coupure du premier dong.
+            self.playTone(spec: spec)
+        }
     }
 
     // MARK: - Aperçus sonores (Réglages)
@@ -496,7 +544,9 @@ public final class EoleAudioEngine {
         guard let url = bundleAudioURL(named: name),
               let player = try? AVAudioPlayer(contentsOf: url) else { return }
 
-        let targetVol = min(1.0, Float(musicVolume) / 100.0)
+        // Même niveau qu'en séance (ducking 0.85) : l'aperçu ne doit pas
+        // sembler plus fort que le vrai fond sonore.
+        let targetVol = Float(musicVolume) / 100 * 0.85
         player.volume = targetVol
         guard player.play() else { return }
         previewAmbientPlayer = player
@@ -522,10 +572,7 @@ public final class EoleAudioEngine {
         previewAmbientPlayer?.stop()
         previewAmbientPlayer = nil
         cuePlayer?.stop()
-    }
-
-    public var isPreviewingAmbient: Bool {
-        previewAmbientPlayer?.isPlaying == true
+        cuePlayerAlt?.stop()
     }
 
     nonisolated private static func generateToneSamples(spec: ToneSpec, sampleRate: Double, volume: Double) -> [Float] {
@@ -534,8 +581,8 @@ public final class EoleAudioEngine {
         let harmonicWeight = max(1.0, spec.harmonics.indices.map { 1.0 / Double($0 + 2) }.reduce(0, +))
         for index in 0..<frames {
             let t = Double(index) / sampleRate
-            let attack = min(1.0, t / 0.015)
-            let release = min(1.0, max(0.0, (spec.seconds - t) / 0.05))
+            let attack = min(1.0, t / max(0.005, spec.attackSeconds))
+            let release = min(1.0, max(0.0, (spec.seconds - t) / max(0.02, spec.releaseSeconds)))
             let envelope = attack * release * exp(-t * spec.decayRate)
             var sample = 0.0
             for (harmonicIndex, ratio) in spec.harmonics.enumerated() {
@@ -579,16 +626,31 @@ public final class EoleAudioEngine {
         }
 
         guard let buffer = makeBuffer(samples: samples, format: format) else { return }
+        // Double nœud en alternance : un nouveau dong ne coupe jamais la
+        // résonance du précédent (fin de rétention → cue, double dong final).
+        // Chevauchement méditatif naturel au lieu d'un stop brutal.
+        useAltCueNode.toggle()
         let player: AVAudioPlayerNode
-        if let cuePlayer {
-            player = cuePlayer
-            player.stop()
+        if useAltCueNode {
+            if let existing = cuePlayerAlt {
+                player = existing
+            } else {
+                let newPlayer = AVAudioPlayerNode()
+                engine.attach(newPlayer)
+                engine.connect(newPlayer, to: engine.mainMixerNode, format: format)
+                cuePlayerAlt = newPlayer
+                player = newPlayer
+            }
         } else {
-            let newPlayer = AVAudioPlayerNode()
-            engine.attach(newPlayer)
-            engine.connect(newPlayer, to: engine.mainMixerNode, format: format)
-            cuePlayer = newPlayer
-            player = newPlayer
+            if let existing = cuePlayer {
+                player = existing
+            } else {
+                let newPlayer = AVAudioPlayerNode()
+                engine.attach(newPlayer)
+                engine.connect(newPlayer, to: engine.mainMixerNode, format: format)
+                cuePlayer = newPlayer
+                player = newPlayer
+            }
         }
         player.scheduleBuffer(buffer, at: nil, options: .interrupts)
         player.play()
@@ -714,6 +776,13 @@ public final class EoleAudioEngine {
         rebuildEngine()
     }
 
+    /// Appelé sur interruption audio entrante (appel, alarme) : la séance
+    /// décide (avertissement, pas d'arrêt automatique = pas de perte d'effort).
+    public var onInterruptionBegan: (() -> Void)?
+    /// Appelé quand un guide respiratoire ne peut pas être joué (asset
+    /// manquant/non prêt) : la séance affiche un avertissement unique.
+    public var onBreathGuideFailed: (() -> Void)?
+
     private func handleInterruption(rawValue: UInt) {
         guard let type = AVAudioSession.InterruptionType(rawValue: rawValue) else { return }
         if type == .ended, isUnlocked {
@@ -724,8 +793,10 @@ public final class EoleAudioEngine {
             preparedAmbientPlayers.values.forEach { $0.stop() }
             preparedBreathPlayers.values.forEach { $0.stop() }
             cuePlayer?.stop()
+            cuePlayerAlt?.stop()
             engine.stop()
             engineReady = false
+            onInterruptionBegan?()
         }
     }
 
@@ -756,6 +827,9 @@ public final class EoleAudioEngine {
         preparedBreathPlayers.values.forEach { $0.stop() }
         cuePlayer?.stop()
         cuePlayer = nil
+        cuePlayerAlt?.stop()
+        cuePlayerAlt = nil
+        useAltCueNode = false
         engine.stop()
         // AVAudioEngine n'est pas garanti réutilisable après un reset des
         // services médias : recréer l'instance reconstruit aussi son graphe.

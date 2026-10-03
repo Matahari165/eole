@@ -24,11 +24,9 @@ public struct SessionConfig: Codable, Sendable, Equatable {
     }
 }
 
-/// Identité unique d'un lancement de séance.
-///
-/// L'écran plein format dépend de cet objet unique : il ne peut donc jamais
-/// être présenté sans sa configuration, même lors de deux lancements
-/// successifs avec exactement les mêmes réglages.
+/// Identité d'un lancement de séance : porte la configuration vers l'écran
+/// plein format, y compris pour deux lancements successifs identiques.
+/// L'UUID distingue les lancements en mémoire ; il n'est pas persisté ni lu.
 public struct SessionLaunch: Identifiable, Sendable, Equatable {
     public let id: UUID
     public let config: SessionConfig
@@ -113,8 +111,12 @@ public struct SoundSettings: Codable, Sendable, Equatable {
 
 public let defaultSessionConfig = SessionConfig(rounds: 3, breathsPerRound: 35, pace: .normal)
 
+/// Vibrations activées par défaut : le signal haptique double le repère
+/// sonore (rétention terminée inaudible si le son est à 0). Les installs
+/// existantes gardent leur choix stocké ; seules les valeurs illisibles
+/// retombent sur ce défaut.
 public let defaultSoundSettings = SoundSettings(
-    musicTrack: .bambou, musicVolume: 32, breathVolume: 72, hapticsEnabled: false, bellStyle: .clarte
+    musicTrack: .bambou, musicVolume: 32, breathVolume: 72, hapticsEnabled: true, bellStyle: .clarte
 )
 
 public struct PaceTiming: Sendable, Equatable {

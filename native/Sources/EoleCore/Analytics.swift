@@ -114,7 +114,7 @@ public func calculateRoundStats(_ sessions: [BreathSession]) -> [RoundPalierStat
 
 public func buildDailySeries(_ sessions: [BreathSession], days: Int, today: Date = Date()) -> [DailyPoint] {
     let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "fr_FR")
+    formatter.locale = Locale(identifier: "en_US")
     if days <= 7 {
         formatter.setLocalizedDateFormatFromTemplate("EEE")
     } else {
@@ -178,19 +178,19 @@ public func nextMilestone(after maxRetention: Int) -> Int {
     ((maxRetention + 1 + 14) / 15) * 15
 }
 
-/// Libellé temporel pour la dernière séance : "Aujourd’hui" si la séance s'est
-/// terminée le jour même, ou date formatée standard.
+/// Time label for the latest session: "Today" if the session ended the same
+/// day, otherwise a standard formatted date.
 public func formatLatestSessionDate(
     _ dateString: String,
     today: Date = Date(),
     calendar: Calendar = .current,
-    locale: Locale = Locale(identifier: "fr_FR")
+    locale: Locale = Locale(identifier: "en_US")
 ) -> String {
     guard let date = parseDate(dateString) else {
         return String(dateString.prefix(10))
     }
     if calendar.isDate(date, inSameDayAs: today) {
-        return "Aujourd’hui"
+        return "Today"
     }
     let formatter = DateFormatter()
     formatter.locale = locale

@@ -96,19 +96,19 @@ struct EoleCoreVerify {
         check(formatClockDuration(65) == "1:05", "formatClockDuration(65)")
         check(formatClockDuration(120) == "2:00", "formatClockDuration(120)")
 
-        // Date de dernière séance ("Aujourd’hui" si jour même)
+        // Last-session date ("Today" if same day)
         var utcCalendar = Calendar(identifier: .gregorian)
         utcCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
         let utcToday = utcCalendar.date(from: DateComponents(year: 2026, month: 8, day: 7, hour: 12))!
         let todaySession = "2026-08-07T14:30:00.000Z"
         let pastSession = "2026-08-06T14:30:00.000Z"
         check(
-            formatLatestSessionDate(todaySession, today: utcToday, calendar: utcCalendar) == "Aujourd’hui",
-            "formatLatestSessionDate aujourd’hui → 'Aujourd’hui'"
+            formatLatestSessionDate(todaySession, today: utcToday, calendar: utcCalendar) == "Today",
+            "formatLatestSessionDate today → 'Today'"
         )
         check(
-            formatLatestSessionDate(pastSession, today: utcToday, calendar: utcCalendar) != "Aujourd’hui",
-            "formatLatestSessionDate jour antérieur → pas 'Aujourd’hui'"
+            formatLatestSessionDate(pastSession, today: utcToday, calendar: utcCalendar) != "Today",
+            "formatLatestSessionDate earlier day → not 'Today'"
         )
         check(
             formatLatestSessionDate("invalide", today: utcToday, calendar: utcCalendar) == "invalide",
@@ -126,7 +126,7 @@ struct EoleCoreVerify {
             ]
         )
         let csv = buildSessionsCsv([csvSession])
-        check(csv.hasPrefix("\u{FEFF}session_id;statut"), "CSV BOM + en-tête")
+        check(csv.hasPrefix("\u{FEFF}session_id;status"), "CSV BOM + header")
         check(csv.components(separatedBy: "\r\n").count == 4, "CSV 2 lignes + fin")
         check(csv.contains(";1;35;62\r\n"), "CSV ligne round 1")
         check(csv.contains(";2;35;75\r\n"), "CSV ligne round 2")

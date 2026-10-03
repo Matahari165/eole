@@ -24,7 +24,7 @@ public struct HomeView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Aujourd’hui")
+                Text("Today")
                     .font(.eoleDisplay)
                     .foregroundStyle(Color.eoleForeground)
                     .accessibilityAddTraits(.isHeader)
@@ -96,7 +96,7 @@ public struct HomeView: View {
                                 Circle().stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
                             }
                             .accessibilityHidden(true)
-                        Text("Ta prochaine séance")
+                        Text("Your next session")
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(Color.eoleForeground)
                     }
@@ -105,7 +105,7 @@ public struct HomeView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "drop.fill")
                                 .font(.caption.weight(.semibold))
-                            Text("\(stats.currentStreak) j")
+                            Text("\(stats.currentStreak)d")
                                 .font(.caption.weight(.bold))
                         }
                         .foregroundStyle(Color.eolePrimary)
@@ -115,30 +115,43 @@ public struct HomeView: View {
                         .overlay {
                             Capsule().stroke(Color.eoleBorder.opacity(0.5), lineWidth: 0.5)
                         }
-                        .accessibilityLabel("Série en cours : \(stats.currentStreak) jours")
+                        .accessibilityLabel("Current streak: \(stats.currentStreak) days, counted in local days")
                     }
                 }
+                Text("Streak counted in local days.")
+                    .font(.caption2)
+                    .foregroundStyle(Color.eoleMuted)
 
-                HStack(spacing: 8) {
-                    configTag("\(defaults.rounds) tours", icon: "arrow.triangle.2.circlepath")
-                    configTag("\(defaults.breathsPerRound) respirations", icon: "lungs.fill")
-                    configTag(paceLabel(defaults.pace), icon: "metronome.fill")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        configTag("\(defaults.rounds) rounds", icon: "arrow.triangle.2.circlepath")
+                        configTag("\(defaults.breathsPerRound) breaths", icon: "lungs.fill")
+                        configTag(paceLabel(defaults.pace), icon: "metronome.fill")
+                    }
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            configTag("\(defaults.rounds) rounds", icon: "arrow.triangle.2.circlepath")
+                            configTag("\(defaults.breathsPerRound) breaths", icon: "lungs.fill")
+                        }
+                        configTag(paceLabel(defaults.pace), icon: "metronome.fill")
+                            .frame(maxWidth: .infinity)
+                    }
                 }
                 .accessibilityElement(children: .combine)
 
                 EoleGlassContainer(spacing: EoleSpacing.sm) {
                     HStack(spacing: EoleSpacing.sm) {
                         Button { onStart(defaults) } label: {
-                            Label("Commencer", systemImage: "play.fill")
+                            Label("Start", systemImage: "play.fill")
                         }
                         .buttonStyle(EolePrimaryButton())
-                        .accessibilityHint("Démarre avec les réglages affichés")
+                        .accessibilityHint("Starts with the settings shown")
 
                         Button { onAdjust() } label: {
                             Image(systemName: "slider.horizontal.3")
                         }
                         .buttonStyle(EoleGlassIconButtonStyle())
-                        .accessibilityLabel("Ajuster la séance")
+                        .accessibilityLabel("Adjust session")
                     }
                 }
             }
@@ -168,12 +181,12 @@ public struct HomeView: View {
         EolePanel {
             VStack(alignment: .leading, spacing: 14) {
                 EoleSectionHeader(
-                    "Tes repères apparaîtront ici",
-                    subtitle: "Après ta première séance, tu retrouveras ta rétention, ta régularité et ton historique.",
+                    "Your milestones will appear here",
+                    subtitle: "After your first session, you'll find your retention, consistency, and history here.",
                     systemImage: "chart.line.uptrend.xyaxis"
                 )
-                // Secondaire : "Commencer" reste l'action primaire unique.
-                Button("Préparer une séance") { onAdjust() }
+                // Secondary: "Start" stays the single primary action.
+                Button("Prepare a session") { onAdjust() }
                     .buttonStyle(.bordered)
                     .tint(Color.eolePrimary)
                     .controlSize(.large)
@@ -184,7 +197,7 @@ public struct HomeView: View {
 
     private func metrics(_ stats: SessionStats) -> some View {
         VStack(alignment: .leading, spacing: EoleSpacing.md) {
-            EoleSectionHeader("Tes repères")
+            EoleSectionHeader("Your milestones")
             // Alignement haut : en AX5 une tuile à 2 lignes ne tasse pas l'autre.
             HStack(alignment: .top, spacing: 12) {
                 EolePanel(padding: 16) {
@@ -205,7 +218,7 @@ public struct HomeView: View {
                             .minimumScaleFactor(0.8)
 
                         let next = nextMilestone(after: stats.maxRetention)
-                        Text("Prochain palier : \(formatDuration(Double(next)))")
+                        Text("Next milestone: \(formatDuration(Double(next)))")
                             .font(.caption2)
                             .foregroundStyle(Color.eolePrimary)
                             .lineLimit(2)
@@ -220,7 +233,7 @@ public struct HomeView: View {
                             Image(systemName: "chart.line.uptrend.xyaxis")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(Color.eoleSecondary)
-                            Text("Moyenne")
+                            Text("Average")
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(Color.eoleMuted)
                         }
@@ -231,7 +244,7 @@ public struct HomeView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
 
-                        Text("\(stats.totalRounds) tours au total")
+                        Text("\(stats.totalRounds) rounds total")
                             .font(.caption2)
                             .foregroundStyle(Color.eoleMuted)
                             .lineLimit(2)
@@ -248,16 +261,16 @@ public struct HomeView: View {
         let maxRetention = max(1, session.rounds.map(\.retentionSeconds).max() ?? 1)
 
         return VStack(alignment: .leading, spacing: EoleSpacing.md) {
-            EoleSectionHeader("Dernière séance", subtitle: formatSessionDate(session.completedAt))
+            EoleSectionHeader("Last session", subtitle: formatSessionDate(session.completedAt))
             EolePanel {
                 VStack(alignment: .leading, spacing: EoleSpacing.md) {
                     HStack {
-                        Text("\(session.rounds.count) tours")
+                        Text("\(session.rounds.count) rounds")
                             .font(.caption.weight(.medium))
                             .foregroundStyle(Color.eoleMuted)
                             .lineLimit(1)
                         Spacer()
-                        Text("Rétention cumulée : \(formatDuration(Double(totalRetention)))")
+                        Text("Total retention: \(formatDuration(Double(totalRetention)))")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Color.eolePrimary)
                             .lineLimit(1)
@@ -265,14 +278,15 @@ public struct HomeView: View {
                     }
 
                     HStack(alignment: .bottom, spacing: 10) {
-                        ForEach(Array(session.rounds.enumerated()), id: \.element.roundIndex) { index, round in
+                        ForEach(Array(session.rounds.enumerated()), id: \.offset) { index, round in
                             VStack(spacing: 6) {
                                 let ratio = CGFloat(round.retentionSeconds) / CGFloat(maxRetention)
                                 // Hauteur finale fixe + montée scaleY : pas de
                                 // relayout du HStack à 60 img/s pendant 0,9 s.
                                 RoundedRectangle(cornerRadius: 3, style: .continuous)
                                     .fill(Color.eolePrimary.opacity(0.85))
-                                    .frame(width: 24, height: max(8, 68 * ratio))
+                                    .frame(maxWidth: 24)
+                                    .frame(height: max(8, 68 * ratio))
                                     .scaleEffect(
                                         y: (reduceMotion || barsAppeared) ? 1 : 0.05,
                                         anchor: .bottom
@@ -300,7 +314,7 @@ public struct HomeView: View {
                     .padding(.top, 4)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Dernière séance : \(session.rounds.count) tours, rétention cumulée \(formatDuration(Double(totalRetention)))")
+                .accessibilityLabel("Last session: \(session.rounds.count) rounds, total retention \(formatDuration(Double(totalRetention)))")
             }
         }
     }
@@ -311,9 +325,9 @@ public struct HomeView: View {
 
     private func paceLabel(_ pace: Pace) -> String {
         switch pace {
-        case .slow: return "Lente"
-        case .normal: return "Normale"
-        case .fast: return "Rapide"
+        case .slow: return "Slow"
+        case .normal: return "Normal"
+        case .fast: return "Fast"
         }
     }
 }

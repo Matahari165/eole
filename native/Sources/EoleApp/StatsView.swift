@@ -15,6 +15,7 @@ public struct StatsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.sizeCategory) private var sizeCategory
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var days = 30
     @State private var showAllHistory = false
     @State private var selectedDay: String?
@@ -27,14 +28,14 @@ public struct StatsView: View {
 
     private static let shortDayFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.setLocalizedDateFormatFromTemplate("EEE")
         return formatter
     }()
 
     private static let dayMonthFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "fr_FR")
+        formatter.locale = Locale(identifier: "en_US")
         formatter.setLocalizedDateFormatFromTemplate("d MMM")
         return formatter
     }()
@@ -51,7 +52,7 @@ public struct StatsView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Progrès")
+                Text("Progress")
                     .font(.eoleDisplay)
                     .foregroundStyle(Color.eoleForeground)
                     .accessibilityAddTraits(.isHeader)
@@ -64,6 +65,11 @@ public struct StatsView: View {
                 header
                 if stats.sessionCount == 0 {
                     emptyState
+                    if store.rejectedCount > 0 {
+                        Text("\(store.rejectedCount) session(s) skipped: unreadable data.")
+                            .font(.footnote)
+                            .foregroundStyle(Color.eoleMuted)
+                    }
                 } else {
                     primaryMetric(stats)
                     secondaryMetrics(stats)
@@ -92,33 +98,33 @@ public struct StatsView: View {
                 }
             }
         }
-        .alert("Supprimer cette séance ?", isPresented: Binding(
+        .alert("Delete this session?", isPresented: Binding(
             get: { sessionToDelete != nil },
             set: { if !$0 { sessionToDelete = nil } }
         )) {
-            Button("Annuler", role: .cancel) {}
-            Button("Supprimer", role: .destructive) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
                 if let sessionToDelete {
                     let label = formatSessionDate(sessionToDelete.completedAt)
                     store.deleteSession(id: sessionToDelete.id)
                     // VoiceOver : le focus perd sa ligne, annonce explicite.
                     #if os(iOS)
-                    UIAccessibility.post(notification: .announcement, argument: "Séance du \(label) supprimée.")
+                    UIAccessibility.post(notification: .announcement, argument: "Session from \(label) deleted.")
                     #endif
                 }
             }
         } message: {
             if let sessionToDelete {
-                Text("La séance du \(formatSessionDate(sessionToDelete.completedAt)) sera retirée des statistiques.")
+                Text("The session from \(formatSessionDate(sessionToDelete.completedAt)) will be removed from statistics.")
             } else {
-                Text("Elle sera retirée des statistiques.")
+                Text("It will be removed from statistics.")
             }
         }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            EoleSectionHeader("Repères")
+            EoleSectionHeader("Milestones")
             periodControl
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -127,13 +133,13 @@ public struct StatsView: View {
     private var periodControl: some View {
         EoleGlassContainer(spacing: 6) {
             HStack(spacing: 6) {
-                periodButton(7, title: "7 jours")
-                periodButton(30, title: "30 jours")
+                periodButton(7, title: "7 days")
+                periodButton(30, title: "30 days")
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Période des graphiques")
-        .accessibilityValue(days == 7 ? "7 jours" : "30 jours")
+        .accessibilityLabel("Chart period")
+        .accessibilityValue(days == 7 ? "7 days" : "30 days")
     }
 
     private func periodButton(_ value: Int, title: String) -> some View {
@@ -162,21 +168,21 @@ public struct StatsView: View {
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Rétention moyenne")
+                EoleSectionHeader("Average retention")
                 HStack(alignment: .lastTextBaseline, spacing: 8) {
                     Text(formatDuration(stats.averageRetention))
                         .font(.system(.largeTitle, design: .rounded).weight(.semibold))
                         .monospacedDigit()
                         .foregroundStyle(Color.eoleForeground)
                         .minimumScaleFactor(0.72)
-                        .accessibilityLabel("Rétention moyenne")
+                        .accessibilityLabel("Average retention")
                         .accessibilityValue(formatDuration(stats.averageRetention))
-                    Text("par tour")
+                    Text("per round")
                         .font(.subheadline)
                         .foregroundStyle(Color.eoleMuted)
                 }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Record : \(formatDuration(Double(stats.maxRetention)))")
+                    Text("Record: \(formatDuration(Double(stats.maxRetention)))")
                         .font(.subheadline)
                         .foregroundStyle(Color.eoleMuted)
                     if let progress {
@@ -197,26 +203,26 @@ public struct StatsView: View {
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 12) {
                 EoleMetricTile(
-                    label: "Séances",
+                    label: "Sessions",
                     value: "\(stats.sessionCount)",
-                    detail: stats.currentStreak > 0 ? "Série : \(stats.currentStreak) j" : "Aucune série en cours"
+                    detail: stats.currentStreak > 0 ? "Streak: \(stats.currentStreak)d" : "No current streak"
                 )
                 EoleMetricTile(
-                    label: "Tours",
+                    label: "Rounds",
                     value: "\(stats.totalRounds)",
-                    detail: "Ø \(oneDecimal(stats.averageRounds)) / séance"
+                    detail: "Avg \(oneDecimal(stats.averageRounds)) / session"
                 )
             }
             HStack(alignment: .top, spacing: 12) {
                 EoleMetricTile(
-                    label: "Temps en rétention",
+                    label: "Time in retention",
                     value: formatDuration(Double(retentionTotal)),
-                    detail: "Sur \(formatDuration(stats.totalPracticeSeconds)) total"
+                    detail: "Of \(formatDuration(stats.totalPracticeSeconds)) total"
                 )
                 EoleMetricTile(
-                    label: "Respirations",
+                    label: "Breaths",
                     value: "\(breathsTotal)",
-                    detail: topPaceLabel(sessions).map { "Cadence \($0)" } ?? "Cadence variée"
+                    detail: topPaceLabel(sessions).map { "Pace: \($0)" } ?? "Mixed paces"
                 )
             }
         }
@@ -231,9 +237,9 @@ public struct StatsView: View {
                     .frame(width: 52, height: 52)
                     .background(Color.eoleSurfaceSoft, in: Circle())
                     .accessibilityHidden(true)
-                EoleSectionHeader("Ta première séance t’attend", subtitle: "Lance une pratique pour voir apparaître tes repères ici.")
+                EoleSectionHeader("Your first session awaits", subtitle: "Start a practice to see your milestones here.")
                 // Secondaire comme sur l'accueil : une seule hiérarchie.
-                Button("Préparer une séance", action: onPrepare)
+                Button("Prepare a session", action: onPrepare)
                     .buttonStyle(.bordered)
                     .tint(Color.eolePrimary)
                     .controlSize(.large)
@@ -289,31 +295,31 @@ public struct StatsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Rétention totale par jour")
+                        Text("Total retention per day")
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(Color.eoleForeground)
 
                         if averageTotal > 0 {
                             // Rappel discret : la valeur exacte vit sur
                             // l'annotation du RuleMark, pas de doublon.
-                            Text("Moyenne \(formatClockDuration(averageTotal))")
+                            Text("Average \(formatClockDuration(averageTotal))")
                                 .font(.caption)
                                 .foregroundStyle(Color.eoleMuted)
                                 .contentTransition(.opacity)
                         } else if values.isEmpty {
                             // Séances existantes mais hors période : le chart
                             // fantôme seul ne l'explique pas.
-                            Text("Aucune séance sur cette période")
+                            Text("No sessions in this period")
                                 .font(.caption)
                                 .foregroundStyle(Color.eoleMuted)
                         } else {
-                            Text("Cumul quotidien (\(days) j)")
+                            Text("Daily total (\(days)d)")
                                 .font(.caption)
                                 .foregroundStyle(Color.eoleMuted)
                         }
                     }
                     Spacer()
-                    Text("\(days) jours")
+                    Text("\(days) days")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(Color.eoleMuted)
                         .padding(.horizontal, 8)
@@ -325,8 +331,8 @@ public struct StatsView: View {
                     ForEach(series, id: \.key) { point in
                         if let total = point.totalRetention {
                             BarMark(
-                                x: .value("Jour", point.key),
-                                y: .value("Temps total", Double(total)),
+                                x: .value("Day", point.key),
+                                y: .value("Total time", Double(total)),
                                 // 8 pt mini en 30 j : sélection au doigt
                                 // possible, plus de filiforme 5 pt.
                                 width: days == 30 ? .fixed(8) : .fixed(24)
@@ -342,8 +348,8 @@ public struct StatsView: View {
                             }
                         } else {
                             BarMark(
-                                x: .value("Jour", point.key),
-                                y: .value("Temps total", max(top * 0.025, 4)),
+                                x: .value("Day", point.key),
+                                y: .value("Total time", max(top * 0.025, 4)),
                                 width: days == 30 ? .fixed(8) : .fixed(12)
                             )
                             .foregroundStyle(Color.eoleBorder.opacity(0.35))
@@ -352,7 +358,7 @@ public struct StatsView: View {
                     }
 
                     if averageTotal > 0 {
-                        RuleMark(y: .value("Moyenne", averageTotal))
+                        RuleMark(y: .value("Average", averageTotal))
                             .foregroundStyle(Color.eoleSecondary)
                             .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                             .annotation(position: .top, alignment: .trailing) {
@@ -370,7 +376,7 @@ public struct StatsView: View {
 
                     if let key = selectedDay,
                        let point = series.first(where: { $0.key == key }) {
-                        RuleMark(x: .value("Jour sélectionné", key))
+                        RuleMark(x: .value("Selected day", key))
                             .foregroundStyle(Color.eoleForeground.opacity(0.5))
                             .lineStyle(StrokeStyle(lineWidth: 1))
                             .annotation(position: .top, alignment: .center) {
@@ -414,14 +420,14 @@ public struct StatsView: View {
                         }
                     }
                 }
-                .frame(height: 190)
+                .frame(height: verticalSizeClass == .compact ? 130 : 190)
                 .opacity((hasAppeared || reduceMotion) ? 1 : 0)
                 .offset(y: (hasAppeared || reduceMotion) ? 0 : 10)
                 .contentTransition(.opacity)
                 .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.chartReveal), value: hasAppeared)
                 .animation(reduceMotion ? nil : .eoleCalm(duration: EoleMotion.controlTransition), value: days)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Temps de rétention total par jour sur \(days) jours")
+                .accessibilityLabel("Total retention time per day over \(days) days")
                 .accessibilityValue(Text(chartAccessibilityValue(series: series, averageTotal: averageTotal)))
             }
         }
@@ -432,7 +438,7 @@ public struct StatsView: View {
 
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
-                EoleSectionHeader("Records par tour", subtitle: "Moyenne et record selon le tour")
+                EoleSectionHeader("Records by round", subtitle: "Average and best by round")
 
                 VStack(spacing: 12) {
                     ForEach(Array(roundStats.enumerated()), id: \.element.id) { index, roundStat in
@@ -442,7 +448,7 @@ public struct StatsView: View {
                                     Text("R\(roundStat.roundIndex)")
                                         .font(.caption.weight(.bold))
                                         .foregroundStyle(Color.eolePrimary)
-                                        .frame(width: 30, height: 22)
+                                        .frame(minWidth: 30, minHeight: 22)
                                         .background(Color.eoleAccent.opacity(0.6), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                                         .overlay {
                                             RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -463,9 +469,9 @@ public struct StatsView: View {
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.85)
                                         .padding(.trailing, 4)
-                                        .accessibilityLabel("\(enHausse ? "En hausse" : "En baisse") de \(formatDuration(abs(diff))) par rapport au tour précédent")
+                                        .accessibilityLabel("\(enHausse ? "Up" : "Down") \(formatDuration(abs(diff))) vs previous round")
                                 }
-                                Text("Record : \(formatDuration(Double(roundStat.maxSeconds)))")
+                                Text("Record: \(formatDuration(Double(roundStat.maxSeconds)))")
                                     .font(.caption2)
                                     .foregroundStyle(Color.eoleMuted)
                                     .lineLimit(1)
@@ -516,13 +522,13 @@ public struct StatsView: View {
         return EolePanel {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    EoleSectionHeader("7 derniers jours")
+                    EoleSectionHeader("Last 7 days")
                     Spacer()
                     if stats.currentStreak > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: "drop.fill")
                                 .font(.caption.weight(.semibold))
-                            Text("Série : \(stats.currentStreak) j")
+                            Text("Streak: \(stats.currentStreak)d")
                                 .font(.caption.weight(.bold))
                         }
                         .foregroundStyle(Color.eolePrimary)
@@ -545,6 +551,8 @@ public struct StatsView: View {
                             Text(dayLabel)
                                 .font(.caption2.weight(isToday ? .bold : .medium))
                                 .foregroundStyle(isToday ? Color.eolePrimary : Color.eoleMuted)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
 
                             ZStack {
                                 Circle()
@@ -576,8 +584,11 @@ public struct StatsView: View {
                     }
                 }
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Sept derniers jours")
+                .accessibilityLabel("Last 7 days")
                 .accessibilityValue(Text(weekDotsAccessibility(active: active, days: weekDays, calendar: calendar)))
+                Text("Streak counted in local days. Travel across time zones may break it.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
             }
         }
     }
@@ -592,13 +603,13 @@ public struct StatsView: View {
 
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 8) {
-                EoleSectionHeader("Dernières séances")
+                EoleSectionHeader("Recent sessions")
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                     .layoutPriority(1)
                 Spacer()
                 if allSessions.count > 8 {
-                    Button(showAllHistory ? "Voir moins" : "Voir tout") {
+                    Button(showAllHistory ? "Show less" : "Show all") {
                         if reduceMotion {
                             showAllHistory.toggle()
                         } else {
@@ -622,6 +633,11 @@ public struct StatsView: View {
                     }
                 }
             }
+            if store.rejectedCount > 0 {
+                Text("\(store.rejectedCount) session(s) skipped: unreadable data.")
+                    .font(.footnote)
+                    .foregroundStyle(Color.eoleMuted)
+            }
         }
     }
 
@@ -631,10 +647,10 @@ public struct StatsView: View {
                 Text(formatSessionDate(session.completedAt))
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.eoleForeground)
-                Text("\(session.rounds.count) / \(session.plannedRounds) tours · \(formatSessionDuration(session))")
+                Text("\(session.rounds.count) / \(session.plannedRounds) rounds · \(formatSessionDuration(session))")
                     .font(.caption)
                     .foregroundStyle(Color.eoleMuted)
-                Text("Rétentions : \(retentionSummary(session))")
+                Text("Retentions: \(retentionSummary(session))")
                     .font(.caption)
                     .foregroundStyle(Color.eoleMuted)
                     .lineLimit(3)
@@ -649,30 +665,35 @@ public struct StatsView: View {
                     .contentShape(Rectangle())
             }
             .foregroundStyle(Color.eoleMuted)
-            .accessibilityLabel("Supprimer la séance du \(formatSessionDate(session.completedAt))")
+            .accessibilityLabel("Delete the session from \(formatSessionDate(session.completedAt))")
         }
         .accessibilityElement(children: .contain)
     }
 
     private var exportAction: some View {
-        ShareLink(
-            item: SessionsCSVExport(csv: cachedCSV),
-            preview: SharePreview("Historique Eole")
-        ) {
-            Label("Exporter l’historique CSV", systemImage: "square.and.arrow.up")
-                .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Color.eolePrimary)
-        .accessibilityHint("Ouvre les options de partage de l’historique")
-        .onAppear { cachedCSV = buildSessionsCsv(store.sessions) }
-        .onChange(of: store.sessions.count) { _, _ in
-            cachedCSV = buildSessionsCsv(store.sessions)
+        VStack(alignment: .leading, spacing: 8) {
+            ShareLink(
+                item: SessionsCSVExport(csv: cachedCSV),
+                preview: SharePreview("Eole history")
+            ) {
+                Label("Export history as CSV", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Color.eolePrimary)
+            .accessibilityHint("Opens history sharing options")
+            .onAppear { cachedCSV = buildSessionsCsv(store.sessions) }
+            .onChange(of: store.sessions) { _, _ in
+                cachedCSV = buildSessionsCsv(store.sessions)
+            }
+            Text("This file contains your full detailed history. Only share it with someone you trust.")
+                .font(.footnote)
+                .foregroundStyle(Color.eoleMuted)
         }
     }
 
     private func oneDecimal(_ value: Double) -> String {
-        String(format: "%.1f", value).replacingOccurrences(of: ".", with: ",")
+        String(format: "%.1f", value)
     }
 
     private func activeDayKeys(last days: Int) -> Set<String> {
@@ -719,7 +740,7 @@ public struct StatsView: View {
         let delta = Int((currentAvg - previousAvg).rounded())
         guard delta != 0 else { return nil }
         let sign = delta > 0 ? "+" : "−"
-        return ("\(sign)\(formatDuration(Double(abs(delta)))) vs période précédente", delta > 0)
+        return ("\(sign)\(formatDuration(Double(abs(delta)))) vs previous period", delta > 0)
     }
 
     private func topPaceLabel(_ sessions: [BreathSession]) -> String? {
@@ -729,9 +750,9 @@ public struct StatsView: View {
         }
         guard let top = counts.max(by: { $0.value < $1.value })?.key else { return nil }
         switch top {
-        case .slow: return "Lente"
-        case .normal: return "Normale"
-        case .fast: return "Rapide"
+        case .slow: return "Slow"
+        case .normal: return "Normal"
+        case .fast: return "Fast"
         }
     }
 
@@ -746,7 +767,7 @@ public struct StatsView: View {
 
     private func formatSessionDuration(_ session: BreathSession) -> String {
         guard let start = parseDate(session.startedAt), let end = parseDate(session.completedAt) else {
-            return "durée inconnue"
+            return "unknown length"
         }
         return formatDuration(max(0, end.timeIntervalSince(start)))
     }
@@ -754,9 +775,9 @@ public struct StatsView: View {
     /// Détail du jour tapé sur le graphique, avec unités explicites.
     private func selectedDayDetail(_ point: DailyPoint) -> String {
         if let value = point.totalRetention {
-            return "\(point.label) : \(formatClockDuration(value))"
+            return "\(point.label): \(formatClockDuration(value))"
         }
-        return "\(point.label) : aucune séance"
+        return "\(point.label): no session"
     }
 
     /// Résumé VoiceOver : total, moyenne, max — pas l'énumération verbeuse
@@ -766,9 +787,9 @@ public struct StatsView: View {
         let total = values.reduce(0, +)
         let maxValue = values.max() ?? 0
         var parts = [
-            "Total : \(formatDuration(Double(total)))",
-            "Moyenne : \(formatClockDuration(averageTotal))",
-            "Max : \(formatDuration(Double(maxValue)))",
+            "Total: \(formatDuration(Double(total)))",
+            "Average: \(formatClockDuration(averageTotal))",
+            "Max: \(formatDuration(Double(maxValue)))",
         ]
         if let key = selectedDay,
            let point = series.first(where: { $0.key == key }) {
@@ -780,8 +801,8 @@ public struct StatsView: View {
     private func weekDotsAccessibility(active: Set<String>, days: [Date], calendar: Calendar) -> String {
         let formatter = Self.shortDayFormatter
         return days.map { date in
-            let mark = active.contains(localDateKey(date, calendar: calendar)) ? "pratiqué" : "repos"
-            return "\(formatter.string(from: date)) : \(mark)"
+            let mark = active.contains(localDateKey(date, calendar: calendar)) ? "practiced" : "rest"
+            return "\(formatter.string(from: date)): \(mark)"
         }.joined(separator: "; ")
     }
 }
@@ -791,10 +812,17 @@ private struct SessionsCSVExport: Transferable {
 
     static var transferRepresentation: some TransferRepresentation {
         FileRepresentation(exportedContentType: .commaSeparatedText) { export in
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
+            // Date lisible en préfixe (« où est mon fichier ? ») + UUID court
+            // contre les collisions dans `temporaryDirectory` (purgé par l'OS).
+            let day: String = {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "en_US_POSIX")
+                formatter.dateFormat = "yyyy-MM-dd"
+                return formatter.string(from: Date())
+            }()
+            let short = String(UUID().uuidString.prefix(8)).lowercased()
             let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("eole-historique-\(formatter.string(from: Date())).csv")
+                .appendingPathComponent("eole-\(day)-\(short).csv")
             try export.csv.write(to: url, atomically: true, encoding: .utf8)
             return SentTransferredFile(url)
         }

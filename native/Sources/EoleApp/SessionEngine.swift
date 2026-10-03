@@ -26,14 +26,38 @@ public final class SessionEngine: ObservableObject {
     @Published public private(set) var recoveryCountdown = 15
     @Published public private(set) var results: [RoundResult] = []
     @Published public private(set) var errorMessage: String?
+    /// Avertissement audio non bloquant (ex. ambiance indisponible) : la
+    /// séance continue en visuel au lieu de rester silencieuse sans message.
+    @Published public private(set) var audioWarning: String?
+    /// Arrêt avant tout tour terminé : explicite au lieu d'une disparition
+    /// silencieuse (« ma séance n'a pas été enregistrée »).
+    @Published public private(set) var wasTooShort = false
+    /// Rétention affichée cappée à `maxRetentionSeconds` : l'historique ne
+    /// retient qu'1 h, on l'affiche avec un « + » au lieu de geler sans signe.
+    @Published public private(set) var retentionCapped = false
+    /// Au moins une rétention de la séance a dépassé le cap : footnote du récap.
+    @Published public private(set) var didCapRetention = false
+    /// Mise en arrière-plan pendant les phases respiratoires (non ancrées sur
+    /// `Date` contrairement à la rétention) : le rythme a pu dériver.
+    @Published public private(set) var backgroundWarning: String?
 
     public let config: SessionConfig
     public let audio: EoleAudioEngine
     public let haptics: EoleHaptics
     public let sessionId = UUID().uuidString
 
+    /// Plafond de validation (`isValidSession` : 1...3600 s). Au-delà, la
+    /// sauvegarde échouerait et la séance serait perdue : on cappe.
+    public static let maxRetentionSeconds = 3600
+
+    public static func cappedRetention(_ seconds: Int) -> Int {
+        min(max(1, seconds), maxRetentionSeconds)
+    }
+
+    /// Figée à `persist()` : le récap ne doit pas dériver si la vue re-render.
+    private var frozenTotalDuration: Double?
     public var totalDurationSeconds: Double {
-        max(1, Date().timeIntervalSince(startedAt))
+        frozenTotalDuration ?? max(1, Date().timeIntervalSince(startedAt))
     }
 
     /// Durées de récupération explicites, partagées avec les visuels.
@@ -42,13 +66,15 @@ public final class SessionEngine: ObservableObject {
     public static let recoveryExhaleSeconds: Double = 2
     public static let recoveryHoldSeconds: Int = 15
 
-    public var onPersist: ((BreathSession, Bool) -> Void)?
+    public var onPersist: ((BreathSession) -> Void)?
 
     private var task: Task<Void, Never>?
     private var audioUnlockTask: Task<Void, Never>?
     private var retentionStart: Date?
     private var retentionContinuation: CheckedContinuation<Void, Never>?
     private var lastRetentionMinute = 0
+    private var lastEndRetentionAt = Date.distantPast
+    private var skipHoldRequested = false
     private var displayTimer: Timer?
     private let startedAt = Date()
     private var hasStarted = false
@@ -70,6 +96,26 @@ public final class SessionEngine: ObservableObject {
     public func start() {
         guard !hasStarted, phase == .ready else { return }
         hasStarted = true
+        audioWarning = nil
+        backgroundWarning = nil
+        audio.onInterruptionBegan = { [weak self] in
+            guard let self else { return }
+            // Pas d'arrêt automatique (perte d'effort) : on signale, et si
+            // c'est en pleine rétention l'utilisateur arbitre au retour.
+            if self.phase == .retention {
+                self.audioWarning = "Interrupted (call, headphones…): retention continued without guidance."
+            } else {
+                self.audioWarning = "Audio interrupted: resume when you're ready."
+            }
+        }
+        audio.onBreathGuideFailed = { [weak self] in
+            guard let self else { return }
+            // Premier échec seul : le guide manque pour toute la séance
+            // (assets préparés une fois au déverrouillage).
+            if self.audioWarning == nil {
+                self.audioWarning = "Breath guides unavailable: follow the visual."
+            }
+        }
         task = Task { @MainActor [weak self] in
             guard let self, !Task.isCancelled, !self.hasPersisted else { return }
             let soundSettings = AppDefaults.shared.soundSettings
@@ -79,7 +125,10 @@ public final class SessionEngine: ObservableObject {
                 guard let self, !Task.isCancelled, !self.hasPersisted else { return }
                 await self.audio.unlock(pace: self.config.pace)
                 if !Task.isCancelled, !self.hasPersisted {
-                    self.audio.startAmbient(track: self.audio.musicTrack)
+                    let started = self.audio.startAmbient(track: self.audio.musicTrack)
+                    if !started, self.audio.musicVolume > 0 {
+                        self.audioWarning = "Soundscape unavailable: visual-only session."
+                    }
                 }
             }
             self.haptics.prepare()
@@ -87,22 +136,66 @@ public final class SessionEngine: ObservableObject {
         }
     }
 
+    private func noteCappedRetention(rawSeconds: Int) {
+        retentionCapped = rawSeconds > Self.maxRetentionSeconds
+        if retentionCapped { didCapRetention = true }
+        retentionSeconds = Self.cappedRetention(rawSeconds)
+    }
+
     /// Recalcule la rétention au retour au premier plan (Timer suspendu en fond).
     public func refreshRetentionDisplay() {
         guard phase == .retention, let start = retentionStart else { return }
-        retentionSeconds = Int(Date().timeIntervalSince(start))
+        noteCappedRetention(rawSeconds: Int(Date().timeIntervalSince(start)))
+        restartDisplayTimerIfNeeded()
+    }
+
+    /// Appelé à la mise en arrière-plan pendant les phases respiratoires :
+    /// `Task.sleep` est suspendu par l'OS, le rythme affiché/joué dérive.
+    /// La rétention, elle, est ancrée sur `Date` et n'a pas besoin d'alerte.
+    public func noteBackgrounded() {
+        switch phase {
+        case .countdown, .inhale, .exhale, .recoveryInhale, .recoveryHold, .recoveryExhale:
+            backgroundWarning = "Moved to background: rhythm may have drifted, ease back in."
+        default:
+            break
+        }
+    }
+
+    /// Coupe le tick 0,5 s hors premier plan : avec `UIBackgroundModes=audio`
+    /// l'app reste vivante, inutile de réveiller le CPU pour un affichage
+    /// invisible — l'ancrage `Date` couvre le retour.
+    public func suspendDisplayTimer() {
+        displayTimer?.invalidate()
+        displayTimer = nil
+    }
+
+    private func restartDisplayTimerIfNeeded() {
+        guard phase == .retention, displayTimer == nil else { return }
+        startDisplayTimer()
     }
 
     /// Fin de rétention via le double-toucher « Double-touchez pour terminer ».
     public func endRetention() {
         guard phase == .retention else { return }
+        // Débounce 300 ms : double-tap + bouton + action VoiceOver peuvent
+        // arriver ensemble et rejoueraient le signal sonore deux fois.
+        let now = Date()
+        guard now.timeIntervalSince(lastEndRetentionAt) > 0.3 else { return }
+        lastEndRetentionAt = now
         if let start = retentionStart {
-            retentionSeconds = Int(Date().timeIntervalSince(start))
+            noteCappedRetention(rawSeconds: Int(Date().timeIntervalSince(start)))
         }
         audio.playCue(frequency: 620)
         haptics.tap()
         retentionContinuation?.resume()
         retentionContinuation = nil
+    }
+
+    /// Passe le maintien de 15 s (récupération poumons pleins) vers l'expire.
+    /// Les 15 s restent la valeur proposée, l'utilisateur pressé ne subit pas.
+    public func skipRecoveryHold() {
+        guard phase == .recoveryHold else { return }
+        skipHoldRequested = true
     }
 
     public func stop() {
@@ -111,7 +204,7 @@ public final class SessionEngine: ObservableObject {
         // on capture la rétention accomplie pour ne pas perdre l'effort de l'utilisateur.
         if phase == .retention {
             if let start = retentionStart {
-                retentionSeconds = max(1, Int(Date().timeIntervalSince(start)))
+                noteCappedRetention(rawSeconds: Int(Date().timeIntervalSince(start)))
             }
             recordCurrentRoundResultIfNeeded()
         } else if phase == .recoveryInhale || phase == .recoveryHold || phase == .recoveryExhale {
@@ -133,12 +226,20 @@ public final class SessionEngine: ObservableObject {
         results.append(RoundResult(
             roundIndex: round,
             breathsCompleted: config.breathsPerRound,
-            retentionSeconds: max(1, retentionSeconds)
+            retentionSeconds: Self.cappedRetention(retentionSeconds)
         ))
     }
 
     public func discard() {
         onPersist = nil
+        audio.onInterruptionBegan = nil
+        audio.onBreathGuideFailed = nil
+        if hasPersisted, pendingSession != nil {
+            // Persist() a déjà invoqué onPersist de façon synchrone avant ce
+            // discard (tout est @MainActor) : rien n'est perdu, le récap
+            // d'erreur éventuel part avec la vue. Tracé pour le diagnostic.
+            eoleLog.warning("Séance fermée avec un enregistrement en attente.")
+        }
         guard !hasPersisted else {
             audio.release()
             haptics.release()
@@ -157,10 +258,13 @@ public final class SessionEngine: ObservableObject {
     // MARK: - Séquence
 
     private func run() async {
-        // Garde anti-crash : SessionConfig est public, un rounds/breaths à 0
-        // ferait lever 1...0 en Release. On persiste vide et on laisse
-        // l'auto-fermeture du récap vide prendre le relais.
-        guard config.rounds >= 1, config.breathsPerRound >= 1 else {
+        // Garde anti-boucle infinie : SessionConfig est public, un appel
+        // direct avec rounds/breaths hors bornes ferait `for 1...Int.max`.
+        // Mêmes bornes que `isValidSession`, via `SessionLimits`.
+        guard SessionLimits.rounds.contains(config.rounds),
+              SessionLimits.breathsPerRound.contains(config.breathsPerRound)
+        else {
+            wasTooShort = true
             persist(status: .stopped)
             return
         }
@@ -188,8 +292,15 @@ public final class SessionEngine: ObservableObject {
         for currentRound in 1...config.rounds {
             guard !Task.isCancelled else { return }
             round = currentRound
+            // Tour suivant entamé = utilisateur présent : l'alerte de dérive
+            // du tour précédent n'a plus lieu d'être.
+            backgroundWarning = nil
             if currentRound > 1 {
-                audio.resumeAmbient()
+                // Reprise d'ambiance vérifiée : un décrochage inter-round
+                // n'est plus silencieux (bannière unique, premier échec seul).
+                if !audio.resumeAmbient(), audioWarning == nil, audio.musicVolume > 0 {
+                    audioWarning = "Soundscape interrupted: finishing visual-only."
+                }
             }
 
             for currentBreath in 1...config.breathsPerRound {
@@ -208,6 +319,9 @@ public final class SessionEngine: ObservableObject {
             // Rétention poumons vides, sans limite, ancrée sur Date.
             phase = .retention
             retentionSeconds = 0
+            retentionCapped = false
+            // La rétention est ancrée sur Date : exacte même après un fond.
+            backgroundWarning = nil
             lastRetentionMinute = 0
             retentionStart = Date()
             audio.playDing()
@@ -228,14 +342,19 @@ public final class SessionEngine: ObservableObject {
             guard !Task.isCancelled else { return }
             displayTimer?.invalidate()
 
-            // Récupération : pause de la musique d'ambiance pendant les 15 s de maintien.
-            audio.pauseAmbient()
+            // Ambiance constante : pas de pause pendant la récupération.
+            // Le dong de fin résonne (double nœud, pas de coupure) pendant
+            // que le guide d'inspiration démarre en fondu doux (0,35 s).
+            // Petite respiration de 0,45 s pour un fondu apaisé, sans mélange brutal.
+            guard await sleep(seconds: 0.45) else { return }
             phase = .recoveryInhale
             audio.playBreath(inhale: true, duration: Self.recoveryInhaleSeconds)
             guard await sleep(seconds: Self.recoveryInhaleSeconds) else { return }
             phase = .recoveryHold
+            skipHoldRequested = false
             for remaining in stride(from: Self.recoveryHoldSeconds, through: 1, by: -1) {
                 guard !Task.isCancelled else { return }
+                if skipHoldRequested { break }
                 recoveryCountdown = remaining
                 if remaining <= 3 {
                     audio.playSoftDing()
@@ -243,16 +362,21 @@ public final class SessionEngine: ObservableObject {
                 }
                 guard await sleep(seconds: 1) else { return }
             }
+            skipHoldRequested = false
             phase = .recoveryExhale
+            // Fondu doux : le cue 540 résonne 0,3 s avant que l'expire
+            // ne démarre lui-même en fondu (playBreath 0,35 s). Pas de
+            // démarrage simultané brutal.
             audio.playCue(frequency: 540)
             haptics.tap()
+            guard await sleep(seconds: 0.3) else { return }
             audio.playBreath(inhale: false, duration: Self.recoveryExhaleSeconds)
             guard await sleep(seconds: Self.recoveryExhaleSeconds) else { return }
 
             results.append(RoundResult(
                 roundIndex: currentRound,
                 breathsCompleted: config.breathsPerRound,
-                retentionSeconds: max(1, retentionSeconds)
+                retentionSeconds: Self.cappedRetention(retentionSeconds)
             ))
 
             if currentRound < config.rounds {
@@ -272,7 +396,13 @@ public final class SessionEngine: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.phase == .retention, let start = self.retentionStart else { return }
                 let elapsed = Date().timeIntervalSince(start)
-                let displayedSeconds = Int(elapsed)
+                let raw = Int(elapsed)
+                let over = raw > Self.maxRetentionSeconds
+                if over, !self.didCapRetention {
+                    self.didCapRetention = true
+                }
+                self.retentionCapped = over
+                let displayedSeconds = Self.cappedRetention(raw)
                 if displayedSeconds != self.retentionSeconds {
                     self.retentionSeconds = displayedSeconds
                 }
@@ -294,6 +424,7 @@ public final class SessionEngine: ObservableObject {
         audioUnlockTask = nil
         displayTimer?.invalidate()
         displayTimer = nil
+        frozenTotalDuration = max(1, Date().timeIntervalSince(startedAt))
         let formatter = Self.isoFormatter
         let session = BreathSession(
             id: sessionId,
@@ -306,36 +437,52 @@ public final class SessionEngine: ObservableObject {
             rounds: results
         )
         if results.isEmpty {
+            // Séance trop courte : pas de dong final, simple fondu.
+            // release() différé à discard() (disparition de la vue) pour
+            // éviter toute coupure sèche — l'écran final reste silencieux.
+            wasTooShort = true
             phase = .complete
-            audio.release()
-            haptics.release()
+            audio.stopAmbient(fadeSeconds: 0.85)
             return
+        }
+        if status == .completed {
+            // Séance terminée : double dong minimaliste distinct du dong
+            // de rétention, puis fondu long de l'ambiance (2 s). Le moteur
+            // reste vivant jusqu'à discard() pour laisser résonner.
+            audio.playSessionComplete()
+            haptics.ding()
+            audio.stopAmbient(fadeSeconds: 2.0)
+        } else {
+            // Arrêt volontaire : pas de jingle, simple fondu apaisé.
+            audio.stopAmbient(fadeSeconds: 0.85)
         }
         pendingSession = session
         phase = .saving
-        onPersist?(session, false)
+        onPersist?(session)
     }
 
     public func markSaved() {
         pendingSession = nil
         onPersist = nil
-        audio.release()
-        haptics.release()
+        // Pas de release ici : le double dong final + le fondu 2 s doivent
+        // résonner sur l'écran de récap. discard() libère à la fermeture.
         phase = .complete
     }
 
     public func markSaveFailed(_ message: String) {
         errorMessage = message
-        audio.release()
-        haptics.release()
+        // Même chose qu'au succès : laisser le récap sonore vivre.
         phase = .complete // Les résultats restent visibles en cas d'échec local.
     }
 
     public func retryPersist() {
-        guard let pendingSession else { return }
+        guard let session = pendingSession else {
+            errorMessage = "Nothing to retry: no session pending."
+            return
+        }
         errorMessage = nil
         phase = .saving
-        onPersist?(pendingSession, false)
+        onPersist?(session)
     }
 
     private func resumeRetention() {

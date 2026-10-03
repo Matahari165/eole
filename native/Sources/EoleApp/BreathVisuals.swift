@@ -13,24 +13,26 @@ public struct BreathContoursView: View {
     /// Durée explicite (ex. récupération 2 s) prioritaire sur le pace.
     /// À nil, le visuel au repos et le rythme du pace sont inchangés.
     private let overrideDuration: Double?
+    /// Diamètre du visuel : 320 par défaut (tous les iPhones iOS 26+ font
+    /// au moins 375 pt de large), réduit en hauteur compacte / paysage.
+    private let side: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Fermetures progressives du contour : l'anneau central reste à 62 %
     /// en exhale (pas de pâté central), l'externe reste plein.
     private static let closedScales: [CGFloat] = [0.62, 0.64, 0.67, 0.70, 0.74, 0.79, 0.86, 1.0]
 
-    public init(motion: MotionPhase, pace: Pace, overrideDuration: Double? = nil) {
+    public init(motion: MotionPhase, pace: Pace, overrideDuration: Double? = nil, side: CGFloat = 320) {
         self.motion = motion
         self.pace = pace
         self.overrideDuration = overrideDuration
+        self.side = side
     }
 
     public var body: some View {
         let timing = paceTiming(for: pace)
         let duration = overrideDuration ?? (motion == .inhale ? timing.inhaleSeconds : timing.exhaleSeconds)
-        // Taille figée 320 : le parent cadre toujours en 320×320, pas de
-        // mesure layout à chaque souffle via GeometryReader.
-        let side: CGFloat = 320
+        let side = self.side
         return ZStack {
             ForEach(0..<8, id: \.self) { index in
                 let inset = side * CGFloat(index) * 0.07

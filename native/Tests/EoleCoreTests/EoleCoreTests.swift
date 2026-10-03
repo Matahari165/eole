@@ -236,7 +236,7 @@ final class EoleCoreTests: XCTestCase {
 
         let csv = buildSessionsCsv([session, emptySession])
 
-        XCTAssertTrue(csv.hasPrefix("\u{FEFF}session_id;statut;"))
+        XCTAssertTrue(csv.hasPrefix("\u{FEFF}session_id;status;"))
         XCTAssertTrue(csv.contains("\"session;\"\"quoted\"\"\";completed"))
         XCTAssertTrue(csv.contains(";1;35;62\r\n"))
         XCTAssertTrue(csv.contains(";2;35;75\r\n"))

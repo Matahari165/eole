@@ -96,6 +96,18 @@ Une notice demande de pratiquer assis ou allongé, jamais dans l’eau, au volan
 ou dans une situation où un malaise serait dangereux. Cette application ne
 remplace pas un avis médical.
 
+## Release TestFlight (~50 pilotes)
+
+1. Incrémenter `CURRENT_PROJECT_VERSION` (+1 à chaque upload, `MARKETING_VERSION`
+   inchangée) dans `ios/Eole.xcodeproj`.
+2. Choisir son équipe Apple dans Signing & Capabilities (`DEVELOPMENT_TEAM`
+   n'est pas versionné) puis Product → Archive (Release, `dwarf-with-dsym`).
+3. Organizer → Distribute App → TestFlight, avec *Include app symbols* coché ;
+   conserver le dSYM local.
+4. Sur App Store Connect → TestFlight : description bêta, e-mail feedback,
+   Beta App Review pour le premier build externe, puis groupe externe + envoi.
+5. Chaque build expire à 90 jours : prévoir le rebuild avant échéance.
+
 ## Limites connues
 
 - La cible automatisée couvre la logique métier ; l’interface, l’audio et le
