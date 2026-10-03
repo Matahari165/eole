@@ -74,6 +74,7 @@ public struct ActiveSessionView: View {
         }
         .foregroundStyle(.white)
         .navigationBarBackButtonHidden(true)
+        .interactiveDismissDisabled(engine.phase == .saving)
         .onAppear {
             let sessionEngine = engine
             sessionEngine.onPersist = { [store, weak sessionEngine] session in
