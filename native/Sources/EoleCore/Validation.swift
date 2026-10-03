@@ -36,6 +36,9 @@ public func isValidSession(_ session: BreathSession) -> Bool {
           completedAt >= startedAt
     else { return false }
     guard session.rounds.count <= SessionLimits.rounds.upperBound else { return false }
+    // Unique ranks: duplicates ([R1, R1]) would corrupt stats and records.
+    let indices = session.rounds.map(\.roundIndex)
+    guard Set(indices).count == indices.count else { return false }
     return session.rounds.allSatisfy { round in
         SessionLimits.rounds.contains(round.roundIndex)
             && SessionLimits.breathsPerRound.contains(round.breathsCompleted)

@@ -740,15 +740,6 @@ public struct ActiveSessionView: View {
 
     // MARK: - Éléments du récapitulatif de fin de séance
 
-    /// Libellé FR du rythme (le `rawValue` est un identifiant technique EN).
-    private func frenchPaceLabel(_ pace: Pace) -> String {
-        switch pace {
-        case .slow: return "Lente"
-        case .normal: return "Normale"
-        case .fast: return "Rapide"
-        }
-    }
-
     private func recordBanner(evaluation: SessionRecordEvaluation) -> some View {
         HStack(spacing: 12) {
             Image(systemName: evaluation.hasOverallRecord ? "trophy.fill" : "star.circle.fill")

@@ -3,6 +3,9 @@ import Charts
 import EoleCore
 #endif
 import SwiftUI
+#if canImport(CoreTransferable)
+import CoreTransferable
+#endif
 import UniformTypeIdentifiers
 #if os(iOS)
 import UIKit

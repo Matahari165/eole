@@ -175,6 +175,9 @@ public final class SessionStore: ObservableObject {
     /// vieux bundle, fuseau exotique) : exposé pour diagnostic au lieu
     /// d'une disparition silencieuse des stats.
     @Published public private(set) var rejectedCount: Int = 0
+    /// In-memory fallback store (disk full, corrupted base): the shown
+    /// history will not survive a restart. Exposed to diagnostics.
+    @Published public private(set) var isDegraded: Bool = false
 
     /// Nombre de séances d'exemple encore présentes (IDs résolus à l'init).
     public var demoSessionsCount: Int {
@@ -185,6 +188,9 @@ public final class SessionStore: ObservableObject {
     // importé récupèrent les ajouts ultérieurs du bundle (dédupliqués par
     // UUID). En Release, aucun import n'a lieu (prod sans exemples).
     private static let importMarkerKey = "eole.initial-sessions.v2"
+    /// The user dismissed the samples: a future marker bump (v2 → v3) must
+    /// not resurrect them. Independent of the marker version.
+    private static let demosDismissedKey = "eole.demos-dismissed.v1"
     private let modelContainer: ModelContainer
     private let modelContext: ModelContext
     /// IDs d'exemple résolus une fois par store (bundle immuable au runtime) :
@@ -203,6 +209,7 @@ public final class SessionStore: ObservableObject {
         // Base mémoire de secours : l'app démarre avec un historique vide
         // plutôt que de crasher, et le bandeau d'erreur reste visible.
         if didFallback {
+            isDegraded = true
             presentStorageError()
         }
     }
@@ -264,6 +271,9 @@ public final class SessionStore: ObservableObject {
 
     /// Supprime uniquement les séances d'exemple du bundle initial.
     /// Les vraies séances de l'utilisateur sont conservées.
+    /// Supprime uniquement les séances d'exemple du bundle initial.
+    /// Les vraies séances de l'utilisateur sont conservées. Mémorise le
+    /// refus pour qu'un futur bump du marqueur ne les réimporte pas.
     public func deleteDemoSessions() {
         do {
             var removed = false
@@ -273,6 +283,7 @@ public final class SessionStore: ObservableObject {
             }
             guard removed else { reload(); return }
             guard saveContext() else { return }
+            UserDefaults.standard.set(true, forKey: Self.demosDismissedKey)
             reload()
         } catch {
             presentStorageError()
@@ -392,11 +403,15 @@ public final class SessionStore: ObservableObject {
             markImported()
             return
         }
+        // Samples dismissed by the user: never reimport, even after a
+        // future marker bump.
+        let dismissed = UserDefaults.standard.bool(forKey: Self.demosDismissedKey)
+        let candidates = dismissed ? [] : initial
 
         // Tolérant : déduplique par UUID, filtre les invalides. Un bundle
         // élargi (7 sessions) ou partiellement invalide n'importe que le bon.
         var seen = Set<String>()
-        let valid = initial.filter { session in
+        let valid = candidates.filter { session in
             guard isValidSession(session), seen.insert(session.id).inserted else { return false }
             return true
         }
@@ -482,8 +497,8 @@ public final class SessionStore: ObservableObject {
         storageErrorMessage = "Your local history is temporarily unavailable."
     }
 
-    /// Texte à coller au support (bouton Réglages) : versions, compteurs,
-    /// erreur éventuelle. Aucune donnée de séance détaillée dedans.
+    /// Support-paste text (Settings button): versions, counters, error if
+    /// any. No detailed session data inside.
     public func diagnosticText() -> String {
         let info = Bundle.main.infoDictionary
         let short = info?["CFBundleShortVersionString"] as? String ?? "dev"
@@ -497,26 +512,8 @@ public final class SessionStore: ObservableObject {
         return """
         Eole \(short) (\(build)) · \(system)
         Sessions: \(sessions.count) · skipped: \(rejectedCount)
+        Degraded mode: \(isDegraded ? "yes (data will not persist)" : "no")
         Error: \(storageErrorMessage ?? "none")
-        """
-    }
-
-    /// Texte à coller au support (bouton Réglages) : versions, compteurs,
-    /// erreur éventuelle. Aucune donnée de séance détaillée dedans.
-    public func diagnosticText() -> String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "dev"
-        let build = info?["CFBundleVersion"] as? String ?? "dev"
-        let system: String
-        #if os(iOS)
-        system = "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)"
-        #else
-        system = ProcessInfo.processInfo.operatingSystemVersionString
-        #endif
-        return """
-        Eole \(short) (\(build)) · \(system)
-        Séances : \(sessions.count) · ignorées : \(rejectedCount)
-        Erreur : \(storageErrorMessage ?? "aucune")
         """
     }
 }

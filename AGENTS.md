@@ -3,7 +3,7 @@
 ## Produit
 
 - Eole is a native breathing app for all iPhones supporting iOS 26 and later
-  (including iOS 27): SE to Pro Max, portrait and landscape, Dynamic Type
+  (including iOS 27): SE to Pro Max, portrait only, Dynamic Type
   up to accessibility sizes.
 - All user-facing strings (UI, accessibility, alerts, onboarding, safety
   notice, settings, stats, CSV headers, dates/numbers) MUST be written in
